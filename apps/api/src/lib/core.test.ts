@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeOutput, outputMatches, checkRules, fillTemplate, normalizeToken, stripCommentsAndStrings } from './grading.js';
+import { normalizeOutput, outputMatches, checkRules, fillTemplate, normalizeToken, stripCommentsAndStrings, choiceOrder, grade, publicExercise } from './grading.js';
 import { sm2 } from './srs.js';
 import { levelFromXp, weekKey, previousDay } from './levels.js';
 import { parseDiagnostics, explainError } from './diagnostics.js';
@@ -75,4 +75,20 @@ test('diagnostics compilateur', () => {
   assert.equal(parseDiagnostics('cpp', "main.cpp:3:5: error: 'x' was not declared in this scope")[0].line, 3);
   assert.equal(parseDiagnostics('java', "Main.java:4: error: ';' expected")[0].line, 4);
   assert.equal(explainError('java', '', 137)[0].title, 'Délai dépassé');
+});
+
+test('QCM : choix mélangés et correction cohérente', async () => {
+  const ex = {
+    id: 'demo-qcm', kind: 'practice', type: 'mcq', language: 'rust', title: null, prompt: '?', difficulty: 1, level: 1, concepts: [], xp: 10, hints: [],
+    content: { choices: ['bonne', 'b', 'c', 'd'], multiple: false },
+    solution: { answer: 0, explanation: '' },
+  } as any;
+  const perm = choiceOrder(ex);
+  assert.deepEqual([...perm].sort(), [0, 1, 2, 3]);
+  const affiches = (publicExercise(ex) as any).choices as string[];
+  const position = affiches.indexOf('bonne');
+  assert.notEqual(position, 0, 'la bonne réponse ne reste pas en tête');
+  assert.equal((await grade(ex, { choice: position }, 'rust')).correct, true);
+  assert.equal((await grade(ex, { choice: (position + 1) % 4 }, 'rust')).correct, false);
+  assert.equal((await grade(ex, { choice: position }, 'rust')).reveal?.answer, position);
 });

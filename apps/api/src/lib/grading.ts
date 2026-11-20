@@ -144,15 +144,19 @@ export async function grade(ex: Exercise, answer: Answer, language: string): Pro
     case 'mcq': {
       const expected = sol.answer as number | number[];
       if (answer.choice === undefined) throw badRequest('Choisis une réponse');
-      const want = [expected].flat().sort();
-      const got = [answer.choice].flat().sort();
+      // Les choix sont présentés mélangés : on ramène les positions affichées aux indices d'origine.
+      const perm = choiceOrder(ex);
+      const byNum = (a: number, b: number) => a - b;
+      const want = [expected].flat().sort(byNum);
+      const got = [answer.choice].flat().map((p) => perm[p] ?? -1).sort(byNum);
       const correct = want.length === got.length && want.every((v, i) => v === got[i]);
+      const shown = (o: number) => perm.indexOf(o);
       return {
         correct,
         score: correct ? 100 : 0,
         feedback: correct ? 'Bonne réponse !' : 'Ce n’est pas la bonne réponse.',
         explanation,
-        reveal: { answer: expected },
+        reveal: { answer: Array.isArray(expected) ? expected.map(shown) : shown(expected) },
       };
     }
     case 'predict': {
@@ -225,7 +229,7 @@ export async function grade(ex: Exercise, answer: Answer, language: string): Pro
     case 'bugfix': {
       const parts: Record<string, boolean> = {};
       parts['ligne'] = typeof answer.line === 'number' && (sol.bugLines as number[]).includes(answer.line);
-      parts['explication'] = answer.choice === sol.answer;
+      parts['explication'] = typeof answer.choice === 'number' && choiceOrder(ex)[answer.choice] === sol.answer;
       let compile: GradeResult['compile'];
       let tests: TestReport[] | undefined;
       let help: Explanation[] | undefined;
@@ -309,6 +313,16 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
   return out;
 }
 
+/**
+ * Ordre de présentation des choix (QCM, explications des bugs) : une permutation stable,
+ * propre à chaque exercice, pour que la bonne réponse ne soit pas toujours au même endroit.
+ * La position affichée p correspond au choix d'origine perm[p].
+ */
+export function choiceOrder(ex: Exercise): number[] {
+  const n = ((ex.content as Content).choices as unknown[] | undefined)?.length ?? 0;
+  return seededShuffle(Array.from({ length: n }, (_, i) => i), `${ex.id}#choix`);
+}
+
 export function publicExercise(ex: Exercise, language?: string) {
   const c = ex.content as Content;
   const base = {
@@ -326,7 +340,7 @@ export function publicExercise(ex: Exercise, language?: string) {
   };
   switch (ex.type) {
     case 'mcq':
-      return { ...base, choices: c.choices, multiple: c.multiple, code: c.code };
+      return { ...base, choices: choiceOrder(ex).map((i) => c.choices[i]), multiple: c.multiple, code: c.code };
     case 'fill':
       return { ...base, code: c.code, blankCount: c.blankCount, compiled: c.compiled };
     case 'order': {
@@ -336,7 +350,7 @@ export function publicExercise(ex: Exercise, language?: string) {
     case 'predict':
       return { ...base, code: c.code, input: c.input };
     case 'bugfix':
-      return { ...base, code: c.code, choices: c.choices, visibleTests: c.visibleTests };
+      return { ...base, code: c.code, choices: choiceOrder(ex).map((i) => c.choices[i]), visibleTests: c.visibleTests };
     case 'code': {
       const starter = c.starters ? (c.starters[language ?? 'rust'] ?? '') : c.starter;
       return { ...base, starter, visibleTests: c.visibleTests, rules: c.rules ?? [], languages: c.starters ? Object.keys(c.starters) : undefined };
