@@ -1,0 +1,1575 @@
+# Projets — niveau expertise (1/2)
+# Chaque étape a un énoncé, des tests (dont cachés) et une solution par langage.
+- slug: application-quiz
+  level: 5
+  title: 'Application complète : plateforme de quiz'
+  summary: 'Concevoir une application complète et bien structurée : chargement de données, correction, multi-utilisateurs, classement et statistiques.'
+  description: |-
+    Tu réalises une application **complète**, de l’entrée des données aux statistiques — avec une **architecture en modules** clairement séparés, comme dans un vrai projet :
+
+    | Module | Responsabilité |
+    |---|---|
+    | modèle | les types (`Question`…) |
+    | chargement | lire et analyser l’entrée |
+    | correction | comparer une réponse à la solution |
+    | statistiques | scores, classement, indicateurs |
+
+    L’entrée commence par la définition du quiz, une question par ligne :
+
+    ```
+    Q id | énoncé | bonne réponse | points
+    ```
+
+    puis une ligne `---`, puis les réponses. Une réponse est correcte si elle est égale à la solution **sans tenir compte de la casse ni des espaces superflus** (`garbage  COLLECTOR` = `Garbage Collector`).
+  objectives:
+  - Structurer une application en modules à responsabilité unique
+  - Analyser un format de données
+  - Normaliser des chaînes pour les comparer
+  - Calculer classements et statistiques sans erreur d’arrondi
+  constraints:
+  - Pourcentages entiers arrondis à l’inférieur
+  - Comparer les taux de réussite sans nombres à virgule (produit en croix)
+  - Champs séparés par « | », espaces autour ignorés
+  languages:
+  - rust
+  - cpp
+  - java
+  steps:
+  - id: quiz-correction
+    title: Correction d’une copie
+    prompt: |-
+      Après `---`, chaque ligne est une réponse : `id | réponse`. Affiche pour chacune `id : correct (+points)`, `id : incorrect (attendu : solution)` ou `id : question inconnue`.
+
+      Puis `sans réponse : N` et `score : S/T (P%) — réussi` (si P ≥ 50) ou `— à retravailler`.
+    hints:
+    - 'Normalise : découpe sur les espaces, rejoins avec un seul espace, passe en minuscules.'
+    - 'Le pourcentage entier : score × 100 / total (division entière).'
+    starters: &id001
+      rust: |
+        use std::io::{self, BufRead};
+
+        fn main() {
+            for ligne in io::stdin().lock().lines() {
+                let ligne = ligne.unwrap();
+                // À toi de jouer !
+                let _ = ligne;
+            }
+        }
+      cpp: |
+        #include <iostream>
+        #include <string>
+        using namespace std;
+
+        int main() {
+            string ligne;
+            while (getline(cin, ligne)) {
+                // À toi de jouer !
+            }
+        }
+      java: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                    String ligne = sc.nextLine();
+                    // À toi de jouer !
+                }
+            }
+        }
+    solutions:
+      rust: |
+        use std::collections::{BTreeMap, HashSet};
+        use std::io::{self, BufRead};
+
+        // ---- modèle ----
+        struct Question {
+            id: String,
+            reponse: String,
+            points: u32,
+        }
+
+        // ---- chargement ----
+        fn champs(l: &str) -> Vec<String> {
+            l.split('|').map(|s| s.trim().to_string()).collect()
+        }
+
+        /// Lit les questions jusqu'à la ligne « --- », puis renvoie les lignes de réponses.
+        fn charger() -> (Vec<Question>, Vec<Vec<String>>) {
+            let stdin = io::stdin();
+            let mut questions = vec![];
+            let mut reponses = vec![];
+            let mut dans_reponses = false;
+            for l in stdin.lock().lines() {
+                let l = l.unwrap();
+                if l.trim().is_empty() {
+                    continue;
+                }
+                if l.trim() == "---" {
+                    dans_reponses = true;
+                } else if dans_reponses {
+                    reponses.push(champs(&l));
+                } else {
+                    let c = champs(&l);
+                    // Q id | énoncé | réponse | points
+                    questions.push(Question { id: c[0].trim_start_matches("Q ").trim().to_string(), reponse: c[2].clone(), points: c[3].parse().unwrap() });
+                }
+            }
+            (questions, reponses)
+        }
+
+        // ---- correction ----
+        fn normaliser(s: &str) -> String {
+            s.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+        }
+
+        fn correcte(q: &Question, r: &str) -> bool {
+            normaliser(&q.reponse) == normaliser(r)
+        }
+
+        fn main() {
+            let (questions, reponses) = charger();
+            let total: u32 = questions.iter().map(|q| q.points).sum();
+            let mut score = 0;
+            let mut repondues = HashSet::new();
+            for r in &reponses {
+                let Some(q) = questions.iter().find(|q| q.id == r[0]) else {
+                    println!("{} : question inconnue", r[0]);
+                    continue;
+                };
+                repondues.insert(q.id.clone());
+                if correcte(q, &r[1]) {
+                    score += q.points;
+                    println!("{} : correct (+{})", q.id, q.points);
+                } else {
+                    println!("{} : incorrect (attendu : {})", q.id, q.reponse);
+                }
+            }
+            let sans = questions.iter().filter(|q| !repondues.contains(&q.id)).count();
+            println!("sans réponse : {}", sans);
+            let pct = if total == 0 { 0 } else { score * 100 / total };
+            println!("score : {}/{} ({}%) — {}", score, total, pct, if pct >= 50 { "réussi" } else { "à retravailler" });
+            let _ = BTreeMap::<u8, u8>::new();
+        }
+      cpp: |
+        #include <algorithm>
+        #include <cctype>
+        #include <iostream>
+        #include <map>
+        #include <set>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        using namespace std;
+
+        // ---- modèle ----
+        struct Question {
+            string id, reponse;
+            unsigned points;
+        };
+
+        // ---- chargement ----
+        string rogner(const string& s) {
+            size_t a = s.find_first_not_of(" \t\r"), b = s.find_last_not_of(" \t\r");
+            return a == string::npos ? "" : s.substr(a, b - a + 1);
+        }
+
+        vector<string> champs(const string& l) {
+            vector<string> v;
+            stringstream ss(l);
+            for (string c; getline(ss, c, '|');) v.push_back(rogner(c));
+            if (!l.empty() && l.back() == '|') v.push_back("");
+            return v;
+        }
+
+        // Lit les questions jusqu'à la ligne « --- », puis les lignes de réponses.
+        void charger(vector<Question>& questions, vector<vector<string>>& reponses) {
+            bool dansReponses = false;
+            for (string l; getline(cin, l);) {
+                if (rogner(l).empty()) continue;
+                if (rogner(l) == "---") dansReponses = true;
+                else if (dansReponses) reponses.push_back(champs(l));
+                else {
+                    auto c = champs(l);  // Q id | énoncé | réponse | points
+                    questions.push_back({rogner(c[0].substr(1)), c[2], (unsigned)stoul(c[3])});
+                }
+            }
+        }
+
+        // ---- correction ----
+        string normaliser(const string& s) {
+            istringstream in(s);
+            string r, m;
+            while (in >> m) r += (r.empty() ? "" : " ") + m;
+            for (char& c : r) c = tolower((unsigned char)c);
+            return r;
+        }
+
+        bool correcte(const Question& q, const string& r) { return normaliser(q.reponse) == normaliser(r); }
+
+        int main() {
+            vector<Question> questions;
+            vector<vector<string>> reponses;
+            charger(questions, reponses);
+            unsigned total = 0, score = 0;
+            for (auto& q : questions) total += q.points;
+            set<string> repondues;
+            for (auto& r : reponses) {
+                auto it = find_if(questions.begin(), questions.end(), [&](const Question& q) { return q.id == r[0]; });
+                if (it == questions.end()) { cout << r[0] << " : question inconnue\n"; continue; }
+                repondues.insert(it->id);
+                if (correcte(*it, r[1])) { score += it->points; cout << it->id << " : correct (+" << it->points << ")\n"; }
+                else cout << it->id << " : incorrect (attendu : " << it->reponse << ")\n";
+            }
+            int sans = 0;
+            for (auto& q : questions) sans += !repondues.count(q.id);
+            cout << "sans réponse : " << sans << "\n";
+            unsigned pct = total ? score * 100 / total : 0;
+            cout << "score : " << score << "/" << total << " (" << pct << "%) — " << (pct >= 50 ? "réussi" : "à retravailler") << "\n";
+        }
+      java: |
+        import java.util.*;
+
+        public class Main {
+            // ---- modèle ----
+            record Question(String id, String reponse, int points) {}
+
+            static final List<Question> questions = new ArrayList<>();
+            static final List<String[]> reponses = new ArrayList<>();
+
+            // ---- chargement ----
+            static String[] champs(String l) {
+                String[] c = l.split("\\|", -1);
+                for (int i = 0; i < c.length; i++) c[i] = c[i].trim();
+                return c;
+            }
+
+            /** Lit les questions jusqu'à la ligne « --- », puis les lignes de réponses. */
+            static void charger() {
+                Scanner sc = new Scanner(System.in);
+                boolean dansReponses = false;
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine();
+                    if (l.isBlank()) continue;
+                    if (l.trim().equals("---")) dansReponses = true;
+                    else if (dansReponses) reponses.add(champs(l));
+                    else {
+                        String[] c = champs(l); // Q id | énoncé | réponse | points
+                        questions.add(new Question(c[0].substring(1).trim(), c[2], Integer.parseInt(c[3])));
+                    }
+                }
+            }
+
+            // ---- correction ----
+            static String normaliser(String s) { return String.join(" ", s.trim().split("\\s+")).toLowerCase(Locale.ROOT); }
+
+            static boolean correcte(Question q, String r) { return normaliser(q.reponse()).equals(normaliser(r)); }
+
+            static Optional<Question> question(String id) { return questions.stream().filter(q -> q.id().equals(id)).findFirst(); }
+
+            public static void main(String[] args) {
+                charger();
+                int total = questions.stream().mapToInt(Question::points).sum(), score = 0;
+                Set<String> repondues = new HashSet<>();
+                for (String[] r : reponses) {
+                    Optional<Question> oq = question(r[0]);
+                    if (oq.isEmpty()) { System.out.println(r[0] + " : question inconnue"); continue; }
+                    Question q = oq.get();
+                    repondues.add(q.id());
+                    if (correcte(q, r[1])) { score += q.points(); System.out.println(q.id() + " : correct (+" + q.points() + ")"); }
+                    else System.out.println(q.id() + " : incorrect (attendu : " + q.reponse() + ")");
+                }
+                System.out.println("sans réponse : " + questions.stream().filter(q -> !repondues.contains(q.id())).count());
+                int pct = total == 0 ? 0 : score * 100 / total;
+                System.out.println("score : " + score + "/" + total + " (" + pct + "%) — " + (pct >= 50 ? "réussi" : "à retravailler"));
+            }
+        }
+    tests:
+    - input: |-
+        Q q1 | Quelle commande compile un projet Rust ? | cargo build | 2
+        Q q2 | Mot-clé Java pour hériter ? | extends | 1
+        Q q3 | Opérateur C++ de résolution de portée ? | :: | 2
+        Q q4 | Nom du ramasse-miettes de Java ? | Garbage   Collector | 3
+        ---
+        q1 | Cargo  BUILD
+        q2 | implements
+        q9 | ?
+        q4 | garbage collector
+      output: |-
+        q1 : correct (+2)
+        q2 : incorrect (attendu : extends)
+        q9 : question inconnue
+        q4 : correct (+3)
+        sans réponse : 1
+        score : 5/8 (62%) — réussi
+    - input: |-
+        Q q1 | Quelle commande compile un projet Rust ? | cargo build | 2
+        Q q2 | Mot-clé Java pour hériter ? | extends | 1
+        Q q3 | Opérateur C++ de résolution de portée ? | :: | 2
+        Q q4 | Nom du ramasse-miettes de Java ? | Garbage   Collector | 3
+        ---
+        q3 | ::
+      output: |-
+        q3 : correct (+2)
+        sans réponse : 3
+        score : 2/8 (25%) — à retravailler
+      hidden: true
+    xp: 80
+  - id: quiz-plateforme
+    title: Plateforme multi-utilisateurs
+    prompt: |-
+      Les réponses deviennent `utilisateur | id | réponse`. Une deuxième réponse d’un même utilisateur à une même question est ignorée (`utilisateur / id : doublon ignoré`) ; une question inconnue → `utilisateur / id : question inconnue` (ces messages s’affichent pendant la lecture).
+
+      Ensuite :
+
+      - `== Scores ==` puis `nom : S/T` (par nom) ;
+      - `== Classement ==` puis `rang. nom (S pts)` par score décroissant puis nom ; les ex æquo **partagent le rang** (1, 1, 3) ;
+      - `== Questions ==` puis `id : R/N réussite(s) (P%)` (N = nombre de réponses reçues) ou `id : aucune réponse` ;
+      - `question la plus difficile : id` (plus faible taux de réussite ; à égalité, la première).
+    hints:
+    - Mémorise les couples (utilisateur, question) déjà vus dans un ensemble.
+    - 'Pour comparer ok₁/n₁ et ok₂/n₂ sans flottants : compare ok₁ × n₂ et ok₂ × n₁.'
+    starters: *id001
+    solutions:
+      rust: |
+        use std::collections::{BTreeMap, HashSet};
+        use std::io::{self, BufRead};
+
+        // ---- modèle ----
+        struct Question {
+            id: String,
+            reponse: String,
+            points: u32,
+        }
+
+        // ---- chargement ----
+        fn champs(l: &str) -> Vec<String> {
+            l.split('|').map(|s| s.trim().to_string()).collect()
+        }
+
+        /// Lit les questions jusqu'à la ligne « --- », puis renvoie les lignes de réponses.
+        fn charger() -> (Vec<Question>, Vec<Vec<String>>) {
+            let stdin = io::stdin();
+            let mut questions = vec![];
+            let mut reponses = vec![];
+            let mut dans_reponses = false;
+            for l in stdin.lock().lines() {
+                let l = l.unwrap();
+                if l.trim().is_empty() {
+                    continue;
+                }
+                if l.trim() == "---" {
+                    dans_reponses = true;
+                } else if dans_reponses {
+                    reponses.push(champs(&l));
+                } else {
+                    let c = champs(&l);
+                    // Q id | énoncé | réponse | points
+                    questions.push(Question { id: c[0].trim_start_matches("Q ").trim().to_string(), reponse: c[2].clone(), points: c[3].parse().unwrap() });
+                }
+            }
+            (questions, reponses)
+        }
+
+        // ---- correction ----
+        fn normaliser(s: &str) -> String {
+            s.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+        }
+
+        fn correcte(q: &Question, r: &str) -> bool {
+            normaliser(&q.reponse) == normaliser(r)
+        }
+
+        // ---- statistiques ----
+        fn main() {
+            let (questions, reponses) = charger();
+            let total: u32 = questions.iter().map(|q| q.points).sum();
+            let mut scores: BTreeMap<String, u32> = BTreeMap::new();
+            let mut deja: HashSet<(String, String)> = HashSet::new();
+            let mut stats: Vec<(u32, u32)> = vec![(0, 0); questions.len()]; // (réussites, réponses)
+            for r in &reponses {
+                let (user, id, rep) = (&r[0], &r[1], &r[2]);
+                scores.entry(user.clone()).or_insert(0);
+                let Some(i) = questions.iter().position(|q| &q.id == id) else {
+                    println!("{} / {} : question inconnue", user, id);
+                    continue;
+                };
+                if !deja.insert((user.clone(), id.clone())) {
+                    println!("{} / {} : doublon ignoré", user, id);
+                    continue;
+                }
+                stats[i].1 += 1;
+                if correcte(&questions[i], rep) {
+                    stats[i].0 += 1;
+                    *scores.get_mut(user).unwrap() += questions[i].points;
+                }
+            }
+            println!("== Scores ==");
+            for (u, s) in &scores {
+                println!("{} : {}/{}", u, s, total);
+            }
+            println!("== Classement ==");
+            let mut v: Vec<(&String, &u32)> = scores.iter().collect();
+            v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+            for (k, (u, s)) in v.iter().enumerate() {
+                // Rang « olympique » : les ex æquo partagent le même rang.
+                let rang = v.iter().position(|(_, s2)| s2 == s).unwrap() + 1;
+                let _ = k;
+                println!("{}. {} ({} pts)", rang, u, s);
+            }
+            println!("== Questions ==");
+            let mut pire: Option<(usize, u32, u32)> = None;
+            for (i, q) in questions.iter().enumerate() {
+                let (ok, n) = stats[i];
+                if n == 0 {
+                    println!("{} : aucune réponse", q.id);
+                    continue;
+                }
+                println!("{} : {}/{} réussite(s) ({}%)", q.id, ok, n, ok * 100 / n);
+                // Comparaison exacte des taux ok/n par produit en croix.
+                if pire.map_or(true, |(_, po, pn)| ok * pn < po * n) {
+                    pire = Some((i, ok, n));
+                }
+            }
+            if let Some((i, _, _)) = pire {
+                println!("question la plus difficile : {}", questions[i].id);
+            }
+        }
+      cpp: |
+        #include <algorithm>
+        #include <cctype>
+        #include <iostream>
+        #include <map>
+        #include <set>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        using namespace std;
+
+        // ---- modèle ----
+        struct Question {
+            string id, reponse;
+            unsigned points;
+        };
+
+        // ---- chargement ----
+        string rogner(const string& s) {
+            size_t a = s.find_first_not_of(" \t\r"), b = s.find_last_not_of(" \t\r");
+            return a == string::npos ? "" : s.substr(a, b - a + 1);
+        }
+
+        vector<string> champs(const string& l) {
+            vector<string> v;
+            stringstream ss(l);
+            for (string c; getline(ss, c, '|');) v.push_back(rogner(c));
+            if (!l.empty() && l.back() == '|') v.push_back("");
+            return v;
+        }
+
+        // Lit les questions jusqu'à la ligne « --- », puis les lignes de réponses.
+        void charger(vector<Question>& questions, vector<vector<string>>& reponses) {
+            bool dansReponses = false;
+            for (string l; getline(cin, l);) {
+                if (rogner(l).empty()) continue;
+                if (rogner(l) == "---") dansReponses = true;
+                else if (dansReponses) reponses.push_back(champs(l));
+                else {
+                    auto c = champs(l);  // Q id | énoncé | réponse | points
+                    questions.push_back({rogner(c[0].substr(1)), c[2], (unsigned)stoul(c[3])});
+                }
+            }
+        }
+
+        // ---- correction ----
+        string normaliser(const string& s) {
+            istringstream in(s);
+            string r, m;
+            while (in >> m) r += (r.empty() ? "" : " ") + m;
+            for (char& c : r) c = tolower((unsigned char)c);
+            return r;
+        }
+
+        bool correcte(const Question& q, const string& r) { return normaliser(q.reponse) == normaliser(r); }
+
+        // ---- statistiques ----
+        int main() {
+            vector<Question> questions;
+            vector<vector<string>> reponses;
+            charger(questions, reponses);
+            unsigned total = 0;
+            for (auto& q : questions) total += q.points;
+            map<string, unsigned> scores;
+            set<pair<string, string>> deja;
+            vector<pair<unsigned, unsigned>> stats(questions.size());  // (réussites, réponses)
+            for (auto& r : reponses) {
+                const string &user = r[0], &id = r[1], &rep = r[2];
+                scores[user];
+                auto it = find_if(questions.begin(), questions.end(), [&](const Question& q) { return q.id == id; });
+                if (it == questions.end()) { cout << user << " / " << id << " : question inconnue\n"; continue; }
+                if (!deja.insert({user, id}).second) { cout << user << " / " << id << " : doublon ignoré\n"; continue; }
+                size_t i = it - questions.begin();
+                stats[i].second++;
+                if (correcte(*it, rep)) { stats[i].first++; scores[user] += it->points; }
+            }
+            cout << "== Scores ==\n";
+            for (auto& [u, s] : scores) cout << u << " : " << s << "/" << total << "\n";
+            cout << "== Classement ==\n";
+            vector<pair<string, unsigned>> v(scores.begin(), scores.end());
+            stable_sort(v.begin(), v.end(), [](auto& a, auto& b) { return a.second > b.second; });
+            for (size_t k = 0; k < v.size(); k++) {
+                // Rang « olympique » : les ex æquo partagent le même rang.
+                size_t rang = k;
+                while (rang > 0 && v[rang - 1].second == v[k].second) rang--;
+                cout << rang + 1 << ". " << v[k].first << " (" << v[k].second << " pts)\n";
+            }
+            cout << "== Questions ==\n";
+            int pire = -1;
+            for (size_t i = 0; i < questions.size(); i++) {
+                auto [ok, n] = stats[i];
+                if (n == 0) { cout << questions[i].id << " : aucune réponse\n"; continue; }
+                cout << questions[i].id << " : " << ok << "/" << n << " réussite(s) (" << ok * 100 / n << "%)\n";
+                // Comparaison exacte des taux ok/n par produit en croix.
+                if (pire < 0 || ok * stats[pire].second < stats[pire].first * n) pire = i;
+            }
+            if (pire >= 0) cout << "question la plus difficile : " << questions[pire].id << "\n";
+        }
+      java: |
+        import java.util.*;
+
+        public class Main {
+            // ---- modèle ----
+            record Question(String id, String reponse, int points) {}
+
+            static final List<Question> questions = new ArrayList<>();
+            static final List<String[]> reponses = new ArrayList<>();
+
+            // ---- chargement ----
+            static String[] champs(String l) {
+                String[] c = l.split("\\|", -1);
+                for (int i = 0; i < c.length; i++) c[i] = c[i].trim();
+                return c;
+            }
+
+            /** Lit les questions jusqu'à la ligne « --- », puis les lignes de réponses. */
+            static void charger() {
+                Scanner sc = new Scanner(System.in);
+                boolean dansReponses = false;
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine();
+                    if (l.isBlank()) continue;
+                    if (l.trim().equals("---")) dansReponses = true;
+                    else if (dansReponses) reponses.add(champs(l));
+                    else {
+                        String[] c = champs(l); // Q id | énoncé | réponse | points
+                        questions.add(new Question(c[0].substring(1).trim(), c[2], Integer.parseInt(c[3])));
+                    }
+                }
+            }
+
+            // ---- correction ----
+            static String normaliser(String s) { return String.join(" ", s.trim().split("\\s+")).toLowerCase(Locale.ROOT); }
+
+            static boolean correcte(Question q, String r) { return normaliser(q.reponse()).equals(normaliser(r)); }
+
+            static Optional<Question> question(String id) { return questions.stream().filter(q -> q.id().equals(id)).findFirst(); }
+
+            // ---- statistiques ----
+            public static void main(String[] args) {
+                charger();
+                int total = questions.stream().mapToInt(Question::points).sum();
+                TreeMap<String, Integer> scores = new TreeMap<>();
+                Set<String> deja = new HashSet<>();
+                int[][] stats = new int[questions.size()][2]; // {réussites, réponses}
+                for (String[] r : reponses) {
+                    String user = r[0], id = r[1], rep = r[2];
+                    scores.putIfAbsent(user, 0);
+                    Optional<Question> oq = question(id);
+                    if (oq.isEmpty()) { System.out.println(user + " / " + id + " : question inconnue"); continue; }
+                    if (!deja.add(user + "\u0000" + id)) { System.out.println(user + " / " + id + " : doublon ignoré"); continue; }
+                    int i = questions.indexOf(oq.get());
+                    stats[i][1]++;
+                    if (correcte(oq.get(), rep)) { stats[i][0]++; scores.merge(user, oq.get().points(), Integer::sum); }
+                }
+                System.out.println("== Scores ==");
+                scores.forEach((u, s) -> System.out.println(u + " : " + s + "/" + total));
+                System.out.println("== Classement ==");
+                List<Map.Entry<String, Integer>> v = new ArrayList<>(scores.entrySet());
+                v.sort(Map.Entry.<String, Integer>comparingByValue().reversed()); // stable : ordre alphabétique conservé
+                for (int k = 0; k < v.size(); k++) {
+                    // Rang « olympique » : les ex æquo partagent le même rang.
+                    int rang = k;
+                    while (rang > 0 && v.get(rang - 1).getValue().equals(v.get(k).getValue())) rang--;
+                    System.out.println((rang + 1) + ". " + v.get(k).getKey() + " (" + v.get(k).getValue() + " pts)");
+                }
+                System.out.println("== Questions ==");
+                int pire = -1;
+                for (int i = 0; i < questions.size(); i++) {
+                    int ok = stats[i][0], n = stats[i][1];
+                    if (n == 0) { System.out.println(questions.get(i).id() + " : aucune réponse"); continue; }
+                    System.out.println(questions.get(i).id() + " : " + ok + "/" + n + " réussite(s) (" + ok * 100 / n + "%)");
+                    // Comparaison exacte des taux ok/n par produit en croix.
+                    if (pire < 0 || ok * stats[pire][1] < stats[pire][0] * n) pire = i;
+                }
+                if (pire >= 0) System.out.println("question la plus difficile : " + questions.get(pire).id());
+            }
+        }
+    tests:
+    - input: |-
+        Q q1 | Quelle commande compile un projet Rust ? | cargo build | 2
+        Q q2 | Mot-clé Java pour hériter ? | extends | 1
+        Q q3 | Opérateur C++ de résolution de portée ? | :: | 2
+        Q q4 | Nom du ramasse-miettes de Java ? | Garbage   Collector | 3
+        ---
+        ada | q1 | cargo build
+        ada | q2 | extends
+        ada | q4 | Garbage Collector
+        bob | q1 | rustc
+        bob | q3 | ::
+        bob | q3 | ::
+        zoe | q1 | cargo build
+        zoe | q2 | Extends
+        zoe | q4 | gc
+        zoe | q7 | x
+        kiri | q2 | super
+      output: |-
+        bob / q3 : doublon ignoré
+        zoe / q7 : question inconnue
+        == Scores ==
+        ada : 6/8
+        bob : 2/8
+        kiri : 0/8
+        zoe : 3/8
+        == Classement ==
+        1. ada (6 pts)
+        2. zoe (3 pts)
+        3. bob (2 pts)
+        4. kiri (0 pts)
+        == Questions ==
+        q1 : 2/3 réussite(s) (66%)
+        q2 : 2/3 réussite(s) (66%)
+        q3 : 1/1 réussite(s) (100%)
+        q4 : 1/2 réussite(s) (50%)
+        question la plus difficile : q4
+    - input: |-
+        Q q1 | Quelle commande compile un projet Rust ? | cargo build | 2
+        Q q2 | Mot-clé Java pour hériter ? | extends | 1
+        Q q3 | Opérateur C++ de résolution de portée ? | :: | 2
+        Q q4 | Nom du ramasse-miettes de Java ? | Garbage   Collector | 3
+        ---
+        b | q1 | cargo build
+        a | q3 | ::
+        c | q2 | non
+      output: |-
+        == Scores ==
+        a : 2/8
+        b : 2/8
+        c : 0/8
+        == Classement ==
+        1. a (2 pts)
+        1. b (2 pts)
+        3. c (0 pts)
+        == Questions ==
+        q1 : 1/1 réussite(s) (100%)
+        q2 : 0/1 réussite(s) (0%)
+        q3 : 1/1 réussite(s) (100%)
+        q4 : aucune réponse
+        question la plus difficile : q2
+      hidden: true
+    xp: 90
+- slug: architecture-modulaire
+  level: 5
+  title: 'Logiciel modulaire : plugins et middlewares'
+  summary: 'Concevoir une architecture extensible : un cœur stable, des plugins interchangeables derrière une interface, et une chaîne de middlewares.'
+  description: |-
+    Les grands logiciels (navigateurs, éditeurs de code, serveurs web, frameworks) sont **extensibles** : leur cœur ne change pas quand on ajoute une fonctionnalité. Deux patrons rendent cela possible :
+
+    - les **plugins** : chaque fonctionnalité implémente une **interface commune** (trait Rust, classe abstraite C++, interface Java) et s’enregistre auprès d’un **registre** ; le cœur ne connaît que l’interface (principe ouvert/fermé, inversion des dépendances) ;
+    - les **middlewares** : une requête traverse une **chaîne de traitements** (authentification, limitation de débit, métriques…) avant d’atteindre sa cible. Chaque maillon peut **court-circuiter** la chaîne. C’est le modèle d’Express, d’ASP.NET, de Tower (Rust) ou des filtres de servlets Java.
+
+    Plugins fournis : `echo` (répète le texte), `majuscules`, `inverser` (l’ordre des mots) et `calc a op b` (entiers, `+ - * /`). La commande `aide` liste les plugins (par nom) avec leur description.
+  objectives:
+  - Définir une interface et plusieurs implémentations
+  - Découpler le cœur des extensions (registre)
+  - Construire une chaîne de responsabilité (middlewares)
+  - Gérer les erreurs des extensions sans faire tomber le cœur
+  constraints:
+  - Le registre ne connaît aucun plugin concret
+  - Une erreur dans un plugin ne doit jamais arrêter le programme
+  - 'Ordre de la chaîne : authentification, limite de débit, métriques'
+  languages:
+  - rust
+  - cpp
+  - java
+  steps:
+  - id: modulaire-plugins
+    title: Registre de plugins
+    prompt: 'Chaque ligne : `commande arguments…`. Affiche le résultat du plugin, `commande inconnue : X`, ou `erreur [plugin] : message` (`usage : calc a op b`, `nombres invalides`, `division par zéro`, `opérateur inconnu OP`).'
+    hints:
+    - Range les plugins dans un dictionnaire nom → plugin (trié par nom pour l’aide).
+    - 'Le registre transforme les erreurs des plugins en message : il ne plante jamais.'
+    starters: *id001
+    solutions:
+      rust: |
+        use std::collections::{BTreeMap, HashMap, HashSet};
+        use std::io::{self, BufRead};
+
+        /// Contrat que tout plugin doit respecter.
+        trait Plugin {
+            fn nom(&self) -> &str;
+            fn description(&self) -> &str;
+            fn executer(&self, args: &[&str]) -> Result<String, String>;
+        }
+
+        struct Echo;
+        impl Plugin for Echo {
+            fn nom(&self) -> &str { "echo" }
+            fn description(&self) -> &str { "répète le texte" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> { Ok(args.join(" ")) }
+        }
+
+        struct Majuscules;
+        impl Plugin for Majuscules {
+            fn nom(&self) -> &str { "majuscules" }
+            fn description(&self) -> &str { "met le texte en majuscules" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> { Ok(args.join(" ").to_uppercase()) }
+        }
+
+        struct Inverser;
+        impl Plugin for Inverser {
+            fn nom(&self) -> &str { "inverser" }
+            fn description(&self) -> &str { "inverse l'ordre des mots" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> {
+                Ok(args.iter().rev().copied().collect::<Vec<_>>().join(" "))
+            }
+        }
+
+        struct Calc;
+        impl Plugin for Calc {
+            fn nom(&self) -> &str { "calc" }
+            fn description(&self) -> &str { "calcule a op b" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> {
+                let [a, op, b] = args else { return Err("usage : calc a op b".into()) };
+                let (Ok(a), Ok(b)) = (a.parse::<i64>(), b.parse::<i64>()) else { return Err("nombres invalides".into()) };
+                match *op {
+                    "+" => Ok((a + b).to_string()),
+                    "-" => Ok((a - b).to_string()),
+                    "*" => Ok((a * b).to_string()),
+                    "/" if b == 0 => Err("division par zéro".into()),
+                    "/" => Ok((a / b).to_string()),
+                    _ => Err(format!("opérateur inconnu {}", op)),
+                }
+            }
+        }
+
+        /// Le registre ne connaît que le trait : ajouter un plugin ne modifie pas le cœur.
+        struct Registre {
+            plugins: BTreeMap<String, Box<dyn Plugin>>,
+        }
+
+        impl Registre {
+            fn new(liste: Vec<Box<dyn Plugin>>) -> Self {
+                Registre { plugins: liste.into_iter().map(|p| (p.nom().to_string(), p)).collect() }
+            }
+            fn executer(&self, cmd: &str, args: &[&str]) -> String {
+                if cmd == "aide" {
+                    return self.plugins.values().map(|p| format!("{} : {}", p.nom(), p.description())).collect::<Vec<_>>().join("\n");
+                }
+                match self.plugins.get(cmd) {
+                    None => format!("commande inconnue : {}", cmd),
+                    Some(p) => p.executer(args).unwrap_or_else(|e| format!("erreur [{}] : {}", cmd, e)),
+                }
+            }
+        }
+
+        fn registre() -> Registre {
+            Registre::new(vec![Box::new(Echo), Box::new(Majuscules), Box::new(Inverser), Box::new(Calc)])
+        }
+
+        fn main() {
+            let reg = registre();
+            for ligne in io::stdin().lock().lines() {
+                let ligne = ligne.unwrap();
+                let t: Vec<&str> = ligne.split_whitespace().collect();
+                if let Some((cmd, args)) = t.split_first() {
+                    println!("{}", reg.executer(cmd, args));
+                }
+            }
+            let _ = (HashMap::<u8, u8>::new(), HashSet::<u8>::new());
+        }
+      cpp: |
+        #include <algorithm>
+        #include <iostream>
+        #include <map>
+        #include <memory>
+        #include <optional>
+        #include <set>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        using namespace std;
+
+        // Contrat que tout plugin doit respecter.
+        struct Plugin {
+            virtual ~Plugin() = default;
+            virtual string nom() const = 0;
+            virtual string description() const = 0;
+            // Lève un runtime_error en cas d'erreur.
+            virtual string executer(const vector<string>& args) const = 0;
+        };
+
+        string joindre(const vector<string>& v) {
+            string r;
+            for (size_t i = 0; i < v.size(); i++) r += (i ? " " : "") + v[i];
+            return r;
+        }
+
+        struct Echo : Plugin {
+            string nom() const override { return "echo"; }
+            string description() const override { return "répète le texte"; }
+            string executer(const vector<string>& a) const override { return joindre(a); }
+        };
+
+        struct Majuscules : Plugin {
+            string nom() const override { return "majuscules"; }
+            string description() const override { return "met le texte en majuscules"; }
+            string executer(const vector<string>& a) const override {
+                string s = joindre(a);
+                for (char& c : s) c = toupper((unsigned char)c);
+                return s;
+            }
+        };
+
+        struct Inverser : Plugin {
+            string nom() const override { return "inverser"; }
+            string description() const override { return "inverse l'ordre des mots"; }
+            string executer(const vector<string>& a) const override { return joindre(vector<string>(a.rbegin(), a.rend())); }
+        };
+
+        struct Calc : Plugin {
+            string nom() const override { return "calc"; }
+            string description() const override { return "calcule a op b"; }
+            string executer(const vector<string>& a) const override {
+                if (a.size() != 3) throw runtime_error("usage : calc a op b");
+                long long x, y;
+                try {
+                    size_t p1, p2;
+                    x = stoll(a[0], &p1);
+                    y = stoll(a[2], &p2);
+                    if (p1 != a[0].size() || p2 != a[2].size()) throw 0;
+                } catch (...) {
+                    throw runtime_error("nombres invalides");
+                }
+                const string& op = a[1];
+                if (op == "+") return to_string(x + y);
+                if (op == "-") return to_string(x - y);
+                if (op == "*") return to_string(x * y);
+                if (op == "/") {
+                    if (y == 0) throw runtime_error("division par zéro");
+                    return to_string(x / y);
+                }
+                throw runtime_error("opérateur inconnu " + op);
+            }
+        };
+
+        // Le registre ne connaît que l'interface : ajouter un plugin ne modifie pas le cœur.
+        struct Registre {
+            map<string, unique_ptr<Plugin>> plugins;
+            void ajouter(unique_ptr<Plugin> p) { string n = p->nom(); plugins[n] = move(p); }
+            string executer(const string& cmd, const vector<string>& args) const {
+                if (cmd == "aide") {
+                    string r;
+                    for (auto& [n, p] : plugins) r += (r.empty() ? "" : "\n") + n + " : " + p->description();
+                    return r;
+                }
+                auto it = plugins.find(cmd);
+                if (it == plugins.end()) return "commande inconnue : " + cmd;
+                try {
+                    return it->second->executer(args);
+                } catch (const runtime_error& e) {
+                    return "erreur [" + cmd + "] : " + e.what();
+                }
+            }
+        };
+
+        Registre registre() {
+            Registre r;
+            r.ajouter(make_unique<Echo>());
+            r.ajouter(make_unique<Majuscules>());
+            r.ajouter(make_unique<Inverser>());
+            r.ajouter(make_unique<Calc>());
+            return r;
+        }
+
+        vector<string> mots(const string& l) {
+            istringstream in(l);
+            vector<string> t;
+            for (string w; in >> w;) t.push_back(w);
+            return t;
+        }
+
+        int main() {
+            Registre reg = registre();
+            string ligne;
+            while (getline(cin, ligne)) {
+                auto t = mots(ligne);
+                if (t.empty()) continue;
+                cout << reg.executer(t[0], vector<string>(t.begin() + 1, t.end())) << "\n";
+            }
+        }
+      java: |
+        import java.util.*;
+
+        public class Main {
+            /** Contrat que tout plugin doit respecter. */
+            interface Plugin {
+                String nom();
+                String description();
+                String executer(List<String> args) throws ErreurPlugin;
+            }
+
+            static class ErreurPlugin extends Exception {
+                ErreurPlugin(String m) { super(m); }
+            }
+
+            record Echo() implements Plugin {
+                public String nom() { return "echo"; }
+                public String description() { return "répète le texte"; }
+                public String executer(List<String> a) { return String.join(" ", a); }
+            }
+
+            record Majuscules() implements Plugin {
+                public String nom() { return "majuscules"; }
+                public String description() { return "met le texte en majuscules"; }
+                public String executer(List<String> a) { return String.join(" ", a).toUpperCase(Locale.ROOT); }
+            }
+
+            record Inverser() implements Plugin {
+                public String nom() { return "inverser"; }
+                public String description() { return "inverse l'ordre des mots"; }
+                public String executer(List<String> a) {
+                    List<String> r = new ArrayList<>(a);
+                    Collections.reverse(r);
+                    return String.join(" ", r);
+                }
+            }
+
+            record Calc() implements Plugin {
+                public String nom() { return "calc"; }
+                public String description() { return "calcule a op b"; }
+                public String executer(List<String> a) throws ErreurPlugin {
+                    if (a.size() != 3) throw new ErreurPlugin("usage : calc a op b");
+                    long x, y;
+                    try { x = Long.parseLong(a.get(0)); y = Long.parseLong(a.get(2)); }
+                    catch (NumberFormatException e) { throw new ErreurPlugin("nombres invalides"); }
+                    return switch (a.get(1)) {
+                        case "+" -> String.valueOf(x + y);
+                        case "-" -> String.valueOf(x - y);
+                        case "*" -> String.valueOf(x * y);
+                        case "/" -> { if (y == 0) throw new ErreurPlugin("division par zéro"); yield String.valueOf(x / y); }
+                        default -> throw new ErreurPlugin("opérateur inconnu " + a.get(1));
+                    };
+                }
+            }
+
+            /** Le registre ne connaît que l'interface : ajouter un plugin ne modifie pas le cœur. */
+            static class Registre {
+                final TreeMap<String, Plugin> plugins = new TreeMap<>();
+                Registre(Plugin... ps) { for (Plugin p : ps) plugins.put(p.nom(), p); }
+                String executer(String cmd, List<String> args) {
+                    if (cmd.equals("aide")) {
+                        StringJoiner j = new StringJoiner("\n");
+                        plugins.values().forEach(p -> j.add(p.nom() + " : " + p.description()));
+                        return j.toString();
+                    }
+                    Plugin p = plugins.get(cmd);
+                    if (p == null) return "commande inconnue : " + cmd;
+                    try { return p.executer(args); }
+                    catch (ErreurPlugin e) { return "erreur [" + cmd + "] : " + e.getMessage(); }
+                }
+            }
+
+            static Registre registre() { return new Registre(new Echo(), new Majuscules(), new Inverser(), new Calc()); }
+
+            public static void main(String[] args) {
+                Registre reg = registre();
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine().trim();
+                    if (l.isEmpty()) continue;
+                    List<String> t = List.of(l.split("\\s+"));
+                    System.out.println(reg.executer(t.get(0), t.subList(1, t.size())));
+                }
+            }
+        }
+    tests:
+    - input: |-
+        aide
+        echo Bonjour   le monde
+        majuscules kiri code
+        inverser un deux trois
+        calc 6 * 7
+        calc 1 / 0
+        calc 2 ^ 3
+        calc x + 1
+        calc 1 +
+        danser
+      output: |-
+        calc : calcule a op b
+        echo : répète le texte
+        inverser : inverse l'ordre des mots
+        majuscules : met le texte en majuscules
+        Bonjour le monde
+        KIRI CODE
+        trois deux un
+        42
+        erreur [calc] : division par zéro
+        erreur [calc] : opérateur inconnu ^
+        erreur [calc] : nombres invalides
+        erreur [calc] : usage : calc a op b
+        commande inconnue : danser
+    - input: |-
+        echo
+        calc -8 / 3
+      output: |2-
+
+        -2
+      hidden: true
+    xp: 80
+  - id: modulaire-middlewares
+    title: Chaîne de middlewares
+    prompt: |-
+      Première ligne : `utilisateurs: nom1 nom2…` (les utilisateurs autorisés). Chaque ligne suivante : `utilisateur commande arguments…`. La requête traverse, dans l’ordre :
+
+      1. **authentification** : utilisateur non autorisé → `refusé : utilisateur inconnu` ;
+      2. **limite de débit** : au-delà de 3 requêtes (comptées dès qu’elles passent l’authentification) pour un même utilisateur → `refusé : limite atteinte` ;
+      3. **métriques** : compte les appels par commande.
+
+      Affiche `[utilisateur] réponse`. Cas spécial : `admin stats` (hors chaîne) affiche `[admin] commande : N appel(s)` pour chaque commande comptée (par nom). Termine par `journal : N requête(s), A acceptée(s), R refusée(s)` (sans les `admin stats`).
+    hints:
+    - Un middleware = une interface avec une seule méthode qui renvoie « rien » (continuer) ou une réponse (arrêter).
+    - Parcours la chaîne dans l’ordre et arrête-toi au premier court-circuit.
+    starters: *id001
+    solutions:
+      rust: |
+        use std::collections::{BTreeMap, HashMap, HashSet};
+        use std::io::{self, BufRead};
+
+        /// Contrat que tout plugin doit respecter.
+        trait Plugin {
+            fn nom(&self) -> &str;
+            fn description(&self) -> &str;
+            fn executer(&self, args: &[&str]) -> Result<String, String>;
+        }
+
+        struct Echo;
+        impl Plugin for Echo {
+            fn nom(&self) -> &str { "echo" }
+            fn description(&self) -> &str { "répète le texte" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> { Ok(args.join(" ")) }
+        }
+
+        struct Majuscules;
+        impl Plugin for Majuscules {
+            fn nom(&self) -> &str { "majuscules" }
+            fn description(&self) -> &str { "met le texte en majuscules" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> { Ok(args.join(" ").to_uppercase()) }
+        }
+
+        struct Inverser;
+        impl Plugin for Inverser {
+            fn nom(&self) -> &str { "inverser" }
+            fn description(&self) -> &str { "inverse l'ordre des mots" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> {
+                Ok(args.iter().rev().copied().collect::<Vec<_>>().join(" "))
+            }
+        }
+
+        struct Calc;
+        impl Plugin for Calc {
+            fn nom(&self) -> &str { "calc" }
+            fn description(&self) -> &str { "calcule a op b" }
+            fn executer(&self, args: &[&str]) -> Result<String, String> {
+                let [a, op, b] = args else { return Err("usage : calc a op b".into()) };
+                let (Ok(a), Ok(b)) = (a.parse::<i64>(), b.parse::<i64>()) else { return Err("nombres invalides".into()) };
+                match *op {
+                    "+" => Ok((a + b).to_string()),
+                    "-" => Ok((a - b).to_string()),
+                    "*" => Ok((a * b).to_string()),
+                    "/" if b == 0 => Err("division par zéro".into()),
+                    "/" => Ok((a / b).to_string()),
+                    _ => Err(format!("opérateur inconnu {}", op)),
+                }
+            }
+        }
+
+        /// Le registre ne connaît que le trait : ajouter un plugin ne modifie pas le cœur.
+        struct Registre {
+            plugins: BTreeMap<String, Box<dyn Plugin>>,
+        }
+
+        impl Registre {
+            fn new(liste: Vec<Box<dyn Plugin>>) -> Self {
+                Registre { plugins: liste.into_iter().map(|p| (p.nom().to_string(), p)).collect() }
+            }
+            fn executer(&self, cmd: &str, args: &[&str]) -> String {
+                if cmd == "aide" {
+                    return self.plugins.values().map(|p| format!("{} : {}", p.nom(), p.description())).collect::<Vec<_>>().join("\n");
+                }
+                match self.plugins.get(cmd) {
+                    None => format!("commande inconnue : {}", cmd),
+                    Some(p) => p.executer(args).unwrap_or_else(|e| format!("erreur [{}] : {}", cmd, e)),
+                }
+            }
+        }
+
+        fn registre() -> Registre {
+            Registre::new(vec![Box::new(Echo), Box::new(Majuscules), Box::new(Inverser), Box::new(Calc)])
+        }
+
+
+        /// Une requête traverse une chaîne de middlewares avant d'atteindre le registre.
+        struct Requete<'a> {
+            utilisateur: &'a str,
+            cmd: &'a str,
+            args: &'a [&'a str],
+        }
+
+        trait Middleware {
+            /// Some(réponse) = court-circuit : la requête s'arrête ici.
+            fn avant(&mut self, req: &Requete) -> Option<String>;
+        }
+
+        struct Authentification {
+            autorises: HashSet<String>,
+        }
+        impl Middleware for Authentification {
+            fn avant(&mut self, req: &Requete) -> Option<String> {
+                (!self.autorises.contains(req.utilisateur)).then(|| "refusé : utilisateur inconnu".to_string())
+            }
+        }
+
+        struct LimiteDebit {
+            max: u32,
+            compteurs: HashMap<String, u32>,
+        }
+        impl Middleware for LimiteDebit {
+            fn avant(&mut self, req: &Requete) -> Option<String> {
+                let c = self.compteurs.entry(req.utilisateur.to_string()).or_insert(0);
+                *c += 1;
+                (*c > self.max).then(|| "refusé : limite atteinte".to_string())
+            }
+        }
+
+        #[derive(Default)]
+        struct Metriques {
+            appels: BTreeMap<String, u32>,
+        }
+        impl Middleware for Metriques {
+            fn avant(&mut self, req: &Requete) -> Option<String> {
+                *self.appels.entry(req.cmd.to_string()).or_insert(0) += 1;
+                None
+            }
+        }
+
+        fn main() {
+            let stdin = io::stdin();
+            let mut lignes = stdin.lock().lines().map(|l| l.unwrap());
+            let entete = lignes.next().unwrap();
+            let autorises: HashSet<String> = entete.trim_start_matches("utilisateurs:").split_whitespace().map(String::from).collect();
+            let reg = registre();
+            let mut auth = Authentification { autorises };
+            let mut limite = LimiteDebit { max: 3, compteurs: HashMap::new() };
+            let mut metriques = Metriques::default();
+            let (mut acceptees, mut refusees) = (0, 0);
+            for ligne in lignes {
+                let t: Vec<&str> = ligne.split_whitespace().collect();
+                if t.len() < 2 {
+                    continue;
+                }
+                let req = Requete { utilisateur: t[0], cmd: t[1], args: &t[2..] };
+                if req.cmd == "stats" && req.utilisateur == "admin" {
+                    for (c, n) in &metriques.appels {
+                        println!("[admin] {} : {} appel(s)", c, n);
+                    }
+                    continue;
+                }
+                let chaine: [&mut dyn Middleware; 3] = [&mut auth, &mut limite, &mut metriques];
+                let mut reponse = None;
+                for mw in chaine {
+                    reponse = mw.avant(&req);
+                    if reponse.is_some() {
+                        break;
+                    }
+                }
+                match reponse {
+                    Some(r) => {
+                        refusees += 1;
+                        println!("[{}] {}", req.utilisateur, r);
+                    }
+                    None => {
+                        acceptees += 1;
+                        println!("[{}] {}", req.utilisateur, reg.executer(req.cmd, req.args));
+                    }
+                }
+            }
+            println!("journal : {} requête(s), {} acceptée(s), {} refusée(s)", acceptees + refusees, acceptees, refusees);
+        }
+      cpp: |
+        #include <algorithm>
+        #include <iostream>
+        #include <map>
+        #include <memory>
+        #include <optional>
+        #include <set>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        using namespace std;
+
+        // Contrat que tout plugin doit respecter.
+        struct Plugin {
+            virtual ~Plugin() = default;
+            virtual string nom() const = 0;
+            virtual string description() const = 0;
+            // Lève un runtime_error en cas d'erreur.
+            virtual string executer(const vector<string>& args) const = 0;
+        };
+
+        string joindre(const vector<string>& v) {
+            string r;
+            for (size_t i = 0; i < v.size(); i++) r += (i ? " " : "") + v[i];
+            return r;
+        }
+
+        struct Echo : Plugin {
+            string nom() const override { return "echo"; }
+            string description() const override { return "répète le texte"; }
+            string executer(const vector<string>& a) const override { return joindre(a); }
+        };
+
+        struct Majuscules : Plugin {
+            string nom() const override { return "majuscules"; }
+            string description() const override { return "met le texte en majuscules"; }
+            string executer(const vector<string>& a) const override {
+                string s = joindre(a);
+                for (char& c : s) c = toupper((unsigned char)c);
+                return s;
+            }
+        };
+
+        struct Inverser : Plugin {
+            string nom() const override { return "inverser"; }
+            string description() const override { return "inverse l'ordre des mots"; }
+            string executer(const vector<string>& a) const override { return joindre(vector<string>(a.rbegin(), a.rend())); }
+        };
+
+        struct Calc : Plugin {
+            string nom() const override { return "calc"; }
+            string description() const override { return "calcule a op b"; }
+            string executer(const vector<string>& a) const override {
+                if (a.size() != 3) throw runtime_error("usage : calc a op b");
+                long long x, y;
+                try {
+                    size_t p1, p2;
+                    x = stoll(a[0], &p1);
+                    y = stoll(a[2], &p2);
+                    if (p1 != a[0].size() || p2 != a[2].size()) throw 0;
+                } catch (...) {
+                    throw runtime_error("nombres invalides");
+                }
+                const string& op = a[1];
+                if (op == "+") return to_string(x + y);
+                if (op == "-") return to_string(x - y);
+                if (op == "*") return to_string(x * y);
+                if (op == "/") {
+                    if (y == 0) throw runtime_error("division par zéro");
+                    return to_string(x / y);
+                }
+                throw runtime_error("opérateur inconnu " + op);
+            }
+        };
+
+        // Le registre ne connaît que l'interface : ajouter un plugin ne modifie pas le cœur.
+        struct Registre {
+            map<string, unique_ptr<Plugin>> plugins;
+            void ajouter(unique_ptr<Plugin> p) { string n = p->nom(); plugins[n] = move(p); }
+            string executer(const string& cmd, const vector<string>& args) const {
+                if (cmd == "aide") {
+                    string r;
+                    for (auto& [n, p] : plugins) r += (r.empty() ? "" : "\n") + n + " : " + p->description();
+                    return r;
+                }
+                auto it = plugins.find(cmd);
+                if (it == plugins.end()) return "commande inconnue : " + cmd;
+                try {
+                    return it->second->executer(args);
+                } catch (const runtime_error& e) {
+                    return "erreur [" + cmd + "] : " + e.what();
+                }
+            }
+        };
+
+        Registre registre() {
+            Registre r;
+            r.ajouter(make_unique<Echo>());
+            r.ajouter(make_unique<Majuscules>());
+            r.ajouter(make_unique<Inverser>());
+            r.ajouter(make_unique<Calc>());
+            return r;
+        }
+
+        vector<string> mots(const string& l) {
+            istringstream in(l);
+            vector<string> t;
+            for (string w; in >> w;) t.push_back(w);
+            return t;
+        }
+
+
+        // Une requête traverse une chaîne de middlewares avant d'atteindre le registre.
+        struct Requete {
+            string utilisateur, cmd;
+            vector<string> args;
+        };
+
+        struct Middleware {
+            virtual ~Middleware() = default;
+            // Une réponse = court-circuit : la requête s'arrête ici.
+            virtual optional<string> avant(const Requete& r) = 0;
+        };
+
+        struct Authentification : Middleware {
+            set<string> autorises;
+            optional<string> avant(const Requete& r) override {
+                if (!autorises.count(r.utilisateur)) return "refusé : utilisateur inconnu";
+                return nullopt;
+            }
+        };
+
+        struct LimiteDebit : Middleware {
+            unsigned max = 3;
+            map<string, unsigned> compteurs;
+            optional<string> avant(const Requete& r) override {
+                if (++compteurs[r.utilisateur] > max) return "refusé : limite atteinte";
+                return nullopt;
+            }
+        };
+
+        struct Metriques : Middleware {
+            map<string, unsigned> appels;
+            optional<string> avant(const Requete& r) override {
+                appels[r.cmd]++;
+                return nullopt;
+            }
+        };
+
+        int main() {
+            string entete;
+            getline(cin, entete);
+            auto auth = make_unique<Authentification>();
+            auto metriques = make_unique<Metriques>();
+            Metriques* m = metriques.get();
+            for (auto& u : mots(entete.substr(entete.find(':') + 1))) auth->autorises.insert(u);
+            vector<unique_ptr<Middleware>> chaine;
+            chaine.push_back(move(auth));
+            chaine.push_back(make_unique<LimiteDebit>());
+            chaine.push_back(move(metriques));
+            Registre reg = registre();
+            int acceptees = 0, refusees = 0;
+            string ligne;
+            while (getline(cin, ligne)) {
+                auto t = mots(ligne);
+                if (t.size() < 2) continue;
+                Requete req{t[0], t[1], vector<string>(t.begin() + 2, t.end())};
+                if (req.cmd == "stats" && req.utilisateur == "admin") {
+                    for (auto& [c, n] : m->appels) cout << "[admin] " << c << " : " << n << " appel(s)\n";
+                    continue;
+                }
+                optional<string> reponse;
+                for (auto& mw : chaine)
+                    if ((reponse = mw->avant(req))) break;
+                if (reponse) { refusees++; cout << "[" << req.utilisateur << "] " << *reponse << "\n"; }
+                else { acceptees++; cout << "[" << req.utilisateur << "] " << reg.executer(req.cmd, req.args) << "\n"; }
+            }
+            cout << "journal : " << acceptees + refusees << " requête(s), " << acceptees << " acceptée(s), " << refusees << " refusée(s)\n";
+        }
+      java: |
+        import java.util.*;
+
+        public class Main {
+            /** Contrat que tout plugin doit respecter. */
+            interface Plugin {
+                String nom();
+                String description();
+                String executer(List<String> args) throws ErreurPlugin;
+            }
+
+            static class ErreurPlugin extends Exception {
+                ErreurPlugin(String m) { super(m); }
+            }
+
+            record Echo() implements Plugin {
+                public String nom() { return "echo"; }
+                public String description() { return "répète le texte"; }
+                public String executer(List<String> a) { return String.join(" ", a); }
+            }
+
+            record Majuscules() implements Plugin {
+                public String nom() { return "majuscules"; }
+                public String description() { return "met le texte en majuscules"; }
+                public String executer(List<String> a) { return String.join(" ", a).toUpperCase(Locale.ROOT); }
+            }
+
+            record Inverser() implements Plugin {
+                public String nom() { return "inverser"; }
+                public String description() { return "inverse l'ordre des mots"; }
+                public String executer(List<String> a) {
+                    List<String> r = new ArrayList<>(a);
+                    Collections.reverse(r);
+                    return String.join(" ", r);
+                }
+            }
+
+            record Calc() implements Plugin {
+                public String nom() { return "calc"; }
+                public String description() { return "calcule a op b"; }
+                public String executer(List<String> a) throws ErreurPlugin {
+                    if (a.size() != 3) throw new ErreurPlugin("usage : calc a op b");
+                    long x, y;
+                    try { x = Long.parseLong(a.get(0)); y = Long.parseLong(a.get(2)); }
+                    catch (NumberFormatException e) { throw new ErreurPlugin("nombres invalides"); }
+                    return switch (a.get(1)) {
+                        case "+" -> String.valueOf(x + y);
+                        case "-" -> String.valueOf(x - y);
+                        case "*" -> String.valueOf(x * y);
+                        case "/" -> { if (y == 0) throw new ErreurPlugin("division par zéro"); yield String.valueOf(x / y); }
+                        default -> throw new ErreurPlugin("opérateur inconnu " + a.get(1));
+                    };
+                }
+            }
+
+            /** Le registre ne connaît que l'interface : ajouter un plugin ne modifie pas le cœur. */
+            static class Registre {
+                final TreeMap<String, Plugin> plugins = new TreeMap<>();
+                Registre(Plugin... ps) { for (Plugin p : ps) plugins.put(p.nom(), p); }
+                String executer(String cmd, List<String> args) {
+                    if (cmd.equals("aide")) {
+                        StringJoiner j = new StringJoiner("\n");
+                        plugins.values().forEach(p -> j.add(p.nom() + " : " + p.description()));
+                        return j.toString();
+                    }
+                    Plugin p = plugins.get(cmd);
+                    if (p == null) return "commande inconnue : " + cmd;
+                    try { return p.executer(args); }
+                    catch (ErreurPlugin e) { return "erreur [" + cmd + "] : " + e.getMessage(); }
+                }
+            }
+
+            static Registre registre() { return new Registre(new Echo(), new Majuscules(), new Inverser(), new Calc()); }
+
+            /** Une requête traverse une chaîne de middlewares avant d'atteindre le registre. */
+            record Requete(String utilisateur, String cmd, List<String> args) {}
+
+            interface Middleware {
+                /** Une réponse = court-circuit : la requête s'arrête ici. */
+                Optional<String> avant(Requete r);
+            }
+
+            static class Authentification implements Middleware {
+                final Set<String> autorises;
+                Authentification(Set<String> a) { autorises = a; }
+                public Optional<String> avant(Requete r) {
+                    return autorises.contains(r.utilisateur()) ? Optional.empty() : Optional.of("refusé : utilisateur inconnu");
+                }
+            }
+
+            static class LimiteDebit implements Middleware {
+                final int max = 3;
+                final Map<String, Integer> compteurs = new HashMap<>();
+                public Optional<String> avant(Requete r) {
+                    return compteurs.merge(r.utilisateur(), 1, Integer::sum) > max ? Optional.of("refusé : limite atteinte") : Optional.empty();
+                }
+            }
+
+            static class Metriques implements Middleware {
+                final TreeMap<String, Integer> appels = new TreeMap<>();
+                public Optional<String> avant(Requete r) {
+                    appels.merge(r.cmd(), 1, Integer::sum);
+                    return Optional.empty();
+                }
+            }
+
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String entete = sc.nextLine();
+                Set<String> autorises = new HashSet<>(List.of(entete.substring(entete.indexOf(':') + 1).trim().split("\\s+")));
+                Metriques metriques = new Metriques();
+                List<Middleware> chaine = List.of(new Authentification(autorises), new LimiteDebit(), metriques);
+                Registre reg = registre();
+                int acceptees = 0, refusees = 0;
+                while (sc.hasNextLine()) {
+                    String[] t = sc.nextLine().trim().split("\\s+");
+                    if (t.length < 2) continue;
+                    Requete req = new Requete(t[0], t[1], List.of(t).subList(2, t.length));
+                    if (req.cmd().equals("stats") && req.utilisateur().equals("admin")) {
+                        metriques.appels.forEach((c, n) -> System.out.println("[admin] " + c + " : " + n + " appel(s)"));
+                        continue;
+                    }
+                    Optional<String> reponse = Optional.empty();
+                    for (Middleware mw : chaine) {
+                        reponse = mw.avant(req);
+                        if (reponse.isPresent()) break;
+                    }
+                    if (reponse.isPresent()) { refusees++; System.out.println("[" + req.utilisateur() + "] " + reponse.get()); }
+                    else { acceptees++; System.out.println("[" + req.utilisateur() + "] " + reg.executer(req.cmd(), req.args())); }
+                }
+                System.out.println("journal : " + (acceptees + refusees) + " requête(s), " + acceptees + " acceptée(s), " + refusees + " refusée(s)");
+            }
+        }
+    tests:
+    - input: |-
+        utilisateurs: ada bob
+        ada echo salut
+        mallory calc 1 + 1
+        bob calc 10 / 0
+        ada majuscules ok
+        ada aide
+        ada echo encore
+        bob nope
+        admin stats
+      output: |-
+        [ada] salut
+        [mallory] refusé : utilisateur inconnu
+        [bob] erreur [calc] : division par zéro
+        [ada] OK
+        [ada] calc : calcule a op b
+        echo : répète le texte
+        inverser : inverse l'ordre des mots
+        majuscules : met le texte en majuscules
+        [ada] refusé : limite atteinte
+        [bob] commande inconnue : nope
+        [admin] aide : 1 appel(s)
+        [admin] calc : 1 appel(s)
+        [admin] echo : 1 appel(s)
+        [admin] majuscules : 1 appel(s)
+        [admin] nope : 1 appel(s)
+        journal : 7 requête(s), 5 acceptée(s), 2 refusée(s)
+    - input: |-
+        utilisateurs: x
+        x echo 1
+        x echo 2
+        x echo 3
+        x echo 4
+        x echo 5
+        admin stats
+      output: |-
+        [x] 1
+        [x] 2
+        [x] 3
+        [x] refusé : limite atteinte
+        [x] refusé : limite atteinte
+        [admin] echo : 3 appel(s)
+        journal : 5 requête(s), 3 acceptée(s), 2 refusée(s)
+      hidden: true
+    xp: 90

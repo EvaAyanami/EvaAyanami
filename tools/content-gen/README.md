@@ -11,7 +11,8 @@ python3 tools/content-gen/proj_inter2.py   content/projects/3-intermediaire-b.ya
 python3 tools/content-gen/proj_avance.py   content/projects/4-avance-a.yaml
 python3 tools/content-gen/proj_avance2.py  content/projects/4-avance-b.yaml
 python3 tools/content-gen/proj_avance3.py  content/projects/4-avance-c.yaml
-python3 tools/content-gen/proj_expert.py   content/projects/5-expertise.yaml
+python3 tools/content-gen/proj_expert.py   content/projects/5-expertise-a.yaml
+python3 tools/content-gen/proj_expert2.py  content/projects/5-expertise-b.yaml
 ```
 
 Après régénération, vérifie toujours les solutions avec le service d'exécution :
