@@ -49,11 +49,16 @@ Puis ouvrir `https://<DOMAIN>`. Avec un vrai nom de domaine pointant vers le ser
 
 Guide complet : [docs/installation.md](docs/installation.md).
 
+### Sur un NAS TrueNAS SCALE
+
+Des images prêtes à l’emploi sont publiées sur `ghcr.io` par la CI : colle [`deploy/truenas/codemori.yaml`](deploy/truenas/codemori.yaml) dans *Apps → Install via YAML*. Guide pas à pas : [docs/truenas.md](docs/truenas.md).
+
 ## Documentation
 
 | Document | Contenu |
 |---|---|
 | [docs/installation.md](docs/installation.md) | Installation, configuration, HTTPS, mises à jour, sauvegardes, dépannage |
+| [docs/truenas.md](docs/truenas.md) | Déploiement sur TrueNAS SCALE (Custom App) |
 | [docs/architecture.md](docs/architecture.md) | Composants, flux d’une exécution, modèle de données, API |
 | [docs/securite.md](docs/securite.md) | Isolation des bacs à sable, authentification, durcissement |
 | [docs/contenu.md](docs/contenu.md) | Format des cours, exercices, projets et tests ; vérification |

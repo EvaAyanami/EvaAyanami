@@ -35,9 +35,14 @@ export async function buildApp() {
         fontSrc: ["'self'", 'data:'], // polices embarquées (aucune requête vers un service tiers)
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'"],
+        // En accès HTTP (réseau local, NAS…), forcer HTTPS casserait le chargement des ressources.
+        upgradeInsecureRequests: config.cookieSecure ? [] : null,
       },
     },
+    hsts: config.cookieSecure,
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: config.cookieSecure,
+    originAgentCluster: config.cookieSecure,
   });
   await app.register(cookie);
   await app.register(rateLimit, { global: true, max: 600, timeWindow: '1 minute' });

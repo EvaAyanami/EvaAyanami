@@ -1,0 +1,106 @@
+# ==============================================================================
+# Codemori pour TrueNAS SCALE (24.10 « Electric Eel » ou plus récent)
+#
+#   Apps → Discover Apps → ⋮ → Install via YAML → nom : codemori → coller ce fichier
+#
+# AVANT d'installer, remplace les 3 valeurs marquées « À CHANGER » :
+#   - MOT_DE_PASSE_DB  (2 occurrences : POSTGRES_PASSWORD et DATABASE_URL)
+#   - JETON_RUNNER     (2 occurrences : runner et app)
+#   - l'adresse de ton NAS dans PUBLIC_URL, ton e-mail/mot de passe admin
+# Génère des secrets dans le Shell TrueNAS : openssl rand -hex 24
+# (uniquement des lettres et des chiffres : ils sont insérés dans une URL)
+#
+# Accès : http://IP-DU-NAS:30480 — guide complet : docs/truenas.md
+# Si tu as forké le dépôt, remplace « evaayanami » par ton nom GitHub.
+# ==============================================================================
+
+services:
+  # --- Images des bacs à sable : téléchargées puis arrêtées (« Exited » = normal)
+  sandbox-rust:
+    image: ghcr.io/evaayanami/codemori-sandbox-rust:latest
+    pull_policy: always
+    entrypoint: ["/bin/true"]
+    restart: "no"
+    network_mode: none
+
+  sandbox-cpp:
+    image: ghcr.io/evaayanami/codemori-sandbox-cpp:latest
+    pull_policy: always
+    entrypoint: ["/bin/true"]
+    restart: "no"
+    network_mode: none
+
+  sandbox-java:
+    image: ghcr.io/evaayanami/codemori-sandbox-java:latest
+    pull_policy: always
+    entrypoint: ["/bin/true"]
+    restart: "no"
+    network_mode: none
+
+  # --- Base de données ---------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: codemori
+      POSTGRES_USER: codemori
+      POSTGRES_PASSWORD: MOT_DE_PASSE_DB            # À CHANGER
+    volumes:
+      - codemori-pgdata:/var/lib/postgresql/data
+    networks: [interne]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codemori -d codemori"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # --- Service d'exécution du code ---------------------------------------------
+  runner:
+    image: ghcr.io/evaayanami/codemori-runner:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      RUNNER_TOKEN: JETON_RUNNER                   # À CHANGER (identique à l'app)
+      RUNNER_MAX_PARALLEL: "2"                     # compilations simultanées
+      RUNNER_IMAGE_RUST: ghcr.io/evaayanami/codemori-sandbox-rust:latest
+      RUNNER_IMAGE_CPP: ghcr.io/evaayanami/codemori-sandbox-cpp:latest
+      RUNNER_IMAGE_JAVA: ghcr.io/evaayanami/codemori-sandbox-java:latest
+    volumes:
+      # Le runner crée un conteneur isolé (sans réseau) par exécution.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [interne]
+    depends_on:
+      sandbox-rust: { condition: service_completed_successfully }
+      sandbox-cpp: { condition: service_completed_successfully }
+      sandbox-java: { condition: service_completed_successfully }
+
+  # --- Application (API + interface web) ----------------------------------------
+  app:
+    image: ghcr.io/evaayanami/codemori-app:latest
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "30480:4000"
+    environment:
+      DATABASE_URL: postgresql://codemori:MOT_DE_PASSE_DB@db:5432/codemori?schema=public   # À CHANGER
+      RUNNER_URL: http://runner:4100
+      RUNNER_TOKEN: JETON_RUNNER                   # À CHANGER (identique au runner)
+      PUBLIC_URL: http://192.168.1.10:30480        # À CHANGER : adresse du NAS
+      # false = accès en HTTP sur le réseau local. Passe à true derrière un proxy HTTPS.
+      COOKIE_SECURE: "false"
+      ADMIN_EMAIL: admin@codemori.local            # À CHANGER
+      ADMIN_PASSWORD: ChangeMoiTresVite2026        # À CHANGER (8 caractères minimum)
+      ALLOW_REGISTRATION: "true"
+      AI_PROVIDER: none
+    networks: [interne, web]
+    depends_on:
+      db: { condition: service_healthy }
+      runner: { condition: service_started }
+
+networks:
+  interne:
+    internal: true
+  web: {}
+
+volumes:
+  codemori-pgdata: {}
