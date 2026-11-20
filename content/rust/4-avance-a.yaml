@@ -1,0 +1,1256 @@
+language: rust
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-smart-pointers
+    title: Smart pointers
+    summary: Box, Deref, Drop, RefCell et la mutabilité intérieure — les pointeurs intelligents qui possèdent leurs données.
+    minutes: 35
+    concepts: [smart-pointers]
+    sections:
+      - title: Box, Deref et Drop
+        body: |
+          Un **pointeur intelligent** est une struct qui se comporte comme un pointeur (trait `Deref`) et gère une ressource (trait `Drop`).
+
+          ```rust
+          use std::ops::Deref;
+
+          struct MaBoite<T>(T);
+          impl<T> Deref for MaBoite<T> {
+              type Target = T;
+              fn deref(&self) -> &T { &self.0 }
+          }
+
+          struct Journal(&'static str);
+          impl Drop for Journal {
+              fn drop(&mut self) { println!("libération de {}", self.0); }
+          }
+
+          let b = MaBoite(5);
+          assert_eq!(*b, 5);            // *b appelle deref()
+          {
+              let _j = Journal("A");
+          }                              // affiche « libération de A »
+          ```
+
+          Les valeurs sont détruites dans l’ordre **inverse** de leur création. `drop(x)` force une libération anticipée.
+      - title: Mutabilité intérieure avec RefCell
+        body: |
+          Parfois, il faut modifier une donnée accessible seulement via `&` (par ex. un cache dans une méthode `&self`). `RefCell<T>` déplace les règles d’emprunt **à l’exécution** :
+
+          ```rust
+          use std::cell::{Cell, RefCell};
+
+          struct Compteur { appels: Cell<u32>, cache: RefCell<Vec<u64>> }
+
+          impl Compteur {
+              fn calculer(&self, n: u64) -> u64 {
+                  self.appels.set(self.appels.get() + 1);   // Cell : valeurs Copy
+                  self.cache.borrow_mut().push(n * n);      // RefCell : emprunt dynamique
+                  n * n
+              }
+          }
+          ```
+
+          `borrow()` et `borrow_mut()` paniquent si les règles sont violées (deux `borrow_mut` simultanés). `Cell<T>` est réservé aux types `Copy`, sans emprunt.
+      - title: Tableau récapitulatif
+        body: |
+          | Type | Propriété | Mutabilité | Threads |
+          |---|---|---|---|
+          | `Box<T>` | unique | selon la variable | ✅ si T l’est |
+          | `Rc<T>` | partagée (comptage) | lecture | ❌ |
+          | `Arc<T>` | partagée (atomique) | lecture | ✅ |
+          | `Cell<T>` / `RefCell<T>` | unique | intérieure | ❌ |
+          | `Mutex<T>` / `RwLock<T>` | — | intérieure, verrouillée | ✅ |
+
+          Combinaisons classiques : `Rc<RefCell<T>>` (graphe partagé mono-thread), `Arc<Mutex<T>>` (état partagé multi-threads).
+    exercises:
+      - id: rust-sp-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          struct Bruyant(&'static str);
+          impl Drop for Bruyant {
+              fn drop(&mut self) { println!("drop {}", self.0); }
+          }
+          fn main() {
+              let _a = Bruyant("a");
+              let b = Bruyant("b");
+              {
+                  let _c = Bruyant("c");
+              }
+              drop(b);
+              println!("fin");
+          }
+        output: "drop c\ndrop b\nfin\ndrop a"
+        concepts: [smart-pointers]
+      - id: rust-sp-q1
+        type: mcq
+        prompt: Que se passe-t-il si on appelle `borrow_mut()` deux fois simultanément sur un RefCell ?
+        choices: [Erreur de compilation, Le programme panique à l’exécution, La seconde attend, Rien]
+        answer: 1
+      - id: rust-sp-fill
+        type: fill
+        prompt: Complète pour modifier un compteur stocké dans un Cell via une référence partagée.
+        code: |
+          use std::cell::Cell;
+          struct Stat { vues: Cell<u32> }
+          impl Stat {
+              fn voir(&self) { self.vues.{{?}}(self.vues.get() + 1); }
+          }
+          fn main() {
+              let s = Stat { vues: Cell::new(0) };
+              s.voir(); s.voir(); s.voir();
+              println!("{}", s.vues.get());
+          }
+        blanks: [[set]]
+        tests:
+          - { input: '', output: '3' }
+      - id: rust-sp-q2
+        type: mcq
+        prompt: Quel trait permet d’utiliser `*` sur un type personnalisé ?
+        choices: [Drop, Deref, Copy, Display]
+        answer: 1
+      - id: rust-sp-code
+        type: code
+        title: Arbre binaire de recherche
+        prompt: |
+          Implémente un arbre binaire de recherche :
+
+          ```rust
+          enum Arbre { Vide, Noeud(Box<Arbre>, i32, Box<Arbre>) }
+          ```
+
+          avec `inserer(self, x: i32) -> Arbre` (les doublons sont ignorés), `contient(&self, x: i32) -> bool` et `parcours(&self, out: &mut Vec<i32>)` (ordre croissant).
+
+          Première ligne : les valeurs à insérer. Seconde ligne : les valeurs à chercher. Affiche le parcours, puis `oui`/`non` pour chaque recherche.
+        starter: |
+          use std::io::{self, Read};
+
+          enum Arbre {
+              Vide,
+              Noeud(Box<Arbre>, i32, Box<Arbre>),
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          enum Arbre {
+              Vide,
+              Noeud(Box<Arbre>, i32, Box<Arbre>),
+          }
+
+          impl Arbre {
+              fn inserer(self, x: i32) -> Arbre {
+                  match self {
+                      Arbre::Vide => Arbre::Noeud(Box::new(Arbre::Vide), x, Box::new(Arbre::Vide)),
+                      Arbre::Noeud(g, v, d) => {
+                          if x < v {
+                              Arbre::Noeud(Box::new(g.inserer(x)), v, d)
+                          } else if x > v {
+                              Arbre::Noeud(g, v, Box::new(d.inserer(x)))
+                          } else {
+                              Arbre::Noeud(g, v, d)
+                          }
+                      }
+                  }
+              }
+              fn contient(&self, x: i32) -> bool {
+                  match self {
+                      Arbre::Vide => false,
+                      Arbre::Noeud(g, v, d) => {
+                          if x == *v { true } else if x < *v { g.contient(x) } else { d.contient(x) }
+                      }
+                  }
+              }
+              fn parcours(&self, out: &mut Vec<i32>) {
+                  if let Arbre::Noeud(g, v, d) = self {
+                      g.parcours(out);
+                      out.push(*v);
+                      d.parcours(out);
+                  }
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut l = e.lines();
+              let mut a = Arbre::Vide;
+              for x in l.next().unwrap().split_whitespace() {
+                  a = a.inserer(x.parse().unwrap());
+              }
+              let mut out = Vec::new();
+              a.parcours(&mut out);
+              let s: Vec<String> = out.iter().map(|x| x.to_string()).collect();
+              println!("{}", s.join(" "));
+              for x in l.next().unwrap_or("").split_whitespace() {
+                  println!("{}", if a.contient(x.parse().unwrap()) { "oui" } else { "non" });
+              }
+          }
+        tests:
+          - { input: "8 3 10 1 6 3 14\n6 7", output: "1 3 6 8 10 14\noui\nnon" }
+          - { input: "5\n5 0", output: "5\noui\nnon", hidden: true }
+        concepts: [smart-pointers]
+    project:
+      id: rust-sp-projet
+      type: code
+      title: Cache mémoïsé
+      difficulty: 3
+      prompt: |
+        Crée `struct Calculateur { cache: RefCell<HashMap<u64, u64>>, calculs: Cell<u32> }` avec une méthode **`&self`** `fn collatz(&self, n: u64) -> u64` qui renvoie le nombre d’étapes de la suite de Syracuse pour atteindre 1 (n pair → n/2, sinon 3n+1), en **mémoïsant** chaque résultat. `calculs` compte le nombre de valeurs réellement calculées (absentes du cache).
+
+        Pour chaque nombre lu, affiche `n : étapes`. Termine par `calculs : X`.
+      starter: |
+        use std::cell::{Cell, RefCell};
+        use std::collections::HashMap;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::cell::{Cell, RefCell};
+        use std::collections::HashMap;
+        use std::io::{self, Read};
+
+        struct Calculateur {
+            cache: RefCell<HashMap<u64, u64>>,
+            calculs: Cell<u32>,
+        }
+
+        impl Calculateur {
+            fn collatz(&self, n: u64) -> u64 {
+                if n == 1 {
+                    return 0;
+                }
+                if let Some(&v) = self.cache.borrow().get(&n) {
+                    return v;
+                }
+                self.calculs.set(self.calculs.get() + 1);
+                let suivant = if n % 2 == 0 { n / 2 } else { 3 * n + 1 };
+                let r = 1 + self.collatz(suivant);
+                self.cache.borrow_mut().insert(n, r);
+                r
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let c = Calculateur { cache: RefCell::new(HashMap::new()), calculs: Cell::new(0) };
+            for x in e.split_whitespace() {
+                let n: u64 = x.parse().unwrap();
+                println!("{} : {}", n, c.collatz(n));
+            }
+            println!("calculs : {}", c.calculs.get());
+        }
+      tests:
+        - { input: '6 3 1', output: "6 : 8\n3 : 7\n1 : 0\ncalculs : 8" }
+        - { input: '27 27', output: "27 : 111\n27 : 111\ncalculs : 111", hidden: true }
+      hints: ['Attention : ne garde pas un `borrow()` actif pendant l’appel récursif, sinon `borrow_mut()` paniquera.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-sp-ex1
+          type: mcq
+          prompt: Dans quel ordre les variables locales sont-elles détruites ?
+          choices: [Ordre de création, Ordre inverse de création, Ordre alphabétique, Aléatoire]
+          answer: 1
+        - id: rust-sp-ex2
+          type: mcq
+          prompt: Quelle combinaison permet un état partagé et modifiable entre plusieurs threads ?
+          choices: ['Rc<RefCell<T>>', 'Arc<Mutex<T>>', 'Box<Cell<T>>', 'Rc<Mutex<T>>']
+          answer: 1
+        - id: rust-sp-ex3
+          type: mcq
+          prompt: Quand les règles d’emprunt d’un RefCell sont-elles vérifiées ?
+          choices: [À la compilation, À l’exécution, Jamais, À l’édition de liens]
+          answer: 1
+        - id: rust-sp-ex4
+          type: mcq
+          prompt: Cell<T> est adapté pour…
+          choices: [Les types Copy, Les String, Les Vec, Les threads]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-rc-arc
+    title: Rc et Arc
+    summary: Partage la propriété d’une valeur grâce au comptage de références (Rc en mono-thread, Arc en multi-threads), et évite les cycles avec Weak.
+    minutes: 30
+    concepts: [smart-pointers, concurrence]
+    sections:
+      - title: Rc, plusieurs propriétaires
+        body: |
+          `Rc<T>` (*Reference Counted*) permet à **plusieurs** variables de posséder la même valeur. Elle n’est libérée que lorsque le dernier propriétaire disparaît.
+
+          ```rust
+          use std::rc::Rc;
+
+          let a = Rc::new(String::from("partagé"));
+          let b = Rc::clone(&a);        // copie du POINTEUR, pas de la chaîne
+          let c = a.clone();            // équivalent
+          println!("{}", Rc::strong_count(&a)); // 3
+          drop(b);
+          println!("{}", Rc::strong_count(&a)); // 2
+          ```
+
+          `Rc` donne un accès **en lecture**. Pour modifier : `Rc<RefCell<T>>`.
+      - title: Arc pour les threads
+        body: |
+          Le compteur de `Rc` n’est pas protégé contre les accès simultanés : `Rc` n’implémente pas `Send`, le compilateur refuse de l’envoyer dans un thread.
+
+          `Arc<T>` (*Atomically Reference Counted*) utilise des opérations atomiques : un peu plus lent, mais sûr entre threads.
+
+          ```rust
+          use std::sync::Arc;
+          use std::thread;
+
+          let donnees = Arc::new(vec![1, 2, 3]);
+          let mut handles = vec![];
+          for i in 0..3 {
+              let d = Arc::clone(&donnees);
+              handles.push(thread::spawn(move || d[i] * 10));
+          }
+          let r: Vec<i32> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+          ```
+      - title: Cycles et Weak
+        body: |
+          Deux `Rc` qui se référencent mutuellement ne descendent jamais à 0 : **fuite mémoire**. On casse le cycle avec `Weak<T>`, une référence qui **ne possède pas** :
+
+          ```rust
+          use std::rc::{Rc, Weak};
+          use std::cell::RefCell;
+
+          struct Noeud {
+              valeur: i32,
+              parent: RefCell<Weak<Noeud>>,
+              enfants: RefCell<Vec<Rc<Noeud>>>,
+          }
+          // parent.borrow().upgrade() renvoie Option<Rc<Noeud>>
+          ```
+
+          `Rc::downgrade(&rc)` crée un `Weak` ; `weak.upgrade()` renvoie `Some(rc)` si la valeur existe encore.
+    exercises:
+      - id: rust-rc-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::rc::Rc;
+          fn main() {
+              let a = Rc::new(5);
+              let b = Rc::clone(&a);
+              {
+                  let _c = Rc::clone(&a);
+                  print!("{} ", Rc::strong_count(&a));
+              }
+              print!("{} ", Rc::strong_count(&b));
+              drop(a);
+              println!("{} {}", Rc::strong_count(&b), *b);
+          }
+        output: 3 2 1 5
+        concepts: [smart-pointers]
+      - id: rust-rc-q1
+        type: mcq
+        prompt: Pourquoi ne peut-on pas envoyer un Rc dans un autre thread ?
+        choices: [Son compteur n’est pas atomique (Rc n’est pas Send), Rc est trop gros, Les threads n’acceptent que des entiers, On peut]
+        answer: 0
+      - id: rust-rc-q2
+        type: mcq
+        prompt: Que fait `Rc::clone(&a)` ?
+        choices: [Copie profonde de la valeur, Incrémente le compteur et renvoie un nouveau pointeur vers la même valeur, Déplace a, Crée un Weak]
+        answer: 1
+      - id: rust-rc-fill
+        type: fill
+        prompt: Complète pour partager une liste modifiable entre deux propriétaires.
+        code: |
+          use std::cell::RefCell;
+          use std::rc::Rc;
+          fn main() {
+              let liste = Rc::new(RefCell::new(vec![1]));
+              let autre = Rc::{{?}}(&liste);
+              autre.{{?}}().push(2);
+              println!("{:?}", liste.borrow());
+          }
+        blanks: [[clone], [borrow_mut]]
+        tests:
+          - { input: '', output: '[1, 2]' }
+      - id: rust-rc-code
+        type: code
+        title: Arbre généalogique
+        prompt: |
+          Chaque ligne `parent enfant` décrit une filiation. Représente les personnes par `Rc<Personne>` avec `struct Personne { nom: String, parent: RefCell<Weak<Personne>>, enfants: RefCell<Vec<Rc<Personne>>> }`.
+
+          Après lecture, pour la dernière personne mentionnée sur la dernière ligne, affiche sa lignée ascendante jusqu’à la racine, séparée par ` <- ` (en remontant avec `upgrade()`).
+        starter: |
+          use std::cell::RefCell;
+          use std::collections::HashMap;
+          use std::io::{self, Read};
+          use std::rc::{Rc, Weak};
+
+          struct Personne {
+              nom: String,
+              parent: RefCell<Weak<Personne>>,
+              enfants: RefCell<Vec<Rc<Personne>>>,
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::cell::RefCell;
+          use std::collections::HashMap;
+          use std::io::{self, Read};
+          use std::rc::{Rc, Weak};
+
+          struct Personne {
+              nom: String,
+              parent: RefCell<Weak<Personne>>,
+              enfants: RefCell<Vec<Rc<Personne>>>,
+          }
+
+          fn obtenir(m: &mut HashMap<String, Rc<Personne>>, nom: &str) -> Rc<Personne> {
+              m.entry(nom.to_string())
+                  .or_insert_with(|| Rc::new(Personne { nom: nom.to_string(), parent: RefCell::new(Weak::new()), enfants: RefCell::new(vec![]) }))
+                  .clone()
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut m: HashMap<String, Rc<Personne>> = HashMap::new();
+              let mut dernier = String::new();
+              for l in e.lines() {
+                  let p: Vec<&str> = l.split_whitespace().collect();
+                  let parent = obtenir(&mut m, p[0]);
+                  let enfant = obtenir(&mut m, p[1]);
+                  *enfant.parent.borrow_mut() = Rc::downgrade(&parent);
+                  parent.enfants.borrow_mut().push(Rc::clone(&enfant));
+                  dernier = p[1].to_string();
+              }
+              let mut chemin = vec![];
+              let mut courant = Some(Rc::clone(&m[&dernier]));
+              while let Some(p) = courant {
+                  chemin.push(p.nom.clone());
+                  courant = p.parent.borrow().upgrade();
+              }
+              println!("{}", chemin.join(" <- "));
+          }
+        tests:
+          - { input: "Ada Bob\nBob Cleo\nAda Dan\nCleo Eve", output: Eve <- Cleo <- Bob <- Ada }
+          - { input: 'X Y', output: Y <- X, hidden: true }
+    project:
+      id: rust-rc-projet
+      type: code
+      title: Calcul parallèle partagé
+      difficulty: 3
+      prompt: |
+        Lis une liste d’entiers et un nombre de threads `t` (première ligne : `t`, seconde : les nombres). Partage la liste avec un `Arc<Vec<i64>>` : le thread `i` calcule la somme des éléments d’indice `j` tels que `j % t == i`.
+
+        Affiche la somme partielle de chaque thread dans l’ordre (`thread i : s`) puis `total : S`.
+      starter: |
+        use std::io::{self, Read};
+        use std::sync::Arc;
+        use std::thread;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+        use std::sync::Arc;
+        use std::thread;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let t: usize = l.next().unwrap().trim().parse().unwrap();
+            let v: Arc<Vec<i64>> = Arc::new(l.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect());
+            let handles: Vec<_> = (0..t)
+                .map(|i| {
+                    let v = Arc::clone(&v);
+                    thread::spawn(move || v.iter().enumerate().filter(|(j, _)| j % t == i).map(|(_, x)| x).sum::<i64>())
+                })
+                .collect();
+            let mut total = 0;
+            for (i, h) in handles.into_iter().enumerate() {
+                let s = h.join().unwrap();
+                println!("thread {} : {}", i, s);
+                total += s;
+            }
+            println!("total : {}", total);
+        }
+      tests:
+        - { input: "2\n1 2 3 4 5", output: "thread 0 : 9\nthread 1 : 6\ntotal : 15" }
+        - { input: "3\n10 20", output: "thread 0 : 10\nthread 1 : 20\nthread 2 : 0\ntotal : 30", hidden: true }
+      require:
+        - { pattern: 'Arc::', message: Partager les données avec Arc }
+        - { pattern: 'thread::spawn', message: Créer des threads }
+      concepts: [concurrence]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-rc-ex1
+          type: mcq
+          prompt: Comment éviter une fuite mémoire due à un cycle de Rc ?
+          choices: [Utiliser Weak pour l’une des directions, Utiliser Box, Appeler drop deux fois, C’est impossible]
+          answer: 0
+        - id: rust-rc-ex2
+          type: mcq
+          prompt: Que renvoie `weak.upgrade()` ?
+          choices: ['Option<Rc<T>>', 'Rc<T>', 'T', 'Result<T, E>']
+          answer: 0
+        - id: rust-rc-ex3
+          type: mcq
+          prompt: Quelle est la différence principale entre Rc et Arc ?
+          choices: [Arc utilise un compteur atomique, utilisable entre threads, Arc permet la modification, Rc est plus lent, Aucune]
+          answer: 0
+        - id: rust-rc-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            use std::rc::Rc;
+            fn main() {
+                let a = Rc::new(vec![1, 2]);
+                let b = a.clone();
+                let w = Rc::downgrade(&a);
+                drop(a);
+                println!("{} {}", b.len(), w.upgrade().is_some());
+                drop(b);
+                println!("{}", w.upgrade().is_some());
+            }
+          output: "2 true\nfalse"
+
+  # ------------------------------------------------------------------
+  - slug: rust-mutex-rwlock
+    title: Mutex et RwLock
+    summary: Protège des données partagées avec Mutex et RwLock, comprends les gardes (guards), le poisoning et les interblocages.
+    minutes: 30
+    concepts: [concurrence]
+    sections:
+      - title: Mutex
+        body: |
+          Un `Mutex<T>` (*mutual exclusion*) garantit qu’**un seul** thread à la fois accède à la donnée :
+
+          ```rust
+          use std::sync::{Arc, Mutex};
+          use std::thread;
+
+          let compteur = Arc::new(Mutex::new(0));
+          let mut handles = vec![];
+          for _ in 0..10 {
+              let c = Arc::clone(&compteur);
+              handles.push(thread::spawn(move || {
+                  let mut garde = c.lock().unwrap();   // attend le verrou
+                  *garde += 1;
+              }));                                     // garde libérée ici (Drop)
+          }
+          for h in handles { h.join().unwrap(); }
+          println!("{}", *compteur.lock().unwrap());   // 10
+          ```
+
+          `lock()` renvoie une **garde** (`MutexGuard`) : le verrou est relâché automatiquement quand elle sort de portée (RAII). Impossible d’oublier de déverrouiller !
+      - title: RwLock
+        body: |
+          `RwLock<T>` autorise **plusieurs lecteurs OU un seul écrivain** — idéal quand les lectures dominent :
+
+          ```rust
+          use std::sync::RwLock;
+          let config = RwLock::new(String::from("v1"));
+          {
+              let r1 = config.read().unwrap();
+              let r2 = config.read().unwrap();   // ✅ lectures simultanées
+              println!("{r1} {r2}");
+          }
+          config.write().unwrap().push_str("-maj");
+          ```
+
+          **Poisoning** : si un thread panique en tenant le verrou, celui-ci devient « empoisonné » et `lock()` renvoie `Err`. On peut récupérer la donnée avec `e.into_inner()`.
+      - title: Interblocages et bonnes pratiques
+        body: |
+          Un **interblocage** (*deadlock*) survient quand deux threads attendent chacun un verrou détenu par l’autre. Rust ne l’empêche pas !
+
+          Bonnes pratiques :
+
+          - garder les verrous le **moins longtemps possible** (copier la donnée puis relâcher) ;
+          - toujours acquérir plusieurs verrous **dans le même ordre** ;
+          - ne pas appeler de code inconnu en tenant un verrou ;
+          - pour un simple compteur, préférer les **atomiques** (`AtomicUsize::fetch_add`) ;
+          - envisager les canaux (`mpsc`) : « partager la mémoire en communiquant ».
+    exercises:
+      - id: rust-mutex-q1
+        type: mcq
+        prompt: Quand le verrou d’un Mutex est-il relâché ?
+        choices: [Quand la garde (MutexGuard) est détruite, Quand on appelle unlock(), À la fin du programme, Après 1 seconde]
+        answer: 0
+        concepts: [concurrence]
+      - id: rust-mutex-q2
+        type: mcq
+        prompt: Quel verrou permet plusieurs lecteurs simultanés ?
+        choices: [Mutex, RwLock, Cell, Barrier]
+        answer: 1
+      - id: rust-mutex-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::sync::{Arc, Mutex};
+          use std::thread;
+          fn main() {
+              let v = Arc::new(Mutex::new(Vec::new()));
+              let hs: Vec<_> = (1..=4).map(|i| {
+                  let v = Arc::clone(&v);
+                  thread::spawn(move || v.lock().unwrap().push(i * i))
+              }).collect();
+              for h in hs { h.join().unwrap(); }
+              let mut r = v.lock().unwrap().clone();
+              r.sort();
+              println!("{:?} {}", r, r.iter().sum::<i32>());
+          }
+        output: '[1, 4, 9, 16] 30'
+      - id: rust-mutex-fill
+        type: fill
+        prompt: Complète pour incrémenter le compteur protégé.
+        code: |
+          use std::sync::Mutex;
+          fn main() {
+              let m = Mutex::new(41);
+              {
+                  let mut g = m.{{?}}().unwrap();
+                  {{?}}g += 1;
+              }
+              println!("{}", m.lock().unwrap());
+          }
+        blanks: [[lock], ['*']]
+        tests:
+          - { input: '', output: '42' }
+      - id: rust-mutex-code
+        type: code
+        title: Banque concurrente
+        prompt: |
+          Plusieurs guichets (threads) traitent des opérations en parallèle sur un même compte `Arc<Mutex<i64>>`.
+
+          Première ligne : solde initial. Chaque ligne suivante est la liste des opérations d’un guichet (entiers positifs = dépôts, négatifs = retraits). Un retrait qui rendrait le solde négatif est refusé.
+
+          Lance un thread par guichet, attends-les, puis affiche le solde final et le nombre total de retraits refusés (compté dans un `Arc<AtomicUsize>` ou un second Mutex). Les tests sont conçus pour que le résultat ne dépende pas de l’ordre d’exécution.
+        starter: |
+          use std::io::{self, Read};
+          use std::sync::{Arc, Mutex};
+          use std::thread;
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+          use std::sync::atomic::{AtomicUsize, Ordering};
+          use std::sync::{Arc, Mutex};
+          use std::thread;
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut l = e.lines();
+              let solde = Arc::new(Mutex::new(l.next().unwrap().trim().parse::<i64>().unwrap()));
+              let refus = Arc::new(AtomicUsize::new(0));
+              let mut hs = vec![];
+              for ligne in l {
+                  let ops: Vec<i64> = ligne.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  let s = Arc::clone(&solde);
+                  let r = Arc::clone(&refus);
+                  hs.push(thread::spawn(move || {
+                      for op in ops {
+                          let mut g = s.lock().unwrap();
+                          if *g + op < 0 {
+                              r.fetch_add(1, Ordering::SeqCst);
+                          } else {
+                              *g += op;
+                          }
+                      }
+                  }));
+              }
+              for h in hs { h.join().unwrap(); }
+              println!("{}", solde.lock().unwrap());
+              println!("{}", refus.load(Ordering::SeqCst));
+          }
+        tests:
+          - { input: "1000\n100 200 -50\n-30 10\n5 5 5", output: "1245\n0" }
+          - { input: "0\n-10\n-20", output: "0\n2", hidden: true }
+        require:
+          - { pattern: 'Mutex', message: Utiliser un Mutex }
+        concepts: [concurrence]
+    project:
+      id: rust-mutex-projet
+      type: code
+      title: Cache de configuration
+      difficulty: 3
+      prompt: |
+        Un `Arc<RwLock<HashMap<String, String>>>` stocke une configuration. Les lignes d’entrée sont des commandes **séquentielles** exécutées chacune par un thread lancé puis attendu (`join`) immédiatement :
+
+        - `set cle valeur` (écriture) ;
+        - `get cle` (lecture) → affiche `cle = valeur` ou `cle absente` ;
+        - `dump` → affiche toutes les paires triées par clé, `cle=valeur` séparées par des espaces (ligne vide si la config est vide).
+
+        Termine par `lectures : R, écritures : W` (comptés avec des `AtomicUsize`).
+      starter: |
+        use std::collections::HashMap;
+        use std::io::{self, Read};
+        use std::sync::{Arc, RwLock};
+        use std::thread;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::collections::HashMap;
+        use std::io::{self, Read};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::{Arc, RwLock};
+        use std::thread;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let conf: Arc<RwLock<HashMap<String, String>>> = Arc::new(RwLock::new(HashMap::new()));
+            let lectures = Arc::new(AtomicUsize::new(0));
+            let ecritures = Arc::new(AtomicUsize::new(0));
+            for ligne in e.lines() {
+                let ligne = ligne.to_string();
+                let c = Arc::clone(&conf);
+                let lec = Arc::clone(&lectures);
+                let ecr = Arc::clone(&ecritures);
+                thread::spawn(move || {
+                    let p: Vec<&str> = ligne.split_whitespace().collect();
+                    match p[0] {
+                        "set" => {
+                            c.write().unwrap().insert(p[1].to_string(), p[2].to_string());
+                            ecr.fetch_add(1, Ordering::SeqCst);
+                        }
+                        "get" => {
+                            let g = c.read().unwrap();
+                            match g.get(p[1]) {
+                                Some(v) => println!("{} = {}", p[1], v),
+                                None => println!("{} absente", p[1]),
+                            }
+                            lec.fetch_add(1, Ordering::SeqCst);
+                        }
+                        _ => {
+                            let g = c.read().unwrap();
+                            let mut paires: Vec<String> = g.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
+                            paires.sort();
+                            println!("{}", paires.join(" "));
+                            lec.fetch_add(1, Ordering::SeqCst);
+                        }
+                    }
+                })
+                .join()
+                .unwrap();
+            }
+            println!("lectures : {}, écritures : {}", lectures.load(Ordering::SeqCst), ecritures.load(Ordering::SeqCst));
+        }
+      tests:
+        - { input: "set port 80\nget port\nset port 8080\nset hote local\ndump\nget tls", output: "port = 80\nhote=local port=8080\ntls absente\nlectures : 3, écritures : 3" }
+        - { input: "dump", output: "\nlectures : 1, écritures : 0", hidden: true }
+      require:
+        - { pattern: 'RwLock', message: Utiliser un RwLock }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-mutex-ex1
+          type: mcq
+          prompt: Qu’est-ce qu’un verrou « empoisonné » (poisoned) ?
+          choices: [Un verrou dont un détenteur a paniqué, Un verrou jamais créé, Un verrou trop lent, Un verrou partagé par Rc]
+          answer: 0
+        - id: rust-mutex-ex2
+          type: mcq
+          prompt: Rust empêche-t-il les interblocages (deadlocks) à la compilation ?
+          choices: [Oui, toujours, Non, Seulement avec RwLock, Seulement en release]
+          answer: 1
+        - id: rust-mutex-ex3
+          type: mcq
+          prompt: Pour un simple compteur partagé, quelle solution est la plus légère ?
+          choices: ['Arc<Mutex<u64>>', 'AtomicU64 dans un Arc', 'Rc<RefCell<u64>>', Une variable globale mut]
+          answer: 1
+        - id: rust-mutex-ex4
+          type: mcq
+          prompt: Comment éviter un deadlock avec deux verrous A et B ?
+          choices: [Toujours les acquérir dans le même ordre, Les acquérir le plus tard possible, Utiliser unsafe, Dupliquer les verrous]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-concurrence
+    title: Concurrence
+    summary: Send et Sync, canaux mpsc, scoped threads et parallélisme sans data race — la « concurrence sans peur » de Rust.
+    minutes: 35
+    concepts: [concurrence]
+    sections:
+      - title: Send et Sync
+        body: |
+          Deux traits marqueurs automatiques garantissent la sûreté des threads :
+
+          - **`Send`** : la valeur peut être **transférée** à un autre thread (`String`, `Vec`, `Arc`… mais pas `Rc`) ;
+          - **`Sync`** : la valeur peut être **partagée** par référence entre threads (`&T` est `Send`) — `Mutex<T>` est `Sync`, `RefCell<T>` ne l’est pas.
+
+          Le compilateur refuse tout programme qui pourrait provoquer une *data race*. C’est la « **concurrence sans peur** » (*fearless concurrency*).
+      - title: Canaux (message passing)
+        body: |
+          « Ne communiquez pas en partageant la mémoire ; partagez la mémoire en communiquant. »
+
+          ```rust
+          use std::sync::mpsc;
+          use std::thread;
+
+          let (tx, rx) = mpsc::channel();
+          for id in 0..3 {
+              let tx = tx.clone();                 // plusieurs producteurs
+              thread::spawn(move || {
+                  tx.send(format!("bonjour de {id}")).unwrap();
+              });
+          }
+          drop(tx);                                // ferme le canal original
+          for msg in rx {                          // itère jusqu’à fermeture
+              println!("{msg}");
+          }
+          ```
+
+          `mpsc` = *multiple producer, single consumer*. `recv()` bloque, `try_recv()` non. `sync_channel(n)` crée un canal borné (contre-pression).
+      - title: Scoped threads
+        body: |
+          `thread::scope` (Rust 1.63+) crée des threads qui **peuvent emprunter** des variables locales, car ils sont garantis terminés à la fin du bloc :
+
+          ```rust
+          let donnees = vec![1, 2, 3, 4, 5, 6];
+          let (gauche, droite) = donnees.split_at(3);
+          let (a, b) = thread::scope(|s| {
+              let h1 = s.spawn(|| gauche.iter().sum::<i32>());
+              let h2 = s.spawn(|| droite.iter().sum::<i32>());
+              (h1.join().unwrap(), h2.join().unwrap())
+          });
+          println!("{}", a + b); // 21 — pas besoin d’Arc !
+          ```
+
+          Pour du parallélisme de données à grande échelle, la crate **rayon** transforme `iter()` en `par_iter()`.
+    exercises:
+      - id: rust-conc-q1
+        type: mcq
+        prompt: Pourquoi Rc n’implémente-t-il pas Send ?
+        choices: [Son compteur non atomique provoquerait des data races, Il est trop gros, Il contient un pointeur, Par erreur historique]
+        answer: 0
+        concepts: [concurrence]
+      - id: rust-conc-q2
+        type: mcq
+        prompt: Que signifie mpsc ?
+        choices: [Multiple producer, single consumer, Memory protected shared channel, Mutex per single core, Multi-process system call]
+        answer: 0
+      - id: rust-conc-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::sync::mpsc;
+          use std::thread;
+          fn main() {
+              let (tx, rx) = mpsc::channel();
+              let h = thread::spawn(move || {
+                  for i in 1..=3 {
+                      tx.send(i * 100).unwrap();
+                  }
+              });
+              h.join().unwrap();
+              let total: i32 = rx.iter().sum();
+              println!("{}", total);
+          }
+        output: '600'
+        explanation: 'Quand le thread se termine, `tx` est détruit : le canal se ferme et l’itération sur `rx` s’arrête.'
+      - id: rust-conc-fill
+        type: fill
+        prompt: Complète pour que les threads puissent emprunter `v` sans Arc.
+        code: |
+          use std::thread;
+          fn main() {
+              let v = vec![1, 2, 3, 4];
+              let s: i32 = thread::{{?}}(|s| {
+                  let h = s.spawn(|| v.iter().sum::<i32>());
+                  h.join().unwrap()
+              });
+              println!("{}", s);
+          }
+        blanks: [[scope]]
+        tests:
+          - { input: '', output: '10' }
+      - id: rust-conc-code
+        type: code
+        title: Producteurs et consommateur
+        prompt: |
+          Chaque ligne d’entrée correspond à un **producteur** (un thread) qui envoie, via un canal `mpsc`, la longueur (en caractères) de chacun de ses mots.
+
+          Le thread principal (consommateur) reçoit tous les messages et affiche : le nombre de messages reçus, la somme des longueurs et la longueur maximale.
+        starter: |
+          use std::io::{self, Read};
+          use std::sync::mpsc;
+          use std::thread;
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+          use std::sync::mpsc;
+          use std::thread;
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let (tx, rx) = mpsc::channel::<usize>();
+              for ligne in e.lines() {
+                  let tx = tx.clone();
+                  let ligne = ligne.to_string();
+                  thread::spawn(move || {
+                      for m in ligne.split_whitespace() {
+                          tx.send(m.chars().count()).unwrap();
+                      }
+                  });
+              }
+              drop(tx);
+              let recus: Vec<usize> = rx.iter().collect();
+              println!("{} {} {}", recus.len(), recus.iter().sum::<usize>(), recus.iter().max().unwrap_or(&0));
+          }
+        tests:
+          - { input: "la concurrence sans peur\nrust", output: 5 25 11 }
+          - { input: "a\nbb\nccc", output: 3 6 3, hidden: true }
+        require:
+          - { pattern: 'mpsc', message: Utiliser un canal mpsc }
+        concepts: [concurrence]
+    project:
+      id: rust-conc-projet
+      type: code
+      title: Pool de travailleurs
+      difficulty: 3
+      prompt: |
+        Implémente un mini **pool de threads** : `N` travailleurs partagent un canal de tâches (`Arc<Mutex<mpsc::Receiver<u64>>>`). Chaque tâche est un nombre `n` ; le travailleur calcule la somme des diviseurs propres de `n` et renvoie `(n, somme)` sur un canal de résultats.
+
+        Première ligne : `N`. Seconde ligne : les tâches. Affiche les résultats **triés par n** au format `n : somme (parfait|abondant|déficient)` — parfait si somme = n, abondant si somme > n.
+      starter: |
+        use std::io::{self, Read};
+        use std::sync::{mpsc, Arc, Mutex};
+        use std::thread;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+        use std::sync::{mpsc, Arc, Mutex};
+        use std::thread;
+
+        fn somme_diviseurs(n: u64) -> u64 {
+            (1..n).filter(|d| n % d == 0).sum()
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let n: usize = l.next().unwrap().trim().parse().unwrap();
+            let taches: Vec<u64> = l.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let (tx_t, rx_t) = mpsc::channel::<u64>();
+            let (tx_r, rx_r) = mpsc::channel::<(u64, u64)>();
+            let rx_t = Arc::new(Mutex::new(rx_t));
+            let mut hs = vec![];
+            for _ in 0..n {
+                let rx = Arc::clone(&rx_t);
+                let tx = tx_r.clone();
+                hs.push(thread::spawn(move || loop {
+                    let tache = rx.lock().unwrap().recv();
+                    match tache {
+                        Ok(x) => tx.send((x, somme_diviseurs(x))).unwrap(),
+                        Err(_) => break,
+                    }
+                }));
+            }
+            drop(tx_r);
+            for t in taches { tx_t.send(t).unwrap(); }
+            drop(tx_t);
+            for h in hs { h.join().unwrap(); }
+            let mut res: Vec<(u64, u64)> = rx_r.iter().collect();
+            res.sort();
+            for (x, s) in res {
+                let genre = if s == x { "parfait" } else if s > x { "abondant" } else { "déficient" };
+                println!("{} : {} ({})", x, s, genre);
+            }
+        }
+      tests:
+        - { input: "3\n6 12 7 28", output: "6 : 6 (parfait)\n7 : 1 (déficient)\n12 : 16 (abondant)\n28 : 28 (parfait)" }
+        - { input: "1\n1 496", output: "1 : 0 (déficient)\n496 : 496 (parfait)", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-conc-ex1
+          type: mcq
+          prompt: Un type `T` est `Sync` si…
+          choices: ['&T peut être partagé entre threads', T peut être copié, T est sur la pile, T est un entier]
+          answer: 0
+        - id: rust-conc-ex2
+          type: mcq
+          prompt: Quand une boucle `for msg in rx` s’arrête-t-elle ?
+          choices: [Quand tous les émetteurs (tx) ont été détruits, Après 10 messages, Jamais, Quand le canal est vide]
+          answer: 0
+        - id: rust-conc-ex3
+          type: mcq
+          prompt: Quel avantage offre `thread::scope` ?
+          choices: [Les threads peuvent emprunter des variables locales, Les threads sont plus rapides, Il remplace les Mutex, Il évite les deadlocks]
+          answer: 0
+        - id: rust-conc-ex4
+          type: mcq
+          prompt: Quelle crate permet de paralléliser un itérateur avec par_iter() ?
+          choices: [tokio, rayon, serde, crossbeam-utils]
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-threads
+    title: Threads
+    summary: Crée et coordonne des threads système — spawn, join, valeurs de retour, move, sleep, Barrier et atomiques.
+    minutes: 30
+    concepts: [concurrence]
+    sections:
+      - title: Créer un thread
+        body: |
+          ```rust
+          use std::thread;
+          use std::time::Duration;
+
+          let handle = thread::spawn(|| {
+              for i in 1..=3 {
+                  println!("thread : {i}");
+                  thread::sleep(Duration::from_millis(10));
+              }
+              42                      // valeur de retour
+          });
+
+          println!("principal");
+          let resultat = handle.join().unwrap();   // attend la fin et récupère 42
+          ```
+
+          ⚠️ L’ordre d’affichage entre threads **n’est pas déterministe**. Quand le thread principal se termine, le programme s’arrête, même si d’autres threads tournent encore : pense à `join()`.
+
+          `join()` renvoie `Err` si le thread a paniqué : une panique ne se propage pas automatiquement.
+      - title: move et données
+        body: |
+          Une closure passée à `spawn` doit être `'static` : elle ne peut pas emprunter des variables locales (le thread pourrait leur survivre). On utilise `move` :
+
+          ```rust
+          let v = vec![1, 2, 3];
+          let h = thread::spawn(move || v.iter().sum::<i32>()); // v est déplacé
+          ```
+
+          Outils de coordination :
+
+          - `std::sync::Barrier` : attendre que N threads atteignent un point ;
+          - `std::sync::atomic::{AtomicUsize, AtomicBool, Ordering}` : compteurs et drapeaux sans verrou ;
+          - `thread::Builder::new().name("worker".into()).spawn(...)` : nommer un thread ;
+          - `thread::available_parallelism()` : nombre de cœurs disponibles.
+    exercises:
+      - id: rust-thr-q1
+        type: mcq
+        prompt: Que renvoie `handle.join()` ?
+        choices: [La valeur de retour du thread dans un Result, Rien, Un booléen, Le nom du thread]
+        answer: 0
+        concepts: [concurrence]
+      - id: rust-thr-q2
+        type: mcq
+        prompt: Pourquoi faut-il souvent `move` devant la closure de `thread::spawn` ?
+        choices: [Le thread peut survivre aux variables locales, il doit donc les posséder, Pour accélérer le thread, Pour le rendre mutable, Ce n’est jamais nécessaire]
+        answer: 0
+      - id: rust-thr-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::sync::atomic::{AtomicUsize, Ordering};
+          use std::sync::Arc;
+          use std::thread;
+          fn main() {
+              let c = Arc::new(AtomicUsize::new(0));
+              let hs: Vec<_> = (0..8).map(|_| {
+                  let c = Arc::clone(&c);
+                  thread::spawn(move || { for _ in 0..1000 { c.fetch_add(1, Ordering::Relaxed); } })
+              }).collect();
+              for h in hs { h.join().unwrap(); }
+              println!("{}", c.load(Ordering::SeqCst));
+          }
+        output: '8000'
+      - id: rust-thr-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0373). Trouve et corrige l’erreur.
+        code: |
+          use std::thread;
+          fn main() {
+              let message = String::from("coucou");
+              let h = thread::spawn(|| {
+                  println!("{}", message);
+              });
+              h.join().unwrap();
+          }
+        bugLines: [4]
+        choices:
+          - La closure emprunte message alors que le thread pourrait lui survivre ; il faut move
+          - println! est interdit dans un thread
+          - Il faut cloner h
+        answer: 0
+        solution: |
+          use std::thread;
+          fn main() {
+              let message = String::from("coucou");
+              let h = thread::spawn(move || {
+                  println!("{}", message);
+              });
+              h.join().unwrap();
+          }
+        tests:
+          - { input: '', output: coucou }
+      - id: rust-thr-code
+        type: code
+        title: Recherche de nombres premiers en parallèle
+        prompt: |
+          Lis `n` et `t`. Découpe l’intervalle `[2, n]` en `t` tranches contiguës de tailles aussi égales que possible et compte les nombres premiers de chaque tranche dans un thread différent.
+
+          Affiche le total des nombres premiers ≤ n.
+        starter: |
+          use std::io;
+          use std::thread;
+
+          fn est_premier(n: u64) -> bool {
+              n >= 2 && (2..).take_while(|d| d * d <= n).all(|d| n % d != 0)
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<u64> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              let (n, t) = (v[0], v[1]);
+          }
+        solution: |
+          use std::io;
+          use std::thread;
+
+          fn est_premier(n: u64) -> bool {
+              n >= 2 && (2..).take_while(|d| d * d <= n).all(|d| n % d != 0)
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<u64> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              let (n, t) = (v[0], v[1]);
+              let total_nombres = if n >= 2 { n - 1 } else { 0 };
+              let taille = (total_nombres + t - 1) / t.max(1);
+              let mut hs = vec![];
+              for i in 0..t {
+                  let debut = 2 + i * taille;
+                  let fin = (debut + taille).min(n + 1);
+                  hs.push(thread::spawn(move || (debut..fin).filter(|&x| est_premier(x)).count()));
+              }
+              let total: usize = hs.into_iter().map(|h| h.join().unwrap()).sum();
+              println!("{}", total);
+          }
+        tests:
+          - { input: '100 4', output: '25' }
+          - { input: '1 3', output: '0', hidden: true }
+          - { input: '100000 8', output: '9592', hidden: true }
+        require:
+          - { pattern: 'thread::spawn', message: Utiliser des threads }
+        concepts: [concurrence]
+    project:
+      id: rust-thr-projet
+      type: code
+      title: Course de tortues synchronisée
+      difficulty: 3
+      prompt: |
+        `N` tortues (threads) avancent en `T` tours. Au tour `k` (de 1 à T), la tortue `i` avance de `((i + 1) * k) % 5 + 1` cases. Une `Barrier` synchronise les tortues à la fin de chaque tour ; les positions sont stockées dans un `Arc<Mutex<Vec<u32>>>`.
+
+        Après chaque tour, **un seul** thread (celui dont `barrier.wait()` renvoie `is_leader()`) enregistre la tortue en tête (la plus petite d’indice en cas d’égalité) dans un vecteur partagé. Affiche la liste des leaders par tour (`tour k : tortue i`) puis les positions finales séparées par des espaces.
+      starter: |
+        use std::io;
+        use std::sync::{Arc, Barrier, Mutex};
+        use std::thread;
+
+        fn main() {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            let v: Vec<usize> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let (n, t) = (v[0], v[1]);
+        }
+      solution: |
+        use std::io;
+        use std::sync::{Arc, Barrier, Mutex};
+        use std::thread;
+
+        fn main() {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            let v: Vec<usize> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let (n, t) = (v[0], v[1]);
+            let positions = Arc::new(Mutex::new(vec![0u32; n]));
+            let leaders = Arc::new(Mutex::new(Vec::new()));
+            let barriere = Arc::new(Barrier::new(n));
+            let mut hs = vec![];
+            for i in 0..n {
+                let pos = Arc::clone(&positions);
+                let lead = Arc::clone(&leaders);
+                let b = Arc::clone(&barriere);
+                hs.push(thread::spawn(move || {
+                    for k in 1..=t {
+                        pos.lock().unwrap()[i] += (((i + 1) * k) % 5 + 1) as u32;
+                        if b.wait().is_leader() {
+                            let p = pos.lock().unwrap();
+                            let max = *p.iter().max().unwrap();
+                            let tete = p.iter().position(|&x| x == max).unwrap();
+                            lead.lock().unwrap().push((k, tete));
+                        }
+                        b.wait();
+                    }
+                }));
+            }
+            for h in hs { h.join().unwrap(); }
+            for (k, i) in leaders.lock().unwrap().iter() {
+                println!("tour {} : tortue {}", k, i);
+            }
+            let p: Vec<String> = positions.lock().unwrap().iter().map(|x| x.to_string()).collect();
+            println!("{}", p.join(" "));
+        }
+      tests:
+        - { input: '3 3', output: "tour 1 : tortue 2\ntour 2 : tortue 1\ntour 3 : tortue 2\n9 10 11" }
+        - { input: '1 2', output: "tour 1 : tortue 0\ntour 2 : tortue 0\n5", hidden: true }
+      hints: ['Un second `wait()` après la section du leader garantit que personne n’entame le tour suivant avant l’enregistrement.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-thr-ex1
+          type: mcq
+          prompt: Que se passe-t-il pour les threads encore actifs quand main se termine ?
+          choices: [Ils sont arrêtés avec le processus, Ils continuent seuls, Ils deviennent des démons, Le programme attend automatiquement]
+          answer: 0
+        - id: rust-thr-ex2
+          type: mcq
+          prompt: Que permet une Barrier ?
+          choices: [Attendre que N threads aient atteint le même point, Protéger une donnée, Envoyer des messages, Limiter la mémoire]
+          answer: 0
+        - id: rust-thr-ex3
+          type: mcq
+          prompt: Comment savoir si un thread a paniqué ?
+          choices: [join() renvoie Err, Le programme s’arrête toujours, Avec is_panicked(), Impossible]
+          answer: 0
+        - id: rust-thr-ex4
+          type: mcq
+          prompt: Quelle fonction donne le nombre de cœurs disponibles ?
+          choices: ['thread::available_parallelism()', 'std::cpu::count()', 'num_cpus()', 'thread::cores()']
+          answer: 0

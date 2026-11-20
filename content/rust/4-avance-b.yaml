@@ -1,0 +1,1448 @@
+language: rust
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-async
+    title: Async/Await
+    summary: Programmation asynchrone avec async fn, .await et le runtime tokio — tâches, join!, select! et temporisations.
+    minutes: 35
+    concepts: [async]
+    sections:
+      - title: Pourquoi l’asynchrone ?
+        body: |
+          Un serveur qui gère 10 000 connexions ne peut pas créer 10 000 threads système (mémoire, changements de contexte). L’**asynchrone** permet à quelques threads de gérer des milliers de tâches qui passent leur temps à **attendre** (réseau, disque, minuteries).
+
+          ```rust
+          async fn telecharger(id: u32) -> String {
+              // ... attente réseau ...
+              format!("page {id}")
+          }
+          ```
+
+          Une `async fn` ne s’exécute pas immédiatement : elle renvoie un **Future**, une valeur qui représente un calcul **à venir**. Il faut l’`.await`er dans un contexte asynchrone, et un **runtime** (comme `tokio`) pour faire avancer les futures.
+      - title: tokio en pratique
+        body: |
+          ```rust
+          use tokio::time::{sleep, Duration};
+
+          async fn tache(nom: &str, ms: u64) -> String {
+              sleep(Duration::from_millis(ms)).await;   // n’occupe PAS le thread
+              format!("{nom} terminée")
+          }
+
+          #[tokio::main]
+          async fn main() {
+              // Séquentiel : ~300 ms
+              let a = tache("A", 100).await;
+              let b = tache("B", 200).await;
+
+              // Concurrent : ~200 ms
+              let (c, d) = tokio::join!(tache("C", 100), tache("D", 200));
+
+              // Tâche indépendante (comme un thread léger)
+              let h = tokio::spawn(async { 21 * 2 });
+              println!("{a} {b} {c} {d} {}", h.await.unwrap());
+          }
+          ```
+
+          `tokio::select!` attend **la première** de plusieurs futures (utile pour les délais : `tokio::time::timeout`).
+      - title: Pièges classiques
+        body: |
+          - **Ne jamais bloquer** dans du code async (`std::thread::sleep`, calcul lourd, I/O bloquante) : cela gèle tout le runtime. Utilise `tokio::time::sleep`, `tokio::fs`, ou `tokio::task::spawn_blocking` pour le calcul lourd.
+          - `.await` n’est possible que dans une fonction ou un bloc `async`.
+          - Les données partagées entre tâches : `Arc<tokio::sync::Mutex<T>>` (un mutex qui peut être tenu à travers un `.await`), canaux `tokio::sync::mpsc`.
+          - Une future non `.await`ée ne fait **rien**.
+
+          > 💡 tokio est pré-installé dans le bac à sable Codemori.
+    exercises:
+      - id: rust-async-q1
+        type: mcq
+        prompt: Que renvoie l’appel d’une `async fn` sans `.await` ?
+        choices: [Le résultat calculé, Une Future qui ne s’exécute pas encore, Un thread, Une erreur]
+        answer: 1
+        concepts: [async]
+      - id: rust-async-q2
+        type: mcq
+        prompt: Pourquoi éviter `std::thread::sleep` dans une tâche async ?
+        choices: [Il bloque le thread du runtime et gèle les autres tâches, Il est trop précis, Il ne compile pas, Il consomme de la mémoire]
+        answer: 0
+      - id: rust-async-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          async fn carre(x: u32) -> u32 { x * x }
+
+          #[tokio::main]
+          async fn main() {
+              let (a, b) = tokio::join!(carre(3), carre(4));
+              let h = tokio::spawn(async move { a + b });
+              println!("{}", h.await.unwrap());
+          }
+        output: '25'
+      - id: rust-async-fill
+        type: fill
+        prompt: Complète pour attendre le résultat de la tâche.
+        code: |
+          async fn salut() -> &'static str { "bonjour" }
+
+          #[tokio::main]
+          async fn main() {
+              let s = salut().{{?}};
+              println!("{}", s);
+          }
+        blanks: [[await]]
+        tests:
+          - { input: '', output: bonjour }
+      - id: rust-async-code
+        type: code
+        title: Téléchargements simultanés
+        prompt: |
+          Chaque ligne d’entrée contient `nom durée_ms`. Simule un téléchargement par ligne avec `tokio::time::sleep`, en lançant **toutes** les tâches en parallèle avec `tokio::spawn`.
+
+          Chaque tâche renvoie `(nom, durée)`. Affiche les noms **dans l’ordre de fin** (le plus rapide d’abord ; les durées sont toutes différentes et espacées d’au moins 30 ms), puis `durée totale ≈ max` (la plus grande durée).
+
+          Astuce : envoie chaque résultat dans un canal `tokio::sync::mpsc` dès que la tâche se termine.
+        starter: |
+          use std::io::{self, Read};
+          use tokio::sync::mpsc;
+          use tokio::time::{sleep, Duration};
+
+          #[tokio::main]
+          async fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+          use tokio::sync::mpsc;
+          use tokio::time::{sleep, Duration};
+
+          #[tokio::main]
+          async fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let (tx, mut rx) = mpsc::channel::<(String, u64)>(100);
+              for l in e.lines() {
+                  let p: Vec<&str> = l.split_whitespace().collect();
+                  let nom = p[0].to_string();
+                  let ms: u64 = p[1].parse().unwrap();
+                  let tx = tx.clone();
+                  tokio::spawn(async move {
+                      sleep(Duration::from_millis(ms)).await;
+                      tx.send((nom, ms)).await.unwrap();
+                  });
+              }
+              drop(tx);
+              let mut max = 0;
+              while let Some((nom, ms)) = rx.recv().await {
+                  println!("{}", nom);
+                  max = max.max(ms);
+              }
+              println!("durée totale ≈ {}", max);
+          }
+        tests:
+          - { input: "image.png 120\npage.html 30\nstyle.css 80", output: "page.html\nstyle.css\nimage.png\ndurée totale ≈ 120" }
+          - { input: "a 200\nb 100", output: "b\na\ndurée totale ≈ 200", hidden: true }
+        require:
+          - { pattern: 'tokio::spawn', message: Lancer les tâches avec tokio::spawn }
+        concepts: [async]
+    project:
+      id: rust-async-projet
+      type: code
+      title: Délai d’expiration
+      difficulty: 3
+      prompt: |
+        Chaque ligne contient `nom durée_ms limite_ms`. Pour chaque requête simulée (un `sleep` de `durée_ms`), utilise `tokio::time::timeout` avec `limite_ms` :
+
+        - si la requête se termine à temps, affiche `nom : OK` ;
+        - sinon `nom : expirée`.
+
+        Les requêtes sont traitées **concurremment** avec `futures`… sans crate supplémentaire : lance-les avec `tokio::spawn`, garde les `JoinHandle` dans un `Vec` et attends-les **dans l’ordre des lignes** pour l’affichage. Termine par `réussies : X/N`.
+      starter: |
+        use std::io::{self, Read};
+        use tokio::time::{sleep, timeout, Duration};
+
+        #[tokio::main]
+        async fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+        use tokio::time::{sleep, timeout, Duration};
+
+        #[tokio::main]
+        async fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut handles = vec![];
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                let nom = p[0].to_string();
+                let duree: u64 = p[1].parse().unwrap();
+                let limite: u64 = p[2].parse().unwrap();
+                handles.push(tokio::spawn(async move {
+                    let ok = timeout(Duration::from_millis(limite), sleep(Duration::from_millis(duree))).await.is_ok();
+                    (nom, ok)
+                }));
+            }
+            let n = handles.len();
+            let mut reussies = 0;
+            for h in handles {
+                let (nom, ok) = h.await.unwrap();
+                if ok { reussies += 1; }
+                println!("{} : {}", nom, if ok { "OK" } else { "expirée" });
+            }
+            println!("réussies : {}/{}", reussies, n);
+        }
+      tests:
+        - { input: "api 50 200\nbdd 300 100\ncache 10 100", output: "api : OK\nbdd : expirée\ncache : OK\nréussies : 2/3" }
+        - { input: "lent 400 50", output: "lent : expirée\nréussies : 0/1", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-async-ex1
+          type: mcq
+          prompt: Que fait `tokio::join!(a, b)` ?
+          choices: [Exécute a puis b séquentiellement, Attend a et b concurremment et renvoie leurs résultats, Crée deux threads système, Annule b si a échoue]
+          answer: 1
+        - id: rust-async-ex2
+          type: mcq
+          prompt: Pour un calcul CPU lourd dans un programme tokio, on utilise…
+          choices: ['tokio::task::spawn_blocking', 'tokio::time::sleep', 'async move', 'select!']
+          answer: 0
+        - id: rust-async-ex3
+          type: mcq
+          prompt: Quel attribut transforme main en point d’entrée asynchrone ?
+          choices: ['#[async]', '#[tokio::main]', '#[await]', '#[runtime]']
+          answer: 1
+        - id: rust-async-ex4
+          type: mcq
+          prompt: Quel est l’intérêt principal de l’asynchrone ?
+          choices: [Gérer de très nombreuses attentes d’E/S avec peu de threads, Accélérer les calculs mathématiques, Remplacer les traits, Éviter le borrow checker]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-futures
+    title: Futures
+    summary: Sous le capot de async — le trait Future, Poll, Waker, Pin, et l’écriture d’un mini exécuteur.
+    minutes: 35
+    concepts: [async]
+    sections:
+      - title: Le trait Future
+        body: |
+          ```rust
+          pub trait Future {
+              type Output;
+              fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+          }
+
+          pub enum Poll<T> { Ready(T), Pending }
+          ```
+
+          L’exécuteur appelle `poll` :
+
+          - `Poll::Ready(v)` : terminé ;
+          - `Poll::Pending` : pas encore prêt. La future doit alors s’arranger pour appeler `cx.waker().wake()` quand elle pourra progresser — l’exécuteur la re-pollera.
+
+          Le compilateur transforme chaque `async fn` en **machine à états** qui implémente `Future` : chaque `.await` est un point de suspension.
+      - title: Écrire une future à la main
+        body: |
+          ```rust
+          use std::future::Future;
+          use std::pin::Pin;
+          use std::task::{Context, Poll};
+
+          struct Compte { restant: u32 }
+
+          impl Future for Compte {
+              type Output = &'static str;
+              fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                  if self.restant == 0 {
+                      Poll::Ready("décollage !")
+                  } else {
+                      self.restant -= 1;
+                      cx.waker().wake_by_ref();   // « re-polle-moi »
+                      Poll::Pending
+                  }
+              }
+          }
+          ```
+
+          **Pin** garantit que la future ne sera plus déplacée en mémoire une fois pollée : indispensable car les machines à états générées peuvent contenir des références vers leurs propres champs.
+      - title: Un mini exécuteur
+        body: |
+          ```rust
+          use std::task::Waker;
+
+          fn bloquer_sur<F: Future>(fut: F) -> F::Output {
+              let mut fut = Box::pin(fut);
+              let mut cx = Context::from_waker(Waker::noop());
+              loop {
+                  if let Poll::Ready(v) = fut.as_mut().poll(&mut cx) {
+                      return v;
+                  }
+              }
+          }
+          ```
+
+          Cet exécuteur « actif » boucle sans arrêt : un vrai runtime (tokio) met les tâches en attente et ne les re-polle que lorsque leur `Waker` est réveillé par un événement (socket prête, minuterie écoulée…).
+    exercises:
+      - id: rust-fut-q1
+        type: mcq
+        prompt: Que signifie `Poll::Pending` ?
+        choices: [La future a échoué, La future n’est pas encore prête, La future est annulée, Le résultat est vide]
+        answer: 1
+        concepts: [async]
+      - id: rust-fut-q2
+        type: mcq
+        prompt: À quoi sert le Waker ?
+        choices: [À signaler à l’exécuteur qu’une future peut progresser, À réveiller l’ordinateur, À annuler une tâche, À libérer la mémoire]
+        answer: 0
+      - id: rust-fut-q3
+        type: mcq
+        prompt: En quoi le compilateur transforme-t-il une async fn ?
+        choices: [En thread, En machine à états implémentant Future, En closure FnOnce, En macro]
+        answer: 1
+      - id: rust-fut-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::future::Future;
+          use std::pin::Pin;
+          use std::task::{Context, Poll, Waker};
+
+          struct Compte { restant: u32, polls: u32 }
+          impl Future for Compte {
+              type Output = u32;
+              fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<u32> {
+                  self.polls += 1;
+                  if self.restant == 0 { Poll::Ready(self.polls) }
+                  else { self.restant -= 1; cx.waker().wake_by_ref(); Poll::Pending }
+              }
+          }
+
+          fn bloquer_sur<F: Future>(f: F) -> F::Output {
+              let mut f = Box::pin(f);
+              let mut cx = Context::from_waker(Waker::noop());
+              loop { if let Poll::Ready(v) = f.as_mut().poll(&mut cx) { return v; } }
+          }
+
+          fn main() {
+              println!("{}", bloquer_sur(Compte { restant: 3, polls: 0 }));
+              println!("{}", bloquer_sur(async { 40 + 2 }));
+          }
+        output: "4\n42"
+      - id: rust-fut-code
+        type: code
+        title: Exécuteur à tour de rôle
+        prompt: |
+          Écris un exécuteur **coopératif** qui fait progresser plusieurs futures à tour de rôle.
+
+          On te donne la future `Travail { nom, etapes }` : à chaque `poll`, elle affiche `nom étape i` puis renvoie `Pending`, jusqu’à avoir effectué toutes ses étapes ; elle renvoie alors `Ready(nom)`.
+
+          Écris `fn executer(taches: Vec<Pin<Box<dyn Future<Output = String>>>>)` qui polle les tâches **en tourniquet** (round-robin, dans l’ordre) jusqu’à ce que toutes soient finies, et affiche `fin de nom` dès qu’une tâche se termine.
+
+          Chaque ligne d’entrée : `nom etapes`.
+        starter: |
+          use std::future::Future;
+          use std::io::{self, Read};
+          use std::pin::Pin;
+          use std::task::{Context, Poll, Waker};
+
+          struct Travail { nom: String, etapes: u32, fait: u32 }
+
+          impl Future for Travail {
+              type Output = String;
+              fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<String> {
+                  if self.fait == self.etapes {
+                      return Poll::Ready(self.nom.clone());
+                  }
+                  self.fait += 1;
+                  println!("{} étape {}", self.nom, self.fait);
+                  Poll::Pending
+              }
+          }
+
+          fn executer(taches: Vec<Pin<Box<dyn Future<Output = String>>>>) {
+              todo!()
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let taches: Vec<Pin<Box<dyn Future<Output = String>>>> = e
+                  .lines()
+                  .map(|l| {
+                      let p: Vec<&str> = l.split_whitespace().collect();
+                      Box::pin(Travail { nom: p[0].to_string(), etapes: p[1].parse().unwrap(), fait: 0 }) as Pin<Box<dyn Future<Output = String>>>
+                  })
+                  .collect();
+              executer(taches);
+          }
+        solution: |
+          use std::future::Future;
+          use std::io::{self, Read};
+          use std::pin::Pin;
+          use std::task::{Context, Poll, Waker};
+
+          struct Travail { nom: String, etapes: u32, fait: u32 }
+
+          impl Future for Travail {
+              type Output = String;
+              fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<String> {
+                  if self.fait == self.etapes {
+                      return Poll::Ready(self.nom.clone());
+                  }
+                  self.fait += 1;
+                  println!("{} étape {}", self.nom, self.fait);
+                  Poll::Pending
+              }
+          }
+
+          fn executer(mut taches: Vec<Pin<Box<dyn Future<Output = String>>>>) {
+              let mut cx = Context::from_waker(Waker::noop());
+              while !taches.is_empty() {
+                  let mut restantes = Vec::new();
+                  for mut t in taches {
+                      match t.as_mut().poll(&mut cx) {
+                          Poll::Ready(nom) => println!("fin de {}", nom),
+                          Poll::Pending => restantes.push(t),
+                      }
+                  }
+                  taches = restantes;
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let taches: Vec<Pin<Box<dyn Future<Output = String>>>> = e
+                  .lines()
+                  .map(|l| {
+                      let p: Vec<&str> = l.split_whitespace().collect();
+                      Box::pin(Travail { nom: p[0].to_string(), etapes: p[1].parse().unwrap(), fait: 0 }) as Pin<Box<dyn Future<Output = String>>>
+                  })
+                  .collect();
+              executer(taches);
+          }
+        tests:
+          - { input: "A 2\nB 1", output: "A étape 1\nB étape 1\nA étape 2\nfin de B\nfin de A" }
+          - { input: "X 0\nY 3", output: "fin de X\nY étape 1\nY étape 2\nY étape 3\nfin de Y", hidden: true }
+        concepts: [async]
+    project:
+      id: rust-fut-projet
+      type: code
+      title: Minuterie maison
+      difficulty: 3
+      prompt: |
+        Crée une future `Minuterie { tics: u32 }` qui devient prête après avoir été pollée `tics` fois (elle réveille son waker à chaque `Pending`), puis un exécuteur `bloquer_sur` comme dans le cours.
+
+        Écris ensuite une `async fn etape(nom: &str, tics: u32) -> u32` qui attend une `Minuterie` puis affiche `nom prête`, et renvoie `tics`.
+
+        Chaque ligne d’entrée est `nom tics`. Dans un seul bloc `async` exécuté par `bloquer_sur`, attends chaque étape **séquentiellement** dans l’ordre, puis affiche `total : <somme des tics>`.
+      starter: |
+        use std::future::Future;
+        use std::io::{self, Read};
+        use std::pin::Pin;
+        use std::task::{Context, Poll, Waker};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::future::Future;
+        use std::io::{self, Read};
+        use std::pin::Pin;
+        use std::task::{Context, Poll, Waker};
+
+        struct Minuterie { tics: u32 }
+
+        impl Future for Minuterie {
+            type Output = ();
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+                if self.tics == 0 {
+                    Poll::Ready(())
+                } else {
+                    self.tics -= 1;
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            }
+        }
+
+        fn bloquer_sur<F: Future>(f: F) -> F::Output {
+            let mut f = Box::pin(f);
+            let mut cx = Context::from_waker(Waker::noop());
+            loop {
+                if let Poll::Ready(v) = f.as_mut().poll(&mut cx) {
+                    return v;
+                }
+            }
+        }
+
+        async fn etape(nom: &str, tics: u32) -> u32 {
+            Minuterie { tics }.await;
+            println!("{} prête", nom);
+            tics
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let total = bloquer_sur(async {
+                let mut t = 0;
+                for l in e.lines() {
+                    let p: Vec<&str> = l.split_whitespace().collect();
+                    t += etape(p[0], p[1].parse().unwrap()).await;
+                }
+                t
+            });
+            println!("total : {}", total);
+        }
+      tests:
+        - { input: "chargement 3\ncalcul 5", output: "chargement prête\ncalcul prête\ntotal : 8" }
+        - { input: 'instantané 0', output: "instantané prête\ntotal : 0", hidden: true }
+      require:
+        - { pattern: 'impl\s+Future\s+for\s+Minuterie', message: Implémenter Future pour Minuterie }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-fut-ex1
+          type: mcq
+          prompt: Pourquoi la méthode poll reçoit-elle `Pin<&mut Self>` ?
+          choices: [Pour garantir que la future ne sera plus déplacée en mémoire, Pour la rendre thread-safe, Pour la copier, Pour l’annuler]
+          answer: 0
+        - id: rust-fut-ex2
+          type: mcq
+          prompt: Que fait un runtime comme tokio quand une future renvoie Pending ?
+          choices: [Il la re-polle immédiatement en boucle, Il attend que son Waker soit réveillé avant de la re-poller, Il l’abandonne, Il crée un thread]
+          answer: 1
+        - id: rust-fut-ex3
+          type: mcq
+          prompt: Que représente chaque .await dans la machine à états générée ?
+          choices: [Un point de suspension possible, Un nouveau thread, Une allocation, Un verrou]
+          answer: 0
+        - id: rust-fut-ex4
+          type: fill
+          prompt: Complète la variante qui signale que la future est terminée.
+          code: 'return Poll::{{?}}(valeur);'
+          blanks: [[Ready]]
+
+  # ------------------------------------------------------------------
+  - slug: rust-macros
+    title: Macros
+    summary: Écris des macros déclaratives avec macro_rules! — motifs, répétitions, récursion — et découvre les macros procédurales.
+    minutes: 30
+    concepts: [macros]
+    sections:
+      - title: macro_rules!
+        body: |
+          Une macro **génère du code** à la compilation, à partir de motifs sur la syntaxe :
+
+          ```rust
+          macro_rules! carre {
+              ($x:expr) => { $x * $x };
+          }
+
+          macro_rules! maximum {
+              ($a:expr) => { $a };
+              ($a:expr, $($reste:expr),+) => {{
+                  let r = maximum!($($reste),+);   // récursion
+                  if $a > r { $a } else { r }
+              }};
+          }
+
+          println!("{}", carre!(7));             // 49
+          println!("{}", maximum!(3, 9, 4));     // 9
+          ```
+
+          Fragments courants : `expr` (expression), `ident` (identifiant), `ty` (type), `tt` (jeton), `literal`, `pat` (motif), `block`.
+      - title: Répétitions
+        body: |
+          `$( ... ),*` répète un motif zéro ou plusieurs fois (séparé par des virgules), `+` au moins une fois :
+
+          ```rust
+          macro_rules! dict {
+              ($($cle:expr => $val:expr),* $(,)?) => {{
+                  let mut m = std::collections::HashMap::new();
+                  $( m.insert($cle, $val); )*
+                  m
+              }};
+          }
+          let notes = dict! { "Ada" => 18, "Bob" => 12 };
+          ```
+
+          C’est ainsi que fonctionne `vec![1, 2, 3]` !
+
+          Les macros sont **hygiéniques** : les variables créées à l’intérieur ne se mélangent pas avec celles du code appelant.
+      - title: Macros procédurales
+        body: |
+          Les **macros procédurales** sont des fonctions Rust qui manipulent un flux de jetons (`TokenStream`). Elles vivent dans une crate dédiée (`proc-macro = true`) :
+
+          - `#[derive(MonTrait)]` : dérive une implémentation (comme `Serialize` de serde) ;
+          - `#[mon_attribut]` : transforme un élément (comme `#[tokio::main]`) ;
+          - `ma_macro!(...)` de type fonction (comme `sqlx::query!`).
+
+          Elles s’écrivent avec les crates `syn` (analyse) et `quote` (génération). `cargo expand` montre le code généré.
+
+          > ⚠️ Préfère une fonction ou un générique quand c’est possible : les macros sont plus difficiles à lire et à déboguer.
+    exercises:
+      - id: rust-mac-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          macro_rules! somme {
+              () => { 0 };
+              ($x:expr $(, $reste:expr)*) => { $x + somme!($($reste),*) };
+          }
+          fn main() {
+              println!("{} {} {}", somme!(), somme!(5), somme!(1, 2, 3, 4));
+          }
+        output: 0 5 10
+        concepts: [macros]
+      - id: rust-mac-q1
+        type: mcq
+        prompt: Que signifie le fragment `$x:expr` ?
+        choices: [x doit être une expression, x est un type, x est un identifiant, x est une chaîne]
+        answer: 0
+      - id: rust-mac-fill
+        type: fill
+        prompt: Complète la macro qui crée un vecteur de chaînes.
+        code: |
+          macro_rules! chaines {
+              ($($s:expr),*) => {
+                  vec![$( String::from($s) ),{{?}}]
+              };
+          }
+          fn main() {
+              let v: Vec<String> = chaines!("a", "b", "c");
+              println!("{}", v.join("-"));
+          }
+        blanks: [['*']]
+        tests:
+          - { input: '', output: a-b-c }
+      - id: rust-mac-q2
+        type: mcq
+        prompt: Quelles crates servent à écrire des macros procédurales ?
+        choices: [syn et quote, serde et tokio, rand et regex, clap et anyhow]
+        answer: 0
+      - id: rust-mac-code
+        type: code
+        title: Macro de getters
+        prompt: |
+          Écris une macro `point!` qui génère une struct avec des champs `f64` et une méthode `norme(&self) -> f64` (racine de la somme des carrés) :
+
+          ```rust
+          point!(Point2 { x, y });
+          point!(Point3 { x, y, z });
+          ```
+
+          Le programme lit des lignes de 2 ou 3 nombres et affiche la norme avec 2 décimales.
+        starter: |
+          use std::io::{self, Read};
+
+          // macro_rules! point { ... }
+
+          point!(Point2 { x, y });
+          point!(Point3 { x, y, z });
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let v: Vec<f64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  let n = if v.len() == 2 { Point2 { x: v[0], y: v[1] }.norme() } else { Point3 { x: v[0], y: v[1], z: v[2] }.norme() };
+                  println!("{:.2}", n);
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          macro_rules! point {
+              ($nom:ident { $($champ:ident),+ }) => {
+                  struct $nom { $($champ: f64),+ }
+                  impl $nom {
+                      fn norme(&self) -> f64 {
+                          (0.0 $(+ self.$champ * self.$champ)+).sqrt()
+                      }
+                  }
+              };
+          }
+
+          point!(Point2 { x, y });
+          point!(Point3 { x, y, z });
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let v: Vec<f64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  let n = if v.len() == 2 { Point2 { x: v[0], y: v[1] }.norme() } else { Point3 { x: v[0], y: v[1], z: v[2] }.norme() };
+                  println!("{:.2}", n);
+              }
+          }
+        tests:
+          - { input: "3 4\n1 2 2", output: "5.00\n3.00" }
+          - { input: "0 0 0\n1 1", output: "0.00\n1.41", hidden: true }
+        require:
+          - { pattern: 'macro_rules!\s*point', message: Définir la macro point! }
+        concepts: [macros]
+    project:
+      id: rust-mac-projet
+      type: code
+      title: Mini langage de tests
+      difficulty: 3
+      prompt: |
+        Écris une macro `verifier!` qui prend une liste de cas `nom: expression_obtenue => attendu;` et génère, pour chacun, l’affichage `✔ nom` ou `✘ nom (obtenu X, attendu Y)`, puis un récapitulatif `R/N réussis`.
+
+        Le `main` (fourni) l’utilise sur des fonctions que tu dois écrire : `pgcd(a, b)` et `inverse(s: &str) -> String`. Lis deux entiers `a b` et un mot `m` sur l’entrée pour construire les cas.
+      starter: |
+        use std::io::{self, Read};
+
+        fn pgcd(a: u64, b: u64) -> u64 { todo!() }
+        fn inverse(s: &str) -> String { todo!() }
+
+        // macro_rules! verifier { ... }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let p: Vec<&str> = e.split_whitespace().collect();
+            let a: u64 = p[0].parse().unwrap();
+            let b: u64 = p[1].parse().unwrap();
+            let m = p[2];
+            verifier! {
+                pgcd_commutatif: pgcd(a, b) => pgcd(b, a);
+                pgcd_divise_a: a % pgcd(a, b) => 0;
+                double_inversion: inverse(&inverse(m)) => m.to_string();
+                inversion_simple: inverse("abc") => String::from("cba");
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn pgcd(a: u64, b: u64) -> u64 {
+            if b == 0 { a } else { pgcd(b, a % b) }
+        }
+        fn inverse(s: &str) -> String {
+            s.chars().rev().collect()
+        }
+
+        macro_rules! verifier {
+            ($($nom:ident : $obtenu:expr => $attendu:expr;)+) => {{
+                let mut reussis = 0;
+                let mut total = 0;
+                $(
+                    total += 1;
+                    let o = $obtenu;
+                    let a = $attendu;
+                    if o == a {
+                        reussis += 1;
+                        println!("✔ {}", stringify!($nom));
+                    } else {
+                        println!("✘ {} (obtenu {:?}, attendu {:?})", stringify!($nom), o, a);
+                    }
+                )+
+                println!("{}/{} réussis", reussis, total);
+            }};
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let p: Vec<&str> = e.split_whitespace().collect();
+            let a: u64 = p[0].parse().unwrap();
+            let b: u64 = p[1].parse().unwrap();
+            let m = p[2];
+            verifier! {
+                pgcd_commutatif: pgcd(a, b) => pgcd(b, a);
+                pgcd_divise_a: a % pgcd(a, b) => 0;
+                double_inversion: inverse(&inverse(m)) => m.to_string();
+                inversion_simple: inverse("abc") => String::from("cba");
+            }
+        }
+      tests:
+        - { input: '12 18 kiri', output: "✔ pgcd_commutatif\n✔ pgcd_divise_a\n✔ double_inversion\n✔ inversion_simple\n4/4 réussis" }
+        - { input: '7 0 été', output: "✔ pgcd_commutatif\n✔ pgcd_divise_a\n✔ double_inversion\n✔ inversion_simple\n4/4 réussis", hidden: true }
+      hints: ['`stringify!($nom)` transforme un identifiant en chaîne.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-mac-ex1
+          type: mcq
+          prompt: Quand une macro est-elle développée ?
+          choices: [À la compilation, À l’exécution, Au chargement du programme, Jamais]
+          answer: 0
+        - id: rust-mac-ex2
+          type: mcq
+          prompt: Que signifie qu’une macro_rules! est « hygiénique » ?
+          choices: [Ses variables internes ne se mélangent pas avec celles de l’appelant, Elle est sans bug, Elle ne génère pas de code, Elle libère la mémoire]
+          answer: 0
+        - id: rust-mac-ex3
+          type: mcq
+          prompt: '`#[derive(Serialize)]` est une macro…'
+          choices: [déclarative, procédurale de type derive, du préprocesseur C, inexistante]
+          answer: 1
+        - id: rust-mac-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            macro_rules! repete {
+                ($s:expr; $n:expr) => { $s.repeat($n) };
+            }
+            fn main() {
+                println!("{}", repete!("ab"; 3));
+            }
+          output: ababab
+
+  # ------------------------------------------------------------------
+  - slug: rust-unsafe
+    title: Unsafe Rust
+    summary: Les cinq super-pouvoirs d’unsafe, pointeurs bruts, FFI, invariants de sûreté et comment encapsuler du code unsafe dans une API sûre.
+    minutes: 30
+    concepts: [unsafe, pointeurs]
+    sections:
+      - title: Les super-pouvoirs
+        body: |
+          Un bloc `unsafe` autorise cinq opérations que le compilateur ne peut pas vérifier :
+
+          1. déréférencer un **pointeur brut** (`*const T`, `*mut T`) ;
+          2. appeler une fonction `unsafe` (dont FFI : fonctions C) ;
+          3. accéder ou modifier une variable `static mut` ;
+          4. implémenter un trait `unsafe` (`Send`, `Sync` manuellement) ;
+          5. accéder aux champs d’une `union`.
+
+          `unsafe` **ne désactive pas** le borrow checker ni les vérifications de types : il transfère simplement au programmeur la responsabilité de certaines garanties.
+      - title: Pointeurs bruts
+        body: |
+          ```rust
+          let mut x = 10;
+          let p = &mut x as *mut i32;    // créer un pointeur brut est sûr
+          unsafe {
+              *p += 1;                    // le déréférencer ne l’est pas
+          }
+          println!("{x}");                // 11
+
+          let v = [1, 2, 3, 4];
+          let ptr = v.as_ptr();
+          let troisieme = unsafe { *ptr.add(2) };   // arithmétique de pointeurs
+          ```
+
+          Un pointeur brut peut être nul, pendant ou mal aligné : le déréférencer dans ces cas est un **comportement indéfini** (UB).
+      - title: Encapsuler l’unsafe
+        body: |
+          La bonne pratique : un petit noyau `unsafe` bien documenté derrière une **API sûre**.
+
+          ```rust
+          /// Sépare une tranche en deux parties mutables disjointes.
+          fn couper_en_deux(t: &mut [i32], milieu: usize) -> (&mut [i32], &mut [i32]) {
+              let n = t.len();
+              assert!(milieu <= n);                    // garantit l’invariant
+              let p = t.as_mut_ptr();
+              // SAFETY : [0, milieu) et [milieu, n) ne se chevauchent pas
+              // et sont dans les limites grâce à l’assert.
+              unsafe {
+                  (std::slice::from_raw_parts_mut(p, milieu),
+                   std::slice::from_raw_parts_mut(p.add(milieu), n - milieu))
+              }
+          }
+          ```
+
+          Convention : un commentaire `// SAFETY:` justifie chaque bloc. Outils : **Miri** (`cargo +nightly miri test`) détecte de nombreux UB.
+
+          FFI : `extern "C" { fn abs(x: i32) -> i32; }` puis `unsafe { abs(-3) }`.
+    exercises:
+      - id: rust-unsafe-q1
+        type: mcq
+        prompt: Que désactive un bloc unsafe ?
+        choices: [Le borrow checker, Rien — il autorise seulement quelques opérations supplémentaires, Toutes les vérifications de types, Les paniques]
+        answer: 1
+        concepts: [unsafe]
+      - id: rust-unsafe-q2
+        type: mcq
+        prompt: Laquelle de ces opérations exige unsafe ?
+        choices: [Créer un pointeur brut, Déréférencer un pointeur brut, Utiliser Box, Appeler une closure]
+        answer: 1
+      - id: rust-unsafe-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let mut tab = [1, 2, 3, 4, 5];
+              let p = tab.as_mut_ptr();
+              unsafe {
+                  *p.add(1) = 20;
+                  *p.add(4) += *p;
+              }
+              println!("{:?}", tab);
+          }
+        output: '[1, 20, 3, 4, 6]'
+      - id: rust-unsafe-fill
+        type: fill
+        prompt: Complète la déclaration d’une fonction C de la libc.
+        code: |
+          extern "C" {
+              fn abs(x: i32) -> i32;
+          }
+          fn main() {
+              let r = {{?}} { abs(-42) };
+              println!("{}", r);
+          }
+        blanks: [[unsafe]]
+        tests:
+          - { input: '', output: '42' }
+      - id: rust-unsafe-code
+        type: code
+        title: Inversion par pointeurs
+        prompt: |
+          Écris `fn inverser(t: &mut [i32])` qui inverse la tranche **en utilisant des pointeurs bruts** (`as_mut_ptr`, `add`, `std::ptr::swap`) dans un bloc `unsafe` commenté par `// SAFETY:`.
+
+          L’API reste sûre : la fonction prend une `&mut [i32]`. Le programme lit des entiers et affiche le résultat.
+        starter: |
+          use std::io;
+
+          fn inverser(t: &mut [i32]) {
+              todo!()
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let mut v: Vec<i32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              inverser(&mut v);
+              println!("{:?}", v);
+          }
+        solution: |
+          use std::io;
+
+          fn inverser(t: &mut [i32]) {
+              let n = t.len();
+              let p = t.as_mut_ptr();
+              for i in 0..n / 2 {
+                  // SAFETY : i et n-1-i sont des indices distincts dans [0, n).
+                  unsafe {
+                      std::ptr::swap(p.add(i), p.add(n - 1 - i));
+                  }
+              }
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let mut v: Vec<i32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              inverser(&mut v);
+              println!("{:?}", v);
+          }
+        tests:
+          - { input: '1 2 3 4 5', output: '[5, 4, 3, 2, 1]' }
+          - { input: '', output: '[]', hidden: true }
+          - { input: '7 8', output: '[8, 7]', hidden: true }
+        require:
+          - { pattern: '\bunsafe\b', message: Utiliser un bloc unsafe }
+          - { pattern: 'SAFETY', message: 'Justifier le bloc avec un commentaire // SAFETY:' }
+        concepts: [unsafe]
+    project:
+      id: rust-unsafe-projet
+      type: code
+      title: Tampon circulaire bas niveau
+      difficulty: 3
+      prompt: |
+        Implémente `struct Anneau { tampon: Vec<i32>, tete: usize, longueur: usize }` (capacité fixe) avec :
+
+        - `pousser(&mut self, x: i32)` : si plein, écrase l’élément le plus ancien ;
+        - `extraire(&mut self) -> Option<i32>` : retire le plus ancien ;
+        - accès internes par pointeurs bruts (`as_ptr`/`as_mut_ptr` + `add`) dans des blocs `unsafe` justifiés, mais une API publique entièrement sûre.
+
+        Première ligne : la capacité. Lignes suivantes : `+ x` (pousser) ou `-` (extraire, affiche la valeur ou `vide`). Termine en affichant le contenu restant du plus ancien au plus récent (`[a, b, …]`).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        struct Anneau {
+            tampon: Vec<i32>,
+            tete: usize,
+            longueur: usize,
+        }
+
+        impl Anneau {
+            fn new(cap: usize) -> Self {
+                Anneau { tampon: vec![0; cap], tete: 0, longueur: 0 }
+            }
+            fn pousser(&mut self, x: i32) {
+                let cap = self.tampon.len();
+                let pos = (self.tete + self.longueur) % cap;
+                // SAFETY : pos < cap = longueur du tampon.
+                unsafe { *self.tampon.as_mut_ptr().add(pos) = x; }
+                if self.longueur == cap {
+                    self.tete = (self.tete + 1) % cap;
+                } else {
+                    self.longueur += 1;
+                }
+            }
+            fn extraire(&mut self) -> Option<i32> {
+                if self.longueur == 0 {
+                    return None;
+                }
+                // SAFETY : tete < cap.
+                let v = unsafe { *self.tampon.as_ptr().add(self.tete) };
+                self.tete = (self.tete + 1) % self.tampon.len();
+                self.longueur -= 1;
+                Some(v)
+            }
+            fn contenu(&self) -> Vec<i32> {
+                let cap = self.tampon.len();
+                // SAFETY : chaque indice calculé modulo cap est valide.
+                (0..self.longueur).map(|i| unsafe { *self.tampon.as_ptr().add((self.tete + i) % cap) }).collect()
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let cap: usize = l.next().unwrap().trim().parse().unwrap();
+            let mut a = Anneau::new(cap);
+            for ligne in l {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                if p[0] == "+" {
+                    a.pousser(p[1].parse().unwrap());
+                } else {
+                    match a.extraire() {
+                        Some(v) => println!("{}", v),
+                        None => println!("vide"),
+                    }
+                }
+            }
+            println!("{:?}", a.contenu());
+        }
+      tests:
+        - { input: "3\n+ 1\n+ 2\n+ 3\n+ 4\n-\n+ 5", output: "2\n[3, 4, 5]" }
+        - { input: "2\n-\n+ 9\n-\n-", output: "vide\n9\nvide\n[]", hidden: true }
+      require:
+        - { pattern: '\bunsafe\b', message: Utiliser des pointeurs bruts dans des blocs unsafe }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-unsafe-ex1
+          type: mcq
+          prompt: Quel outil détecte les comportements indéfinis dans le code unsafe ?
+          choices: [Miri, Clippy, rustfmt, cargo doc]
+          answer: 0
+        - id: rust-unsafe-ex2
+          type: mcq
+          prompt: Quelle convention documente un bloc unsafe ?
+          choices: ['// SAFETY: …', '// TODO', '/// unsafe', '#[safe]']
+          answer: 0
+        - id: rust-unsafe-ex3
+          type: mcq
+          prompt: Modifier une variable `static mut` nécessite…
+          choices: [Un bloc unsafe, Un Mutex obligatoirement, Rien, Un Box]
+          answer: 0
+        - id: rust-unsafe-ex4
+          type: mcq
+          prompt: Quel est le bon usage de unsafe ?
+          choices: [Un petit noyau unsafe vérifié derrière une API sûre, Mettre tout le programme en unsafe pour aller plus vite, L’éviter même quand il est nécessaire, Remplacer les tests]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-gestion-memoire
+    title: Gestion mémoire avancée
+    summary: Disposition mémoire, taille des types, alignement, optimisation des niches, allocateurs, Cow et éviter les allocations inutiles.
+    minutes: 30
+    concepts: [memoire]
+    sections:
+      - title: Taille et disposition
+        body: |
+          ```rust
+          use std::mem::{size_of, align_of};
+          println!("{}", size_of::<(u8, u32)>());     // 8 (alignement sur 4)
+          println!("{}", size_of::<Option<Box<i32>>>()); // 8 : optimisation de niche !
+          println!("{}", size_of::<&str>());          // 16 : pointeur + longueur (fat pointer)
+          ```
+
+          - Le compilateur **réordonne** les champs d’une struct pour minimiser le remplissage (*padding*). `#[repr(C)]` impose l’ordre du C (FFI).
+          - **Optimisation de niche** : `Option<&T>`, `Option<Box<T>>`, `Option<NonZeroU32>` ont la même taille que le type intérieur, car la valeur « nulle » (impossible pour ces types) code `None`.
+          - Les **fat pointers** (`&str`, `&[T]`, `&dyn Trait`) contiennent une métadonnée en plus de l’adresse (longueur ou vtable).
+      - title: Éviter les allocations
+        body: |
+          - Réserver la capacité : `Vec::with_capacity(n)`, `String::with_capacity(n)`.
+          - Réutiliser un tampon : `buf.clear()` garde la capacité.
+          - Emprunter (`&str`, `&[T]`) plutôt que cloner.
+          - `Cow<'a, str>` (*Clone on Write*) : emprunte quand c’est possible, ne clone que si une modification est nécessaire.
+
+          ```rust
+          use std::borrow::Cow;
+          fn normaliser(s: &str) -> Cow<str> {
+              if s.contains(' ') { Cow::Owned(s.replace(' ', "_")) }  // allocation
+              else { Cow::Borrowed(s) }                                // aucune allocation
+          }
+          ```
+
+          `std::mem::take(&mut v)` remplace une valeur par sa valeur par défaut et renvoie l’ancienne (sans clone) ; `std::mem::replace` et `std::mem::swap` sont ses cousins.
+      - title: Allocateurs et fuites
+        body: |
+          - L’allocateur global peut être remplacé (`#[global_allocator]`), par ex. par **mimalloc** ou **jemalloc** pour les serveurs.
+          - Une fuite reste possible en Rust *safe* (cycles de `Rc`, `Box::leak`, `mem::forget`) : ce n’est pas une violation de la sûreté mémoire, mais un bug.
+          - Outils : `valgrind`, `heaptrack`, `dhat` (crate) pour profiler les allocations.
+    exercises:
+      - id: rust-gm-predict
+        type: predict
+        prompt: Que va afficher ce programme (64 bits) ?
+        code: |
+          use std::mem::size_of;
+          fn main() {
+              println!("{} {} {}", size_of::<Option<Box<u64>>>(), size_of::<&[u8]>(), size_of::<Option<u64>>());
+          }
+        output: 8 16 16
+        explanation: '`Option<Box<_>>` profite de la niche du pointeur non nul ; `Option<u64>` n’a pas de niche et ajoute un discriminant (aligné sur 8).'
+        concepts: [memoire]
+      - id: rust-gm-q1
+        type: mcq
+        prompt: À quoi sert `Cow<str>` ?
+        choices: [À n’allouer une String que si une modification est nécessaire, À compter les références, À verrouiller une chaîne, À convertir en majuscules]
+        answer: 0
+      - id: rust-gm-q2
+        type: mcq
+        prompt: Que fait `std::mem::take(&mut v)` sur un Vec ?
+        choices: [Renvoie l’ancien Vec et laisse un Vec vide à sa place, Clone le Vec, Supprime le Vec, Panique]
+        answer: 0
+      - id: rust-gm-fill
+        type: fill
+        prompt: Complète pour réserver la place de 100 éléments d’avance.
+        code: |
+          fn main() {
+              let mut v: Vec<u32> = Vec::{{?}}(100);
+              for i in 0..100 { v.push(i); }
+              println!("{} {}", v.len(), v.capacity() >= 100);
+          }
+        blanks: [[with_capacity]]
+        tests:
+          - { input: '', output: 100 true }
+      - id: rust-gm-code
+        type: code
+        title: Normalisation sans allocation superflue
+        prompt: |
+          Écris `fn slug(s: &str) -> Cow<str>` qui renvoie la chaîne **empruntée** si elle ne contient que des minuscules ASCII, chiffres et `-`, sinon une version possédée où les espaces deviennent `-`, les majuscules ASCII des minuscules, et les autres caractères sont supprimés.
+
+          Pour chaque ligne, affiche `emprunté : X` ou `possédé : X`.
+        starter: |
+          use std::borrow::Cow;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  match slug(l) {
+                      Cow::Borrowed(s) => println!("emprunté : {}", s),
+                      Cow::Owned(s) => println!("possédé : {}", s),
+                  }
+              }
+          }
+        solution: |
+          use std::borrow::Cow;
+          use std::io::{self, Read};
+
+          fn slug(s: &str) -> Cow<str> {
+              if s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+                  return Cow::Borrowed(s);
+              }
+              let mut out = String::with_capacity(s.len());
+              for c in s.chars() {
+                  if c == ' ' {
+                      out.push('-');
+                  } else if c.is_ascii_alphanumeric() || c == '-' {
+                      out.push(c.to_ascii_lowercase());
+                  }
+              }
+              Cow::Owned(out)
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  match slug(l) {
+                      Cow::Borrowed(s) => println!("emprunté : {}", s),
+                      Cow::Owned(s) => println!("possédé : {}", s),
+                  }
+              }
+          }
+        tests:
+          - { input: "deja-ok-42\nHello World!", output: "emprunté : deja-ok-42\npossédé : hello-world" }
+          - { input: "Été 2026\nrust", output: "possédé : t-2026\nemprunté : rust", hidden: true }
+        concepts: [memoire]
+    project:
+      id: rust-gm-projet
+      type: code
+      title: Analyse de disposition mémoire
+      difficulty: 3
+      prompt: |
+        Déclare ces types et affiche, pour chacun, `Nom : taille=T alignement=A` grâce à `size_of` et `align_of` :
+
+        - `struct Desordre { a: u8, b: u64, c: u8 }` (disposition Rust par défaut) ;
+        - `#[repr(C)] struct DesordreC { a: u8, b: u64, c: u8 }` ;
+        - `enum Etat { Vide, Plein(u32) }` ;
+        - `Option<&u8>` (affiché `OptionRef`).
+
+        L’entrée est ignorée.
+      starter: |
+        use std::mem::{align_of, size_of};
+
+        fn main() {
+        }
+      solution: |
+        use std::mem::{align_of, size_of};
+
+        #[allow(dead_code)]
+        struct Desordre { a: u8, b: u64, c: u8 }
+        #[allow(dead_code)]
+        #[repr(C)]
+        struct DesordreC { a: u8, b: u64, c: u8 }
+        #[allow(dead_code)]
+        enum Etat { Vide, Plein(u32) }
+
+        fn main() {
+            println!("Desordre : taille={} alignement={}", size_of::<Desordre>(), align_of::<Desordre>());
+            println!("DesordreC : taille={} alignement={}", size_of::<DesordreC>(), align_of::<DesordreC>());
+            println!("Etat : taille={} alignement={}", size_of::<Etat>(), align_of::<Etat>());
+            println!("OptionRef : taille={} alignement={}", size_of::<Option<&u8>>(), align_of::<Option<&u8>>());
+        }
+      tests:
+        - { input: '', output: "Desordre : taille=16 alignement=8\nDesordreC : taille=24 alignement=8\nEtat : taille=8 alignement=4\nOptionRef : taille=8 alignement=8" }
+        - { input: 'x', output: "Desordre : taille=16 alignement=8\nDesordreC : taille=24 alignement=8\nEtat : taille=8 alignement=4\nOptionRef : taille=8 alignement=8", hidden: true }
+      require:
+        - { pattern: '#\[repr\(C\)\]', message: 'Utiliser #[repr(C)] pour DesordreC' }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-gm-ex1
+          type: mcq
+          prompt: Pourquoi `Option<&T>` a-t-il la même taille que `&T` ?
+          choices: [Une référence n’est jamais nulle, la valeur nulle sert à coder None, Les Option sont gratuites, &T est vide, Par hasard]
+          answer: 0
+        - id: rust-gm-ex2
+          type: mcq
+          prompt: Que fait `#[repr(C)]` ?
+          choices: [Impose la disposition mémoire du C (ordre des champs conservé), Compile en C, Rend la struct thread-safe, Supprime le padding]
+          answer: 0
+        - id: rust-gm-ex3
+          type: mcq
+          prompt: Une fuite mémoire est-elle possible en Rust safe ?
+          choices: ['Oui (cycles de Rc, Box::leak)', Non, jamais, Seulement en release, Seulement avec Vec]
+          answer: 0
+        - id: rust-gm-ex4
+          type: mcq
+          prompt: Qu’est-ce qu’un fat pointer ?
+          choices: [Un pointeur accompagné d’une métadonnée (longueur, vtable), Un pointeur vers une grosse donnée, Un pointeur nul, Un Box]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-optimisation
+    title: Optimisation
+    summary: Mesure avant d’optimiser — profils release, benchmarks, complexité algorithmique, itérateurs, inlining et pièges de performance.
+    minutes: 30
+    concepts: [performance]
+    sections:
+      - title: Mesurer d’abord
+        body: |
+          « L’optimisation prématurée est la racine de tous les maux » (Knuth). La démarche :
+
+          1. compiler en **release** (`cargo build --release`) — souvent 10 à 100× plus rapide que debug ;
+          2. **mesurer** : `std::time::Instant`, benchmarks avec **criterion**, profilage avec `perf` / **cargo-flamegraph** ;
+          3. optimiser le **point chaud** identifié ;
+          4. re-mesurer.
+
+          ```rust
+          use std::time::Instant;
+          let t = Instant::now();
+          let s: u64 = (0..10_000_000u64).sum();
+          println!("{s} en {:?}", t.elapsed());
+          ```
+      - title: Les vrais gains
+        body: |
+          Par ordre d’impact habituel :
+
+          1. **Algorithme** : passer de O(n²) à O(n log n) bat toutes les micro-optimisations.
+          2. **Structure de données** : `HashSet` pour l’appartenance, `Vec` contigu pour le cache CPU.
+          3. **Allocations** : réutiliser les tampons, `with_capacity`, éviter les `clone()`.
+          4. **E/S** : `BufReader`/`BufWriter`, verrouiller `stdout` une fois (`let mut out = io::stdout().lock();`).
+          5. **Micro** : itérateurs (souvent mieux vectorisés que les boucles indexées), `#[inline]`, `lto = true`, `codegen-units = 1`, `target-cpu=native`.
+
+          ```rust
+          use std::io::Write;
+          let out = std::io::stdout();
+          let mut w = std::io::BufWriter::new(out.lock());
+          for i in 0..1000 { writeln!(w, "{i}").unwrap(); }   // 1 seul appel système à la fin
+          ```
+      - title: Pièges fréquents
+        body: |
+          - `println!` dans une boucle chaude (verrou + appel système à chaque ligne).
+          - `v.contains(x)` dans une boucle → O(n²) : utiliser un `HashSet`.
+          - `String` construite par `+=` répétés sans capacité réservée.
+          - Récursion naïve (Fibonacci exponentiel) → mémoïsation ou version itérative.
+          - Copie de grosses structures par valeur au lieu de références.
+          - Vérification des bornes : `iter()` les élimine souvent, contrairement à `v[i]` dans une boucle indexée.
+    exercises:
+      - id: rust-opt2-q1
+        type: mcq
+        prompt: Quelle est la première étape avant toute optimisation ?
+        choices: ['Mesurer et profiler', 'Réécrire en unsafe', 'Ajouter #[inline] partout', 'Passer en C']
+        answer: 0
+        concepts: [performance]
+      - id: rust-opt2-q2
+        type: mcq
+        prompt: Pourquoi `v.contains(&x)` dans une boucle sur n éléments est-il coûteux ?
+        choices: [Complexité O(n²) au total, Il alloue de la mémoire, Il bloque un mutex, Il n’est pas coûteux]
+        answer: 0
+      - id: rust-opt2-fill
+        type: fill
+        prompt: Complète pour bufferiser les écritures.
+        code: |
+          use std::io::{self, Write};
+          fn main() {
+              let out = io::stdout();
+              let mut w = io::{{?}}::new(out.lock());
+              for i in 1..=3 { writeln!(w, "{}", i * i).unwrap(); }
+          }
+        blanks: [[BufWriter]]
+        tests:
+          - { input: '', output: "1\n4\n9" }
+      - id: rust-opt2-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::collections::HashSet;
+          fn main() {
+              let a: Vec<u32> = (0..1000).collect();
+              let b: HashSet<u32> = (500..1500).collect();
+              let communs = a.iter().filter(|x| b.contains(x)).count();
+              println!("{}", communs);
+          }
+        output: '500'
+      - id: rust-opt2-code
+        type: code
+        title: Paires de somme cible
+        prompt: |
+          Première ligne : `n cible`. Seconde ligne : `n` entiers distincts. Compte les **paires** (i < j) dont la somme vaut `cible`.
+
+          ⚠️ Les tests cachés contiennent jusqu’à 200 000 nombres avec une limite de temps : une solution O(n²) sera trop lente. Utilise un `HashSet` (O(n)).
+        starter: |
+          use std::collections::HashSet;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::collections::HashSet;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut it = e.split_whitespace().map(|x| x.parse::<i64>().unwrap());
+              let n = it.next().unwrap() as usize;
+              let cible = it.next().unwrap();
+              let mut vus: HashSet<i64> = HashSet::with_capacity(n);
+              let mut paires = 0u64;
+              for x in it.take(n) {
+                  if vus.contains(&(cible - x)) {
+                      paires += 1;
+                  }
+                  vus.insert(x);
+              }
+              println!("{}", paires);
+          }
+        tests:
+          - { input: "5 10\n1 9 3 7 5", output: '2' }
+          - { input: "4 0\n-2 2 -5 5", output: '2', hidden: true }
+          - { input: "3 100\n1 2 3", output: '0', hidden: true }
+        concepts: [performance, hashmap]
+    project:
+      id: rust-opt2-projet
+      type: code
+      title: Crible d’Ératosthène
+      difficulty: 3
+      prompt: |
+        Lis plusieurs requêtes `n` (une par ligne, n ≤ 5 000 000). Pour chacune, affiche le **nombre de nombres premiers ≤ n**.
+
+        Pour tenir dans la limite de temps, calcule **une seule fois** un crible d’Ératosthène jusqu’au maximum des requêtes, puis un tableau de cumuls, et réponds à chaque requête en O(1). Utilise un `BufWriter` pour la sortie.
+      starter: |
+        use std::io::{self, Read, Write};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read, Write};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let requetes: Vec<usize> = e.split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let max = requetes.iter().copied().max().unwrap_or(0);
+            let mut premier = vec![true; max + 1];
+            premier[0] = false;
+            if max >= 1 { premier[1] = false; }
+            let mut i = 2;
+            while i * i <= max {
+                if premier[i] {
+                    let mut j = i * i;
+                    while j <= max {
+                        premier[j] = false;
+                        j += i;
+                    }
+                }
+                i += 1;
+            }
+            let mut cumul = vec![0u32; max + 1];
+            let mut c = 0;
+            for k in 0..=max {
+                if premier[k] { c += 1; }
+                cumul[k] = c;
+            }
+            let out = io::stdout();
+            let mut w = io::BufWriter::new(out.lock());
+            for n in requetes {
+                writeln!(w, "{}", cumul[n]).unwrap();
+            }
+        }
+      tests:
+        - { input: "10\n100\n1", output: "4\n25\n0" }
+        - { input: "5000000\n2\n1000000", output: "348513\n1\n78498", hidden: true }
+      require:
+        - { pattern: 'BufWriter', message: Utiliser un BufWriter }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-opt2-ex1
+          type: mcq
+          prompt: Quelle crate est la référence pour les benchmarks statistiques en Rust ?
+          choices: [criterion, rayon, serde, tokio]
+          answer: 0
+        - id: rust-opt2-ex2
+          type: mcq
+          prompt: Quel changement apporte généralement le plus grand gain ?
+          choices: ['Un meilleur algorithme (complexité)', 'Ajouter #[inline]', 'Renommer les variables', 'Utiliser des u8 partout']
+          answer: 0
+        - id: rust-opt2-ex3
+          type: mcq
+          prompt: Pourquoi println! dans une boucle très chaude est-il lent ?
+          choices: [Verrouillage de stdout et appel système à chaque ligne, Il alloue des Vec, Il compile à chaque appel, Il n’est pas lent]
+          answer: 0
+        - id: rust-opt2-ex4
+          type: mcq
+          prompt: Quel outil produit un graphe en flammes du temps CPU ?
+          choices: [cargo-flamegraph, cargo-fmt, cargo-audit, cargo-tree]
+          answer: 0
