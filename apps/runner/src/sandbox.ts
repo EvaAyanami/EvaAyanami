@@ -65,8 +65,11 @@ async function buildTar(job: RunJob): Promise<Buffer> {
 export function dockerArgs(lang: LanguageSpec, name: string): string[] {
   const pids = process.env.RUNNER_PIDS_LIMIT ?? '128';
   const cpus = process.env.RUNNER_CPUS ?? '1';
+  // Runtime d'isolation renforcée optionnel (ex. gVisor : RUNNER_DOCKER_RUNTIME=runsc).
+  const runtime = process.env.RUNNER_DOCKER_RUNTIME ? ['--runtime', process.env.RUNNER_DOCKER_RUNTIME] : [];
   return [
     'run', '--rm', '-i',
+    ...runtime,
     '--name', name,
     '--network', 'none',
     '--memory', lang.memory,

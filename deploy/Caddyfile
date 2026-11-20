@@ -1,0 +1,33 @@
+# Reverse proxy Codemori.
+# - DOMAIN=codemori.mondomaine.fr → certificat Let's Encrypt automatique
+#   (les ports 80 et 443 doivent être joignables depuis Internet).
+# - DOMAIN=localhost (défaut) → certificat local auto-signé, pour tester.
+{
+	# Décommente et renseigne pour recevoir les alertes d'expiration Let's Encrypt :
+	# email admin@mondomaine.fr
+}
+
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Les fichiers compilés (hash dans le nom) peuvent être mis en cache longtemps
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	reverse_proxy app:4000 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

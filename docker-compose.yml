@@ -1,0 +1,153 @@
+# ------------------------------------------------------------------------------
+# Codemori — déploiement auto-hébergé
+#
+#   cp .env.example .env    (puis adapter, ou lancer scripts/install.sh)
+#   docker compose up -d --build
+#
+# Services :
+#   caddy    reverse proxy HTTPS (certificats Let's Encrypt automatiques)
+#   app      API + interface web
+#   runner   service d'exécution du code (pilote les bacs à sable Docker)
+#   db       PostgreSQL
+#   sandbox-*  construisent les images des bacs à sable puis s'arrêtent
+#   ollama   (optionnel, profil « ai ») modèle de langage local
+# ------------------------------------------------------------------------------
+
+name: codemori
+
+x-sandbox: &sandbox
+  # Ces services ne font que construire les images utilisées par le runner :
+  # ils démarrent, s'arrêtent aussitôt (état « Exited (0) ») et c'est normal.
+  entrypoint: ["/bin/true"]
+  restart: "no"
+  network_mode: none
+
+services:
+  sandbox-rust:
+    <<: *sandbox
+    image: codemori/sandbox-rust:latest
+    build:
+      context: ./apps/runner/images
+      dockerfile: rust/Dockerfile
+
+  sandbox-cpp:
+    <<: *sandbox
+    image: codemori/sandbox-cpp:latest
+    build:
+      context: ./apps/runner/images
+      dockerfile: cpp/Dockerfile
+
+  sandbox-java:
+    <<: *sandbox
+    image: codemori/sandbox-java:latest
+    build:
+      context: ./apps/runner/images
+      dockerfile: java/Dockerfile
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-codemori}
+      POSTGRES_USER: ${POSTGRES_USER:-codemori}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Définis POSTGRES_PASSWORD dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [interne]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  runner:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: codemori/runner:latest
+    restart: unless-stopped
+    environment:
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?Définis RUNNER_TOKEN dans .env}
+      RUNNER_MAX_PARALLEL: ${RUNNER_MAX_PARALLEL:-4}
+      RUNNER_MAX_QUEUE: ${RUNNER_MAX_QUEUE:-50}
+      RUNNER_CPUS: ${RUNNER_CPUS:-1}
+      RUNNER_DOCKER_RUNTIME: ${RUNNER_DOCKER_RUNTIME:-}
+      RUNNER_MEMORY_RUST: ${RUNNER_MEMORY_RUST:-512m}
+      RUNNER_MEMORY_CPP: ${RUNNER_MEMORY_CPP:-384m}
+      RUNNER_MEMORY_JAVA: ${RUNNER_MEMORY_JAVA:-640m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      # Accès au démon Docker pour créer les bacs à sable. Voir docs/securite.md.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [interne]
+    depends_on:
+      sandbox-rust: { condition: service_completed_successfully }
+      sandbox-cpp: { condition: service_completed_successfully }
+      sandbox-java: { condition: service_completed_successfully }
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: codemori/app:latest
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${APP_NAME:-Codemori}
+      PUBLIC_URL: ${PUBLIC_URL:-https://localhost}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-codemori}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-codemori}?schema=public
+      RUNNER_URL: http://runner:4100
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SESSION_DAYS: ${SESSION_DAYS:-30}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      CONTENT_AUTO_IMPORT: ${CONTENT_AUTO_IMPORT:-true}
+      RUN_LIMIT_PER_MINUTE: ${RUN_LIMIT_PER_MINUTE:-20}
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks: [interne, web]
+    depends_on:
+      db: { condition: service_healthy }
+      runner: { condition: service_started }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+    depends_on: [app]
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    # « web » permet de télécharger les modèles (ollama pull)
+    networks: [interne, web]
+
+networks:
+  # Réseau privé : base de données, runner, ollama. Jamais exposé.
+  interne:
+    internal: true
+  # Réseau entre le reverse proxy et l'application.
+  web:
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  ollama:

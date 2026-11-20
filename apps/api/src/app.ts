@@ -31,8 +31,8 @@ export async function buildApp() {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-eval'", 'blob:'], // Monaco utilise des web workers
         workerSrc: ["'self'", 'blob:'],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'", 'data:'], // polices embarquées (aucune requête vers un service tiers)
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'"],
       },

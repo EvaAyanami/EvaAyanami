@@ -8,3 +8,4 @@ coverage/
 apps/web/dist/
 apps/api/dist/
 apps/runner/dist/
+*.tsbuildinfo
