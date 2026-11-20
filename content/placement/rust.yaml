@@ -1,0 +1,212 @@
+# Banque de questions du test de positionnement adaptatif (Rust).
+# Chaque question porte un niveau (1 à 5) : le test monte d'un niveau après une bonne réponse
+# et descend après une erreur ; le niveau final est le plus haut niveau réussi à 50 % ou plus.
+language: rust
+questions:
+  # ---------------------------------------------------------- niveau 1
+  - id: pl-rust-1a
+    level: 1
+    type: mcq
+    prompt: Quelle macro affiche du texte suivi d’un retour à la ligne ?
+    choices: ['println!', 'print', 'echo!', 'printf']
+    answer: 0
+  - id: pl-rust-1b
+    level: 1
+    type: mcq
+    prompt: Par défaut, une variable déclarée avec let est…
+    choices: ['immuable', 'modifiable', 'globale', 'constante à la compilation']
+    answer: 0
+  - id: pl-rust-1c
+    level: 1
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      fn main() {
+          let x = 7;
+          let y = 2;
+          println!("{} {}", x / y, x % y);
+      }
+    output: 3 1
+  - id: pl-rust-1d
+    level: 1
+    type: mcq
+    prompt: Quelle commande crée un nouveau projet Rust ?
+    choices: ['cargo new', 'rustc new', 'cargo init-project', 'rust create']
+    answer: 0
+  # ---------------------------------------------------------- niveau 2
+  - id: pl-rust-2a
+    level: 2
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      fn main() {
+          let mut total = 0;
+          for i in 1..=4 {
+              if i % 2 == 0 {
+                  total += i;
+              }
+          }
+          println!("{}", total);
+      }
+    output: '6'
+  - id: pl-rust-2b
+    level: 2
+    type: mcq
+    prompt: "Après `let s1 = String::from(\"a\"); let s2 = s1;`, que se passe-t-il si on utilise s1 ?"
+    choices: ['Erreur de compilation : la valeur a été déplacée', 's1 vaut toujours "a"', 's1 est une chaîne vide', 'Plantage à l’exécution']
+    answer: 0
+  - id: pl-rust-2c
+    level: 2
+    type: mcq
+    prompt: Quel type utiliser pour une valeur qui peut être absente ?
+    choices: ['Option<T>', 'Result<T, E>', 'Null<T>', 'Maybe<T>']
+    answer: 0
+  - id: pl-rust-2d
+    level: 2
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      fn double(v: &mut Vec<i32>) {
+          for x in v.iter_mut() {
+              *x *= 2;
+          }
+      }
+      fn main() {
+          let mut v = vec![1, 2, 3];
+          double(&mut v);
+          println!("{:?}", v);
+      }
+    output: '[2, 4, 6]'
+  # ---------------------------------------------------------- niveau 3
+  - id: pl-rust-3a
+    level: 3
+    type: mcq
+    prompt: Que fait l’opérateur ? appliqué à un Result ?
+    choices: ['Renvoie l’erreur à l’appelant, sinon extrait la valeur', 'Ignore l’erreur', 'Provoque un panic', 'Convertit en Option']
+    answer: 0
+  - id: pl-rust-3b
+    level: 3
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      trait Forme {
+          fn aire(&self) -> f64;
+      }
+      struct Carre(f64);
+      struct Rect(f64, f64);
+      impl Forme for Carre {
+          fn aire(&self) -> f64 { self.0 * self.0 }
+      }
+      impl Forme for Rect {
+          fn aire(&self) -> f64 { self.0 * self.1 }
+      }
+      fn main() {
+          let formes: Vec<Box<dyn Forme>> = vec![Box::new(Carre(2.0)), Box::new(Rect(2.0, 3.0))];
+          let total: f64 = formes.iter().map(|f| f.aire()).sum();
+          println!("{}", total);
+      }
+    output: '10'
+  - id: pl-rust-3c
+    level: 3
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      use std::collections::HashMap;
+      fn main() {
+          let mut m = HashMap::new();
+          for mot in "le chat le chien le".split(' ') {
+              *m.entry(mot).or_insert(0) += 1;
+          }
+          println!("{} {}", m["le"], m.len());
+      }
+    output: 3 3
+  - id: pl-rust-3d
+    level: 3
+    type: mcq
+    prompt: "Que signifie `fn plus_long<'a>(x: &'a str, y: &'a str) -> &'a str` ?"
+    choices: ['La référence renvoyée vit au plus aussi longtemps que x et y', 'La fonction alloue une nouvelle chaîne', 'x et y doivent être des String', 'La référence est statique']
+    answer: 0
+  # ---------------------------------------------------------- niveau 4
+  - id: pl-rust-4a
+    level: 4
+    type: mcq
+    prompt: Pourquoi utilise-t-on Arc<Mutex<T>> plutôt que Rc<RefCell<T>> entre plusieurs threads ?
+    choices: ['Arc et Mutex sont Send/Sync et thread-safe', 'Arc est plus rapide que Rc', 'Rc ne fonctionne qu’avec des entiers', 'Mutex évite toute allocation']
+    answer: 0
+  - id: pl-rust-4b
+    level: 4
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      use std::sync::{Arc, Mutex};
+      use std::thread;
+      fn main() {
+          let c = Arc::new(Mutex::new(0));
+          let h: Vec<_> = (0..4).map(|_| {
+              let c = Arc::clone(&c);
+              thread::spawn(move || { for _ in 0..250 { *c.lock().unwrap() += 1; } })
+          }).collect();
+          for t in h { t.join().unwrap(); }
+          println!("{} {}", *c.lock().unwrap(), Arc::strong_count(&c));
+      }
+    output: 1000 1
+  - id: pl-rust-4c
+    level: 4
+    type: mcq
+    prompt: Que garantit un bloc unsafe ?
+    choices: ['Rien de plus : le programmeur promet de respecter les règles que le compilateur ne peut pas vérifier', 'L’absence de comportement indéfini', 'Un code plus rapide', 'La désactivation du borrow checker partout']
+    answer: 0
+  - id: pl-rust-4d
+    level: 4
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      fn compose<A, B, C>(f: impl Fn(A) -> B, g: impl Fn(B) -> C) -> impl Fn(A) -> C {
+          move |x| g(f(x))
+      }
+      fn main() {
+          let h = compose(|x: i32| x + 1, |x: i32| x * 10);
+          let v: Vec<i32> = (1..=3).map(&h).collect();
+          println!("{:?}", v);
+      }
+    output: '[20, 30, 40]'
+  # ---------------------------------------------------------- niveau 5
+  - id: pl-rust-5a
+    level: 5
+    type: mcq
+    prompt: Qu’est-ce qu’une Future en Rust ?
+    choices: ['Une valeur qui ne fait rien tant qu’elle n’est pas interrogée (poll) par un exécuteur', 'Un thread système', 'Un callback exécuté immédiatement', 'Une promesse JavaScript']
+    answer: 0
+  - id: pl-rust-5b
+    level: 5
+    type: mcq
+    prompt: Pourquoi une auto-référence (struct contenant une référence vers elle-même) pose-t-elle problème en Rust ?
+    choices: ['Déplacer la structure invaliderait la référence : il faut Pin', 'Les références sont interdites dans les structs', 'Cela crée une fuite mémoire', 'Le compilateur ne supporte pas la récursion']
+    answer: 0
+  - id: pl-rust-5c
+    level: 5
+    type: predict
+    prompt: Que va afficher ce programme (sur deux lignes) ?
+    code: |
+      struct Trace(&'static str);
+      impl Drop for Trace {
+          fn drop(&mut self) { print!("{} ", self.0); }
+      }
+      fn main() {
+          let _a = Trace("a");
+          let _b = Trace("b");
+          {
+              let _c = Trace("c");
+          }
+          let d = Trace("d");
+          std::mem::drop(d);
+          println!("fin");
+      }
+    output: "c d fin\nb a"
+    explanation: c est libérée à la fin de son bloc, d explicitement par drop ; a et b sont libérées à la fin de main, après « fin », dans l’ordre inverse de leur création (b puis a).
+  - id: pl-rust-5d
+    level: 5
+    type: mcq
+    prompt: Quel outil détecte des comportements indéfinis dans du code unsafe en l’interprétant ?
+    choices: ['Miri', 'Clippy', 'rustfmt', 'cargo audit']
+    answer: 0

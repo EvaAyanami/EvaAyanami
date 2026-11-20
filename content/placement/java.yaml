@@ -1,0 +1,207 @@
+# Banque de questions du test de positionnement adaptatif (Java).
+language: java
+questions:
+  # ---------------------------------------------------------- niveau 1
+  - id: pl-java-1a
+    level: 1
+    type: mcq
+    prompt: Quelle instruction affiche une ligne de texte en Java ?
+    choices: ['System.out.println("…")', 'print("…")', 'console.log("…")', 'echo "…"']
+    answer: 0
+  - id: pl-java-1b
+    level: 1
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      public class Main {
+          public static void main(String[] args) {
+              int a = 7, b = 2;
+              System.out.println(a / b + " " + a % b + " " + 7.0 / 2);
+          }
+      }
+    output: 3 1 3.5
+  - id: pl-java-1c
+    level: 1
+    type: mcq
+    prompt: Qu’exécute la JVM ?
+    choices: ['Du bytecode produit par javac', 'Directement le fichier .java', 'Du code machine natif uniquement', 'Du JavaScript']
+    answer: 0
+  - id: pl-java-1d
+    level: 1
+    type: mcq
+    prompt: Quel type utiliser pour stocker du texte ?
+    choices: ['String', 'char', 'Text', 'str']
+    answer: 0
+  # ---------------------------------------------------------- niveau 2
+  - id: pl-java-2a
+    level: 2
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      public class Main {
+          public static void main(String[] args) {
+              String a = new String("kiri"), b = new String("kiri");
+              System.out.println((a == b) + " " + a.equals(b));
+          }
+      }
+    output: false true
+  - id: pl-java-2b
+    level: 2
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      public class Main {
+          static class Animal { String cri() { return "..."; } }
+          static class Chat extends Animal { @Override String cri() { return "miaou"; } }
+          public static void main(String[] args) {
+              Animal a = new Chat();
+              System.out.println(a.cri() + " " + (a instanceof Chat));
+          }
+      }
+    output: miaou true
+  - id: pl-java-2c
+    level: 2
+    type: mcq
+    prompt: À quoi sert le mot-clé private sur un attribut ?
+    choices: ['À le rendre accessible uniquement dans sa classe (encapsulation)', 'À le rendre constant', 'À le partager entre instances', 'À accélérer son accès']
+    answer: 0
+  - id: pl-java-2d
+    level: 2
+    type: mcq
+    prompt: Une classe peut-elle implémenter plusieurs interfaces ?
+    choices: ['Oui', 'Non, une seule', 'Seulement si elle est abstraite', 'Seulement en Java 21']
+    answer: 0
+  # ---------------------------------------------------------- niveau 3
+  - id: pl-java-3a
+    level: 3
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      import java.util.*;
+      import java.util.stream.*;
+      public class Main {
+          public static void main(String[] args) {
+              List<String> l = List.of("kiwi", "ananas", "pomme", "abricot");
+              System.out.println(l.stream().filter(s -> s.startsWith("a")).map(String::length).collect(Collectors.toList()));
+          }
+      }
+    output: '[6, 7]'
+  - id: pl-java-3b
+    level: 3
+    type: mcq
+    prompt: Laquelle est une exception vérifiée (checked) ?
+    choices: ['IOException', 'NullPointerException', 'ArithmeticException', 'IndexOutOfBoundsException']
+    answer: 0
+  - id: pl-java-3c
+    level: 3
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      import java.util.*;
+      public class Main {
+          public static void main(String[] args) {
+              Map<String, Integer> m = new TreeMap<>();
+              for (String mot : "b a b c b a".split(" ")) m.merge(mot, 1, Integer::sum);
+              System.out.println(m);
+          }
+      }
+    output: '{a=2, b=3, c=1}'
+  - id: pl-java-3d
+    level: 3
+    type: mcq
+    prompt: Pourquoi List<Integer> n’est-il pas un sous-type de List<Number> ?
+    choices: ['Sinon on pourrait y ajouter un Double : les génériques sont invariants', 'Integer n’hérite pas de Number', 'C’est un bug de Java', 'Il l’est']
+    answer: 0
+  # ---------------------------------------------------------- niveau 4
+  - id: pl-java-4a
+    level: 4
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      import java.util.*;
+      import java.util.concurrent.*;
+      public class Main {
+          public static void main(String[] args) throws Exception {
+              try (ExecutorService pool = Executors.newFixedThreadPool(4)) {
+                  List<Future<Integer>> f = new ArrayList<>();
+                  for (int i = 1; i <= 4; i++) { final int x = i; f.add(pool.submit(() -> x * x)); }
+                  int s = 0;
+                  for (Future<Integer> r : f) s += r.get();
+                  System.out.println(s);
+              }
+          }
+      }
+    output: '30'
+  - id: pl-java-4b
+    level: 4
+    type: mcq
+    prompt: Que garantit le mot-clé volatile ?
+    choices: ['La visibilité des écritures entre threads, pas l’atomicité', 'L’atomicité de ++', 'L’exclusion mutuelle', 'Que la variable n’est jamais collectée']
+    answer: 0
+  - id: pl-java-4c
+    level: 4
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      import java.util.concurrent.*;
+      public class Main {
+          public static void main(String[] args) {
+              String r = CompletableFuture.supplyAsync(() -> 20)
+                  .thenCombine(CompletableFuture.supplyAsync(() -> 22), Integer::sum)
+                  .thenApply(x -> "total=" + x)
+                  .join();
+              System.out.println(r);
+          }
+      }
+    output: total=42
+  - id: pl-java-4d
+    level: 4
+    type: mcq
+    prompt: Quand un objet devient-il éligible au ramasse-miettes ?
+    choices: ['Quand il n’est plus accessible depuis les racines (threads, statiques…)', 'Quand on appelle System.gc()', 'Après une minute', 'Jamais pour les objets créés avec new']
+    answer: 0
+  # ---------------------------------------------------------- niveau 5
+  - id: pl-java-5a
+    level: 5
+    type: mcq
+    prompt: Quelle forme d’injection de dépendances Spring recommande-t-il ?
+    choices: ['Par constructeur', 'Par attribut public', 'Par variable statique', 'Par réflexion manuelle']
+    answer: 0
+  - id: pl-java-5b
+    level: 5
+    type: mcq
+    prompt: Qu’est-ce que le problème N+1 avec JPA/Hibernate ?
+    choices: ['Une requête pour la liste puis une requête par élément pour ses relations', 'Une erreur d’identifiant', 'Un dépassement d’entier', 'Une jointure manquante dans le schéma']
+    answer: 0
+  - id: pl-java-5c
+    level: 5
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      import java.lang.annotation.*;
+      import java.lang.reflect.*;
+      import java.util.*;
+      public class Main {
+          @Retention(RetentionPolicy.RUNTIME) @interface Route { String value(); }
+          static class Ctrl {
+              @Route("/a") public void a() {}
+              public void b() {}
+              @Route("/c") public void c() {}
+          }
+          public static void main(String[] args) {
+              List<String> r = new ArrayList<>();
+              for (Method m : Ctrl.class.getDeclaredMethods()) {
+                  Route x = m.getAnnotation(Route.class);
+                  if (x != null) r.add(x.value());
+              }
+              Collections.sort(r);
+              System.out.println(r);
+          }
+      }
+    output: '[/a, /c]'
+  - id: pl-java-5d
+    level: 5
+    type: mcq
+    prompt: Quel algorithme utiliser pour stocker des mots de passe ?
+    choices: ['Argon2 ou bcrypt (lents et salés)', 'SHA-256 sans sel', 'MD5', 'Base64']
+    answer: 0

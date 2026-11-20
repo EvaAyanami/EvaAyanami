@@ -1,0 +1,207 @@
+# Banque de questions du test de positionnement adaptatif (C++).
+language: cpp
+questions:
+  # ---------------------------------------------------------- niveau 1
+  - id: pl-cpp-1a
+    level: 1
+    type: mcq
+    prompt: Quel objet de la bibliothèque standard affiche du texte à l’écran ?
+    choices: ['std::cout', 'std::cin', 'std::print_line', 'console.log']
+    answer: 0
+  - id: pl-cpp-1b
+    level: 1
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      int main() {
+          int a = 7, b = 2;
+          std::cout << a / b << " " << a % b << " " << 7.0 / 2 << "\n";
+      }
+    output: 3 1 3.5
+  - id: pl-cpp-1c
+    level: 1
+    type: mcq
+    prompt: Que doit-on ajouter à la fin de chaque instruction en C++ ?
+    choices: ['Un point-virgule', 'Un point', 'Rien', 'Deux-points']
+    answer: 0
+  - id: pl-cpp-1d
+    level: 1
+    type: mcq
+    prompt: Quel est le rôle du compilateur (g++, clang++) ?
+    choices: ['Traduire le code source en programme exécutable', 'Exécuter le code ligne par ligne', 'Corriger automatiquement les bugs', 'Mettre en forme le code']
+    answer: 0
+  # ---------------------------------------------------------- niveau 2
+  - id: pl-cpp-2a
+    level: 2
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      void f(int x) { x = 10; }
+      void g(int& x) { x = 20; }
+      int main() {
+          int a = 1, b = 1;
+          f(a);
+          g(b);
+          std::cout << a << " " << b << "\n";
+      }
+    output: 1 20
+  - id: pl-cpp-2b
+    level: 2
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      #include <vector>
+      int main() {
+          std::vector<int> v{3, 1, 4};
+          v.push_back(1);
+          int s = 0;
+          for (int x : v) s += x;
+          std::cout << v.size() << " " << s << "\n";
+      }
+    output: 4 9
+  - id: pl-cpp-2c
+    level: 2
+    type: mcq
+    prompt: Que contient un pointeur ?
+    choices: ['L’adresse mémoire d’une valeur', 'Une copie de la valeur', 'Le nom de la variable', 'Toujours nullptr']
+    answer: 0
+  - id: pl-cpp-2d
+    level: 2
+    type: mcq
+    prompt: Quelle est la différence entre class et struct ?
+    choices: ['La visibilité par défaut des membres (private ou public)', 'struct ne peut pas avoir de méthodes', 'class est plus rapide', 'Aucune différence']
+    answer: 0
+  # ---------------------------------------------------------- niveau 3
+  - id: pl-cpp-3a
+    level: 3
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      #include <memory>
+      struct R {
+          R() { std::cout << "+"; }
+          ~R() { std::cout << "-"; }
+      };
+      int main() {
+          {
+              auto p = std::make_unique<R>();
+              auto q = std::move(p);
+              std::cout << (p ? "p" : "_");
+          }
+          std::cout << "!\n";
+      }
+    output: +_-!
+  - id: pl-cpp-3b
+    level: 3
+    type: mcq
+    prompt: Que signifie RAII ?
+    choices: ['Lier la durée de vie d’une ressource à celle d’un objet (libérée dans le destructeur)', 'Une règle d’optimisation du compilateur', 'Un format de fichier', 'Une boucle spéciale']
+    answer: 0
+  - id: pl-cpp-3c
+    level: 3
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      #include <string>
+      template <typename T>
+      T maximum(T a, T b) { return a > b ? a : b; }
+      int main() {
+          std::cout << maximum(3, 9) << " " << maximum<double>(2.5, 1) << " " << maximum(std::string("abc"), std::string("abd")) << "\n";
+      }
+    output: 9 2.5 abd
+  - id: pl-cpp-3d
+    level: 3
+    type: mcq
+    prompt: Pourquoi déclarer virtual le destructeur d’une classe de base polymorphe ?
+    choices: ['Pour que delete via un pointeur de base appelle le destructeur de la classe dérivée', 'Pour accélérer la destruction', 'Pour interdire l’héritage', 'Ce n’est jamais nécessaire']
+    answer: 0
+  # ---------------------------------------------------------- niveau 4
+  - id: pl-cpp-4a
+    level: 4
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      #include <string>
+      #include <utility>
+      struct S {
+          std::string n;
+          S(std::string x) : n(std::move(x)) {}
+          S(const S& o) : n(o.n) { std::cout << "copie "; }
+          S(S&& o) noexcept : n(std::move(o.n)) { std::cout << "déplacement "; }
+      };
+      int main() {
+          S a("x");
+          S b = a;
+          S c = std::move(a);
+          std::cout << "[" << a.n << "][" << c.n << "]\n";
+      }
+    output: copie déplacement [][x]
+  - id: pl-cpp-4b
+    level: 4
+    type: mcq
+    prompt: Qu’est-ce qu’une condition de course (data race) en C++ ?
+    choices: ['Un comportement indéfini : deux threads accèdent à la même donnée sans synchronisation, dont au moins une écriture', 'Une exception levée par std::thread', 'Une boucle infinie', 'Une erreur de compilation']
+    answer: 0
+  - id: pl-cpp-4c
+    level: 4
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <atomic>
+      #include <iostream>
+      #include <thread>
+      #include <vector>
+      int main() {
+          std::atomic<int> n{0};
+          std::vector<std::thread> t;
+          for (int i = 0; i < 4; i++) t.emplace_back([&] { for (int k = 0; k < 1000; k++) n++; });
+          for (auto& x : t) x.join();
+          std::cout << n << "\n";
+      }
+    output: '4000'
+  - id: pl-cpp-4d
+    level: 4
+    type: mcq
+    prompt: "Avec `const int& r = x; auto y = r;`, quel est le type de y ?"
+    choices: ['int (auto supprime la référence et le const de premier niveau)', 'const int&', 'const int', 'int&']
+    answer: 0
+  # ---------------------------------------------------------- niveau 5
+  - id: pl-cpp-5a
+    level: 5
+    type: mcq
+    prompt: À quoi servent les concepts de C++20 ?
+    choices: ['Contraindre les paramètres de templates avec des exigences nommées et des messages d’erreur clairs', 'Remplacer les classes', 'Gérer la mémoire automatiquement', 'Créer des threads']
+    answer: 0
+  - id: pl-cpp-5b
+    level: 5
+    type: predict
+    prompt: Que va afficher ce programme ?
+    code: |
+      #include <iostream>
+      constexpr long long fib(int n) { return n < 2 ? n : fib(n - 1) + fib(n - 2); }
+      template <int N> struct Fact { static constexpr long long v = N * Fact<N - 1>::v; };
+      template <> struct Fact<0> { static constexpr long long v = 1; };
+      int main() {
+          static_assert(fib(10) == 55);
+          constexpr auto f = Fact<10>::v;
+          std::cout << fib(20) << " " << f << "\n";
+      }
+    output: 6765 3628800
+  - id: pl-cpp-5c
+    level: 5
+    type: mcq
+    prompt: Quel est l’effet de std::memory_order_relaxed sur une opération atomique ?
+    choices: ['L’opération reste atomique mais n’impose aucun ordre par rapport aux autres accès mémoire', 'L’opération n’est plus atomique', 'Elle bloque tous les threads', 'Elle force un ordre séquentiellement cohérent']
+    answer: 0
+  - id: pl-cpp-5d
+    level: 5
+    type: mcq
+    prompt: Quel outil détecte à l’exécution les accès mémoire invalides (débordements, use-after-free) ?
+    choices: ['AddressSanitizer (-fsanitize=address)', 'clang-format', 'Doxygen', 'CMake']
+    answer: 0
