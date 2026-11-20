@@ -1,0 +1,1336 @@
+language: rust
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-modules
+    title: Modules
+    summary: Organise ton code avec mod, contrôle la visibilité avec pub et importe des éléments avec use.
+    minutes: 25
+    concepts: [modules]
+    sections:
+      - title: Déclarer des modules
+        body: |
+          Un **module** regroupe des fonctions, types et constantes sous un même nom :
+
+          ```rust
+          mod geometrie {
+              pub const PI: f64 = 3.14159;
+
+              pub fn aire_cercle(r: f64) -> f64 {
+                  PI * r * r
+              }
+
+              fn secret() {}            // privé : invisible hors du module
+
+              pub mod volumes {         // module imbriqué
+                  pub fn cube(c: f64) -> f64 { c * c * c }
+              }
+          }
+
+          fn main() {
+              println!("{}", geometrie::aire_cercle(2.0));
+              println!("{}", geometrie::volumes::cube(3.0));
+          }
+          ```
+
+          **Tout est privé par défaut.** `pub` rend un élément visible depuis le module parent.
+      - title: Chemins et use
+        body: |
+          ```rust
+          use geometrie::volumes::cube;          // importe une fonction
+          use std::collections::{HashMap, HashSet}; // plusieurs éléments
+          use std::fmt::Result as FmtResult;     // renommage
+          ```
+
+          Chemins relatifs et absolus :
+
+          - `crate::a::b` part de la racine de la crate ;
+          - `self::x` désigne le module courant, `super::x` le module parent.
+
+          Dans un projet Cargo, `mod reseau;` dans `main.rs` charge le fichier `src/reseau.rs` (ou `src/reseau/mod.rs`). Les champs d’une struct `pub` restent privés sauf s’ils sont eux-mêmes marqués `pub`.
+    exercises:
+      - id: rust-mod-q1
+        type: mcq
+        prompt: Par défaut, une fonction déclarée dans un module est…
+        choices: [publique, privée, globale, constante]
+        answer: 1
+        concepts: [modules]
+      - id: rust-mod-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          mod banque {
+              pub struct Compte {
+                  pub titulaire: String,
+                  solde: i64,
+              }
+              impl Compte {
+                  pub fn new(t: &str) -> Self { Compte { titulaire: t.to_string(), solde: 0 } }
+                  pub fn deposer(&mut self, m: i64) { self.solde += m; }
+                  pub fn solde(&self) -> i64 { self.solde }
+              }
+          }
+          use banque::Compte;
+          fn main() {
+              let mut c = Compte::new("Kiri");
+              c.deposer(30);
+              c.deposer(12);
+              println!("{} {}", c.titulaire, c.solde());
+          }
+        output: Kiri 42
+      - id: rust-mod-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0603). Trouve la ligne à corriger.
+        code: |
+          mod outils {
+              fn doubler(x: i32) -> i32 {
+                  x * 2
+              }
+          }
+
+          fn main() {
+              println!("{}", outils::doubler(21));
+          }
+        bugLines: [2]
+        choices:
+          - La fonction doubler est privée ; il faut la déclarer pub
+          - Les modules ne peuvent pas contenir de fonctions
+          - Il faut écrire outils.doubler
+        answer: 0
+        solution: |
+          mod outils {
+              pub fn doubler(x: i32) -> i32 {
+                  x * 2
+              }
+          }
+
+          fn main() {
+              println!("{}", outils::doubler(21));
+          }
+        tests:
+          - { input: '', output: '42' }
+      - id: rust-mod-fill
+        type: fill
+        prompt: Complète pour appeler une fonction du module parent depuis un sous-module.
+        code: |
+          fn salut() -> &'static str { "salut" }
+
+          mod enfant {
+              pub fn parler() -> String {
+                  format!("{} !", {{?}}::salut())
+              }
+          }
+
+          fn main() {
+              println!("{}", enfant::parler());
+          }
+        blanks: [[super, crate]]
+        tests:
+          - { input: '', output: salut ! }
+      - id: rust-mod-code
+        type: code
+        title: Module de conversions
+        prompt: |
+          Crée un module `conversions` contenant deux sous-modules publics :
+
+          - `longueur` avec `pub fn km_vers_miles(km: f64) -> f64` (× 0.621371) ;
+          - `masse` avec `pub fn kg_vers_livres(kg: f64) -> f64` (× 2.20462).
+
+          Chaque ligne d’entrée est `valeur unite` (`km` ou `kg`). Affiche la conversion avec 2 décimales (`5.00 km = 3.11 mi`, `2.00 kg = 4.41 lb`).
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          mod conversions {
+              pub mod longueur {
+                  pub fn km_vers_miles(km: f64) -> f64 { km * 0.621371 }
+              }
+              pub mod masse {
+                  pub fn kg_vers_livres(kg: f64) -> f64 { kg * 2.20462 }
+              }
+          }
+
+          use conversions::{longueur, masse};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let p: Vec<&str> = l.split_whitespace().collect();
+                  let v: f64 = p[0].parse().unwrap();
+                  if p[1] == "km" {
+                      println!("{:.2} km = {:.2} mi", v, longueur::km_vers_miles(v));
+                  } else {
+                      println!("{:.2} kg = {:.2} lb", v, masse::kg_vers_livres(v));
+                  }
+              }
+          }
+        tests:
+          - { input: "5 km\n2 kg", output: "5.00 km = 3.11 mi\n2.00 kg = 4.41 lb" }
+          - { input: "42.195 km\n0 kg", output: "42.20 km = 26.22 mi\n0.00 kg = 0.00 lb", hidden: true }
+        require:
+          - { pattern: 'mod\s+conversions', message: Créer le module conversions }
+          - { pattern: 'pub\s+mod\s+longueur', message: Créer le sous-module public longueur }
+        concepts: [modules]
+    project:
+      id: rust-mod-projet
+      type: code
+      title: Bibliothèque modulaire
+      difficulty: 3
+      prompt: |
+        Organise un petit gestionnaire de bibliothèque en modules :
+
+        - `modele` : `pub struct Livre { pub titre: String, pub auteur: String, emprunte: bool }` avec `new`, `emprunter(&mut self) -> bool` (false si déjà emprunté), `rendre(&mut self)`, `est_disponible(&self) -> bool` ;
+        - `catalogue` : `pub struct Catalogue` contenant un `Vec<Livre>` (champ privé) avec `ajouter`, `chercher_mut(&mut self, titre: &str) -> Option<&mut Livre>`, `disponibles(&self) -> usize`.
+
+        Commandes : `ajouter Titre;Auteur`, `emprunter Titre`, `rendre Titre`, `stats`. Les sorties attendues :
+
+        - `emprunter` → `OK` ou `indisponible` ou `introuvable` ;
+        - `rendre` → `OK` ou `introuvable` ;
+        - `stats` → `disponibles : N`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let (cmd, arg) = l.split_once(' ').unwrap_or((l, ""));
+                // …
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        mod modele {
+            pub struct Livre {
+                pub titre: String,
+                pub auteur: String,
+                emprunte: bool,
+            }
+            impl Livre {
+                pub fn new(titre: &str, auteur: &str) -> Self {
+                    Livre { titre: titre.into(), auteur: auteur.into(), emprunte: false }
+                }
+                pub fn emprunter(&mut self) -> bool {
+                    if self.emprunte { false } else { self.emprunte = true; true }
+                }
+                pub fn rendre(&mut self) { self.emprunte = false; }
+                pub fn est_disponible(&self) -> bool { !self.emprunte }
+            }
+        }
+
+        mod catalogue {
+            use super::modele::Livre;
+            pub struct Catalogue { livres: Vec<Livre> }
+            impl Catalogue {
+                pub fn new() -> Self { Catalogue { livres: Vec::new() } }
+                pub fn ajouter(&mut self, l: Livre) { self.livres.push(l); }
+                pub fn chercher_mut(&mut self, titre: &str) -> Option<&mut Livre> {
+                    self.livres.iter_mut().find(|l| l.titre == titre)
+                }
+                pub fn disponibles(&self) -> usize {
+                    self.livres.iter().filter(|l| l.est_disponible()).count()
+                }
+            }
+        }
+
+        use catalogue::Catalogue;
+        use modele::Livre;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut cat = Catalogue::new();
+            for l in e.lines() {
+                let (cmd, arg) = l.split_once(' ').unwrap_or((l, ""));
+                match cmd {
+                    "ajouter" => {
+                        let (t, a) = arg.split_once(';').unwrap();
+                        cat.ajouter(Livre::new(t, a));
+                    }
+                    "emprunter" => match cat.chercher_mut(arg) {
+                        Some(livre) => println!("{}", if livre.emprunter() { "OK" } else { "indisponible" }),
+                        None => println!("introuvable"),
+                    },
+                    "rendre" => match cat.chercher_mut(arg) {
+                        Some(livre) => { livre.rendre(); println!("OK"); }
+                        None => println!("introuvable"),
+                    },
+                    _ => println!("disponibles : {}", cat.disponibles()),
+                }
+            }
+        }
+      tests:
+        - { input: "ajouter Dune;Herbert\najouter Fondation;Asimov\nemprunter Dune\nemprunter Dune\nstats\nrendre Dune\nstats\nemprunter Hypérion", output: "OK\nindisponible\ndisponibles : 1\nOK\ndisponibles : 2\nintrouvable" }
+        - { input: "stats\nrendre X\najouter A B;C\nemprunter A B\nstats", output: "disponibles : 0\nintrouvable\nOK\ndisponibles : 0", hidden: true }
+      require:
+        - { pattern: 'mod\s+modele', message: Créer le module modele }
+        - { pattern: 'mod\s+catalogue', message: Créer le module catalogue }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-mod-ex1
+          type: mcq
+          prompt: Que désigne `super` dans un chemin ?
+          choices: [La racine de la crate, Le module parent, La bibliothèque standard, Le module courant]
+          answer: 1
+        - id: rust-mod-ex2
+          type: mcq
+          prompt: Avec `mod reseau;` dans `src/main.rs`, quel fichier Cargo charge-t-il ?
+          choices: [src/reseau.rs ou src/reseau/mod.rs, reseau.toml, lib/reseau.rs, Aucun]
+          answer: 0
+        - id: rust-mod-ex3
+          type: mcq
+          prompt: Une struct `pub` a des champs sans `pub`. Peut-on les lire depuis un autre module ?
+          choices: [Oui, 'Non, ils restent privés', Seulement en lecture, Seulement avec unsafe]
+          answer: 1
+        - id: rust-mod-ex4
+          type: fill
+          prompt: Complète l’import groupé.
+          code: 'use std::collections::{{{?}}, HashSet};'
+          blanks: [[HashMap, BTreeMap, VecDeque]]
+
+  # ------------------------------------------------------------------
+  - slug: rust-crates
+    title: Crates
+    summary: Crates binaires et bibliothèques, crates.io, versionnage sémantique et utilisation de crates populaires (rand, serde_json, regex).
+    minutes: 25
+    concepts: [build, modules]
+    sections:
+      - title: Qu’est-ce qu’une crate ?
+        body: |
+          Une **crate** est l’unité de compilation de Rust :
+
+          - **crate binaire** : produit un exécutable (contient `fn main`, racine `src/main.rs`) ;
+          - **crate bibliothèque** : du code réutilisable (racine `src/lib.rs`).
+
+          Un **package** (défini par `Cargo.toml`) contient au plus une bibliothèque et autant de binaires que nécessaire.
+
+          L’écosystème partage ses bibliothèques sur **crates.io** (plus de 150 000 crates). La documentation de chacune est sur **docs.rs**.
+      - title: Ajouter une dépendance
+        body: |
+          ```toml
+          [dependencies]
+          rand = "0.8"          # ^0.8 : toute version 0.8.x compatible
+          serde = { version = "1", features = ["derive"] }
+          regex = "1.10"
+          ```
+
+          Ou en ligne de commande : `cargo add rand`.
+
+          Le **versionnage sémantique** (SemVer) `MAJEUR.MINEUR.CORRECTIF` : une version majeure différente peut casser la compatibilité. `Cargo.lock` fige les versions exactes pour des compilations reproductibles.
+
+          > 💡 Sur Codemori, les crates `rand`, `serde`, `serde_json`, `regex` et `tokio` sont pré-installées dans le bac à sable.
+      - title: Quelques crates incontournables
+        body: |
+          ```rust
+          use rand::{rngs::StdRng, Rng, SeedableRng};
+
+          let mut rng = StdRng::seed_from_u64(42);   // générateur reproductible
+          let de = rng.gen_range(1..=6);
+          ```
+
+          ```rust
+          use serde_json::{json, Value};
+
+          let v: Value = serde_json::from_str(r#"{"nom": "Kiri", "age": 16}"#).unwrap();
+          println!("{}", v["nom"]);                  // "Kiri"
+          let j = json!({ "langages": ["Rust", "C++", "Java"] });
+          ```
+
+          ```rust
+          use regex::Regex;
+          let re = Regex::new(r"\d{4}-\d{2}-\d{2}").unwrap();
+          assert!(re.is_match("le 2026-11-20"));
+          ```
+
+          Autres classiques : `clap` (arguments CLI), `tokio` (asynchrone), `reqwest` (HTTP), `anyhow`/`thiserror` (erreurs), `chrono` (dates).
+    exercises:
+      - id: rust-crate-q1
+        type: mcq
+        prompt: Quel fichier est la racine d’une crate bibliothèque ?
+        choices: [src/main.rs, src/lib.rs, Cargo.toml, lib/mod.rs]
+        answer: 1
+      - id: rust-crate-q2
+        type: mcq
+        prompt: 'Que signifie `rand = "0.8"` dans Cargo.toml ?'
+        choices: [Exactement la version 0.8.0, Toute version 0.8.x compatible, La version 8, La dernière version disponible]
+        answer: 1
+      - id: rust-crate-order
+        type: order
+        prompt: Remets dans l’ordre les étapes pour utiliser une nouvelle crate.
+        lines:
+          - Chercher la crate sur crates.io
+          - Lire sa documentation sur docs.rs
+          - Ajouter la dépendance avec cargo add
+          - Importer ses éléments avec use
+          - Compiler avec cargo build
+      - id: rust-crate-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use serde_json::Value;
+
+          fn main() {
+              let v: Value = serde_json::from_str(r#"{"nom": "Kiri", "notes": [12, 17, 15]}"#).unwrap();
+              let somme: i64 = v["notes"].as_array().unwrap().iter().map(|n| n.as_i64().unwrap()).sum();
+              println!("{} {}", v["nom"].as_str().unwrap(), somme);
+          }
+        output: Kiri 44
+      - id: rust-crate-code
+        type: code
+        title: Extraire des dates avec regex
+        prompt: |
+          À l’aide de la crate `regex`, extrais toutes les dates au format `AAAA-MM-JJ` du texte lu et affiche-les au format français `JJ/MM/AAAA`, une par ligne, dans l’ordre d’apparition.
+        starter: |
+          use regex::Regex;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut texte = String::new();
+              io::stdin().read_to_string(&mut texte).unwrap();
+              let re = Regex::new(r"(\d{4})-(\d{2})-(\d{2})").unwrap();
+              // re.captures_iter(&texte)
+          }
+        solution: |
+          use regex::Regex;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut texte = String::new();
+              io::stdin().read_to_string(&mut texte).unwrap();
+              let re = Regex::new(r"(\d{4})-(\d{2})-(\d{2})").unwrap();
+              for c in re.captures_iter(&texte) {
+                  println!("{}/{}/{}", &c[3], &c[2], &c[1]);
+              }
+          }
+        tests:
+          - { input: 'Réunion le 2026-11-20, rendu le 2026-12-01.', output: "20/11/2026\n01/12/2026" }
+          - { input: "Aucune date ici\nmais 1999-01-31 là", output: 31/01/1999, hidden: true }
+        require:
+          - { pattern: 'use\s+regex', message: Utiliser la crate regex }
+    project:
+      id: rust-crate-projet
+      type: code
+      title: Statistiques JSON
+      difficulty: 3
+      prompt: |
+        L’entrée est un tableau JSON d’élèves : `[{"nom": "...", "notes": [..]}, ...]`.
+
+        Avec `serde_json`, affiche pour chaque élève `nom : moyenne` (1 décimale ; `nom : aucune note` si la liste est vide), puis `Meilleur : nom` (meilleure moyenne, le premier en cas d’égalité, en ignorant les élèves sans note).
+      starter: |
+        use serde_json::Value;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let v: Value = serde_json::from_str(&e).unwrap();
+        }
+      solution: |
+        use serde_json::Value;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let v: Value = serde_json::from_str(&e).unwrap();
+            let mut meilleur: Option<(String, f64)> = None;
+            for eleve in v.as_array().unwrap() {
+                let nom = eleve["nom"].as_str().unwrap();
+                let notes: Vec<f64> = eleve["notes"].as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect();
+                if notes.is_empty() {
+                    println!("{} : aucune note", nom);
+                    continue;
+                }
+                let moy = notes.iter().sum::<f64>() / notes.len() as f64;
+                println!("{} : {:.1}", nom, moy);
+                if meilleur.as_ref().map_or(true, |(_, m)| moy > *m) {
+                    meilleur = Some((nom.to_string(), moy));
+                }
+            }
+            if let Some((nom, _)) = meilleur {
+                println!("Meilleur : {}", nom);
+            }
+        }
+      tests:
+        - { input: '[{"nom": "Ada", "notes": [15, 18]}, {"nom": "Bob", "notes": [12]}]', output: "Ada : 16.5\nBob : 12.0\nMeilleur : Ada" }
+        - { input: '[{"nom": "Zoé", "notes": []}, {"nom": "Lou", "notes": [10, 10.5]}, {"nom": "Max", "notes": [10.25]}]', output: "Zoé : aucune note\nLou : 10.2\nMax : 10.2\nMeilleur : Lou", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-crate-ex1
+          type: mcq
+          prompt: Quel fichier fige les versions exactes des dépendances ?
+          choices: [Cargo.toml, Cargo.lock, rust-toolchain, deps.txt]
+          answer: 1
+        - id: rust-crate-ex2
+          type: mcq
+          prompt: Sur quel site sont publiées les crates ?
+          choices: [npmjs.com, crates.io, pypi.org, maven.org]
+          answer: 1
+        - id: rust-crate-ex3
+          type: mcq
+          prompt: Quelle commande ajoute une dépendance au projet ?
+          choices: [cargo install, cargo add, cargo get, rustup add]
+          answer: 1
+        - id: rust-crate-ex4
+          type: mcq
+          prompt: En SemVer, que signale un changement de version MAJEURE ?
+          choices: [Une correction de bug, Une nouvelle fonctionnalité compatible, Un changement potentiellement incompatible, Rien]
+          answer: 2
+
+  # ------------------------------------------------------------------
+  - slug: rust-collections
+    title: Collections
+    summary: Panorama des collections standard (Vec, VecDeque, HashMap, BTreeMap, HashSet, BinaryHeap) et choix de la bonne structure.
+    minutes: 30
+    concepts: [collections]
+    sections:
+      - title: Le panorama
+        body: |
+          | Collection | Usage | Accès typique |
+          |---|---|---|
+          | `Vec<T>` | liste dynamique | indice O(1), ajout en fin O(1) |
+          | `VecDeque<T>` | file à double entrée | ajout/retrait aux deux bouts O(1) |
+          | `HashMap<K, V>` | dictionnaire | recherche O(1) moyen |
+          | `BTreeMap<K, V>` | dictionnaire **trié** | O(log n), parcours ordonné |
+          | `HashSet<T>` / `BTreeSet<T>` | ensemble sans doublons | appartenance O(1) / O(log n) |
+          | `BinaryHeap<T>` | file de priorité (max en tête) | sommet O(1), insertion O(log n) |
+
+          Toutes se trouvent dans `std::collections` (sauf `Vec`, présent dans le prélude).
+      - title: Exemples
+        body: |
+          ```rust
+          use std::collections::{VecDeque, BTreeMap, HashSet, BinaryHeap};
+
+          let mut file = VecDeque::new();
+          file.push_back("a"); file.push_back("b");
+          let premier = file.pop_front();         // Some("a")
+
+          let mut tri = BTreeMap::new();
+          tri.insert("zèbre", 1); tri.insert("ane", 2);
+          for (k, v) in &tri { println!("{k} {v}"); } // ane puis zèbre
+
+          let vus: HashSet<i32> = [3, 1, 3, 2].into_iter().collect(); // {1, 2, 3}
+          let mut tas = BinaryHeap::from(vec![4, 9, 1]);
+          println!("{:?}", tas.pop());             // Some(9)
+          ```
+
+          Pour un tas **min**, on enveloppe les valeurs dans `std::cmp::Reverse`.
+      - title: Choisir
+        body: |
+          - Besoin d’un ordre et d’indices ? → `Vec`.
+          - File d’attente (FIFO) ? → `VecDeque`.
+          - Associer clé → valeur ? → `HashMap` (ou `BTreeMap` si l’ordre des clés compte).
+          - Éliminer des doublons, tester l’appartenance ? → `HashSet`.
+          - Toujours traiter l’élément le plus prioritaire ? → `BinaryHeap`.
+
+          Les éléments d’un `HashMap`/`HashSet` doivent implémenter `Eq + Hash` ; ceux d’un `BTreeMap`/`BTreeSet` ou `BinaryHeap`, `Ord`.
+    exercises:
+      - id: rust-coll-q1
+        type: mcq
+        prompt: Quelle collection choisir pour une file d’attente (premier arrivé, premier servi) ?
+        choices: ['Vec', 'VecDeque', 'HashSet', 'BinaryHeap']
+        answer: 1
+        concepts: [collections]
+      - id: rust-coll-q2
+        type: mcq
+        prompt: Quelle collection parcourt ses clés dans l’ordre trié ?
+        choices: ['HashMap', 'BTreeMap', 'HashSet', 'VecDeque']
+        answer: 1
+      - id: rust-coll-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::collections::{BinaryHeap, HashSet, VecDeque};
+          use std::cmp::Reverse;
+
+          fn main() {
+              let s: HashSet<char> = "mississippi".chars().collect();
+              let mut q: VecDeque<i32> = VecDeque::new();
+              q.push_back(1); q.push_front(0); q.push_back(2);
+              let mut h = BinaryHeap::new();
+              for x in [5, 2, 8] { h.push(Reverse(x)); }
+              let Reverse(min) = h.pop().unwrap();
+              println!("{} {:?} {}", s.len(), q, min);
+          }
+        output: 4 [0, 1, 2] 2
+      - id: rust-coll-code
+        type: code
+        title: Mots uniques triés
+        prompt: |
+          Lis un texte et affiche ses mots **uniques** (en minuscules), triés par ordre alphabétique, séparés par des espaces. Utilise un `BTreeSet`.
+        starter: |
+          use std::collections::BTreeSet;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut t = String::new();
+              io::stdin().read_to_string(&mut t).unwrap();
+          }
+        solution: |
+          use std::collections::BTreeSet;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut t = String::new();
+              io::stdin().read_to_string(&mut t).unwrap();
+              let mots: BTreeSet<String> = t.split_whitespace().map(|m| m.to_lowercase()).collect();
+              let v: Vec<String> = mots.into_iter().collect();
+              println!("{}", v.join(" "));
+          }
+        tests:
+          - { input: 'le chat et le Chien et la souris', output: chat chien et la le souris }
+          - { input: "B a\nb A c", output: a b c, hidden: true }
+        require:
+          - { pattern: 'BTreeSet', message: Utiliser un BTreeSet }
+        concepts: [collections]
+    project:
+      id: rust-coll-projet
+      type: code
+      title: Guichet de la préfecture
+      difficulty: 3
+      prompt: |
+        Simule un guichet avec deux files : une file **prioritaire** et une file **normale** (deux `VecDeque<String>`).
+
+        Commandes :
+
+        - `arrivee NOM` / `arrivee_prio NOM` : ajoute la personne dans la file correspondante ;
+        - `appel` : appelle la prochaine personne (la file prioritaire passe toujours en premier) et affiche `Guichet : NOM`, ou `Personne en attente` ;
+        - `attente` : affiche `En attente : P prioritaires, N normales`.
+      starter: |
+        use std::collections::VecDeque;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::collections::VecDeque;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut prio: VecDeque<String> = VecDeque::new();
+            let mut normale: VecDeque<String> = VecDeque::new();
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                match p[0] {
+                    "arrivee" => normale.push_back(p[1].to_string()),
+                    "arrivee_prio" => prio.push_back(p[1].to_string()),
+                    "appel" => match prio.pop_front().or_else(|| normale.pop_front()) {
+                        Some(n) => println!("Guichet : {}", n),
+                        None => println!("Personne en attente"),
+                    },
+                    _ => println!("En attente : {} prioritaires, {} normales", prio.len(), normale.len()),
+                }
+            }
+        }
+      tests:
+        - { input: "arrivee Ada\narrivee Bob\narrivee_prio Zoe\nattente\nappel\nappel\nappel\nappel", output: "En attente : 1 prioritaires, 2 normales\nGuichet : Zoe\nGuichet : Ada\nGuichet : Bob\nPersonne en attente" }
+        - { input: "appel\narrivee_prio A\narrivee_prio B\narrivee C\nappel\nattente", output: "Personne en attente\nGuichet : A\nEn attente : 1 prioritaires, 1 normales", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-coll-ex1
+          type: mcq
+          prompt: Quel trait doivent implémenter les clés d’un HashMap ?
+          choices: ['Ord', 'Eq + Hash', 'Copy', 'Display']
+          answer: 1
+        - id: rust-coll-ex2
+          type: mcq
+          prompt: Comment obtenir un tas « min » avec BinaryHeap ?
+          choices: [BinaryHeap::min(), En enveloppant les valeurs dans Reverse, C’est impossible, Avec sort_desc]
+          answer: 1
+        - id: rust-coll-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            use std::collections::BTreeMap;
+            fn main() {
+                let mut m = BTreeMap::new();
+                for (k, v) in [("c", 3), ("a", 1), ("b", 2), ("a", 10)] {
+                    m.insert(k, v);
+                }
+                let s: Vec<String> = m.iter().map(|(k, v)| format!("{}{}", k, v)).collect();
+                println!("{}", s.join(","));
+            }
+          output: a10,b2,c3
+        - id: rust-coll-ex4
+          type: mcq
+          prompt: Quelle est la complexité moyenne d’une recherche dans un HashSet ?
+          choices: ['O(1)', 'O(log n)', 'O(n)', 'O(n²)']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-vecteurs
+    title: Vecteurs
+    summary: Crée, modifie, trie et parcours des Vec<T> ; maîtrise get, retain, dedup, sort_by et les fenêtres.
+    minutes: 30
+    concepts: [collections, vecteurs]
+    sections:
+      - title: Créer et modifier
+        body: |
+          ```rust
+          let mut v: Vec<i32> = Vec::new();
+          let w = vec![1, 2, 3];
+          let zeros = vec![0; 10];
+
+          v.push(4);             // ajoute à la fin
+          v.extend([5, 6]);      // ajoute plusieurs éléments
+          v.insert(0, 3);        // insère à l’indice 0 (décale le reste)
+          let dernier = v.pop(); // Option<i32>
+          v.remove(0);           // retire l’indice 0
+          v.clear();             // vide tout
+          ```
+
+          Accès : `v[i]` panique hors limites, `v.get(i)` renvoie un `Option`. `v.len()`, `v.is_empty()`, `v.contains(&x)`, `v.first()`, `v.last()`.
+      - title: Trier et filtrer
+        body: |
+          ```rust
+          let mut n = vec![5, 3, 8, 3, 1];
+          n.sort();                       // [1, 3, 3, 5, 8]
+          n.dedup();                      // supprime les doublons consécutifs → [1, 3, 5, 8]
+          n.reverse();                    // [8, 5, 3, 1]
+          n.retain(|&x| x > 2);           // garde ceux qui vérifient → [8, 5, 3]
+          n.sort_by(|a, b| b.cmp(a));     // tri décroissant
+          n.sort_by_key(|x| x % 3);       // tri selon une clé
+          ```
+
+          Pour les flottants (qui n’implémentent pas `Ord`) : `v.sort_by(|a, b| a.partial_cmp(b).unwrap())` ou `v.sort_by(f64::total_cmp)`.
+
+          Recherche dans un vecteur trié : `n.binary_search(&5)` → `Ok(indice)` ou `Err(position_d_insertion)`.
+      - title: Tranches et fenêtres
+        body: |
+          ```rust
+          let v = vec![1, 2, 3, 4, 5];
+          for paire in v.windows(2) { print!("{:?} ", paire); }   // [1,2] [2,3] [3,4] [4,5]
+          for bloc in v.chunks(2) { print!("{:?} ", bloc); }      // [1,2] [3,4] [5]
+          let (gauche, droite) = v.split_at(2);                   // [1,2] et [3,4,5]
+          println!("{}", v.iter().max().unwrap());                // 5
+          ```
+    exercises:
+      - id: rust-vec-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let mut v = vec![4, 1, 4, 2, 9, 2];
+              v.sort();
+              v.dedup();
+              v.retain(|&x| x != 9);
+              v.insert(1, 7);
+              println!("{:?} {}", v, v.len());
+          }
+        output: '[1, 7, 2, 4] 4'
+        concepts: [vecteurs]
+      - id: rust-vec-q1
+        type: mcq
+        prompt: Que renvoie `v.get(100)` sur un vecteur de 3 éléments ?
+        choices: [Un panic, 'None', 'Some(0)', Une erreur de compilation]
+        answer: 1
+      - id: rust-vec-fill
+        type: fill
+        prompt: Complète pour trier les mots par longueur décroissante.
+        code: |
+          fn main() {
+              let mut mots = vec!["kiwi", "ananas", "figue"];
+              mots.{{?}}(|a, b| b.len().cmp(&a.len()));
+              println!("{:?}", mots);
+          }
+        blanks: [[sort_by]]
+        tests:
+          - { input: '', output: '["ananas", "figue", "kiwi"]' }
+      - id: rust-vec-bug
+        type: bugfix
+        prompt: Ce programme panique (index out of bounds). Trouve la ligne fautive.
+        code: |
+          fn main() {
+              let v = vec![10, 20, 30];
+              let mut somme = 0;
+              for i in 0..=v.len() {
+                  somme += v[i];
+              }
+              println!("{}", somme);
+          }
+        bugLines: [4]
+        choices:
+          - L’intervalle 0..=v.len() va un indice trop loin (il faut 0..v.len())
+          - somme devrait être un f64
+          - On ne peut pas indexer un Vec
+        answer: 0
+        solution: |
+          fn main() {
+              let v = vec![10, 20, 30];
+              let mut somme = 0;
+              for i in 0..v.len() {
+                  somme += v[i];
+              }
+              println!("{}", somme);
+          }
+        tests:
+          - { input: '', output: '60' }
+      - id: rust-vec-code
+        type: code
+        title: Plus grande progression
+        prompt: |
+          Lis une série de températures (entiers séparés par des espaces). Avec `windows(2)`, trouve la plus grande **hausse** entre deux jours consécutifs et affiche-la (0 s’il n’y a aucune hausse).
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let t: Vec<i32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+          }
+        solution: |
+          use std::io;
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let t: Vec<i32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              let mut meilleure = 0;
+              for w in t.windows(2) {
+                  meilleure = meilleure.max(w[1] - w[0]);
+              }
+              println!("{}", meilleure);
+          }
+        tests:
+          - { input: '12 15 11 19 18', output: '8' }
+          - { input: '30 20 10', output: '0', hidden: true }
+          - { input: '5', output: '0', hidden: true }
+          - { input: '-5 3 -10 7', output: '17', hidden: true }
+        require:
+          - { pattern: '\.windows\(', message: Utiliser windows }
+    project:
+      id: rust-vec-projet
+      type: code
+      title: Médiane et quartiles
+      difficulty: 3
+      prompt: |
+        Lis des nombres décimaux (un par ligne). Trie-les et affiche (2 décimales) :
+
+        ```
+        Min : …
+        Médiane : …
+        Max : …
+        Écart interquartile : …
+        ```
+
+        La médiane d’un nombre pair d’éléments est la moyenne des deux valeurs centrales. Q1 est la médiane de la moitié inférieure, Q3 celle de la moitié supérieure (sans inclure la médiane si n est impair). L’écart interquartile vaut Q3 − Q1. Il y a toujours au moins 2 nombres.
+      starter: |
+        use std::io::{self, Read};
+
+        fn mediane(v: &[f64]) -> f64 {
+            todo!()
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut v: Vec<f64> = e.lines().map(|l| l.trim().parse().unwrap()).collect();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn mediane(v: &[f64]) -> f64 {
+            let n = v.len();
+            if n % 2 == 0 { (v[n / 2 - 1] + v[n / 2]) / 2.0 } else { v[n / 2] }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut v: Vec<f64> = e.lines().map(|l| l.trim().parse().unwrap()).collect();
+            v.sort_by(f64::total_cmp);
+            let n = v.len();
+            let bas = &v[..n / 2];
+            let haut = &v[(n + 1) / 2..];
+            println!("Min : {:.2}", v[0]);
+            println!("Médiane : {:.2}", mediane(&v));
+            println!("Max : {:.2}", v[n - 1]);
+            println!("Écart interquartile : {:.2}", mediane(haut) - mediane(bas));
+        }
+      tests:
+        - { input: "7\n1\n3\n9\n5", output: "Min : 1.00\nMédiane : 5.00\nMax : 9.00\nÉcart interquartile : 6.00" }
+        - { input: "4\n2", output: "Min : 2.00\nMédiane : 3.00\nMax : 4.00\nÉcart interquartile : 2.00", hidden: true }
+        - { input: "1.5\n2.5\n10\n4\n3\n8", output: "Min : 1.50\nMédiane : 3.50\nMax : 10.00\nÉcart interquartile : 5.50", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-vec-ex1
+          type: mcq
+          prompt: Que fait `v.retain(|&x| x % 2 == 0)` ?
+          choices: [Garde uniquement les nombres pairs, Supprime les pairs, Compte les pairs, Trie les pairs en premier]
+          answer: 0
+        - id: rust-vec-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let v = vec![1, 2, 3, 4, 5, 6, 7];
+                let s: Vec<i32> = v.chunks(3).map(|c| c.iter().sum()).collect();
+                println!("{:?}", s);
+            }
+          output: '[6, 15, 7]'
+        - id: rust-vec-ex3
+          type: mcq
+          prompt: Pourquoi `vec![2.5, 1.0].sort()` ne compile-t-il pas ?
+          choices: ['f64 n’implémente pas Ord (à cause de NaN)', Les vecteurs de flottants sont interdits, sort n’existe pas, Il faut mut]
+          answer: 0
+        - id: rust-vec-ex4
+          type: mcq
+          prompt: Que renvoie `vec![1, 3, 5].binary_search(&4)` ?
+          choices: ['Ok(1)', 'Err(2)', 'None', 'Ok(2)']
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-hashmap
+    title: HashMap
+    summary: Associe des clés à des valeurs, compte des occurrences avec l’API entry et parcours un dictionnaire.
+    minutes: 30
+    concepts: [hashmap, collections]
+    sections:
+      - title: Bases
+        body: |
+          ```rust
+          use std::collections::HashMap;
+
+          let mut capitales = HashMap::new();
+          capitales.insert("France", "Paris");
+          capitales.insert("Japon", "Tokyo");
+
+          if let Some(c) = capitales.get("Japon") { println!("{c}"); }
+          capitales.remove("France");
+          println!("{}", capitales.contains_key("France")); // false
+          println!("{}", capitales.len());
+
+          for (pays, ville) in &capitales {     // ordre NON garanti
+              println!("{pays} → {ville}");
+          }
+          ```
+
+          `insert` sur une clé existante **remplace** la valeur (et renvoie l’ancienne dans un `Option`).
+      - title: L’API entry
+        body: |
+          Le motif le plus courant : compter ou regrouper.
+
+          ```rust
+          let texte = "le chat et le chien";
+          let mut freq: HashMap<&str, u32> = HashMap::new();
+          for mot in texte.split_whitespace() {
+              *freq.entry(mot).or_insert(0) += 1;
+          }
+          // freq["le"] == 2
+
+          let mut groupes: HashMap<usize, Vec<&str>> = HashMap::new();
+          for mot in texte.split_whitespace() {
+              groupes.entry(mot.len()).or_default().push(mot);
+          }
+          ```
+
+          `entry(k)` renvoie une « entrée » sur laquelle `or_insert(v)` insère `v` si la clé est absente, puis renvoie une `&mut` vers la valeur.
+      - title: Ordonner les résultats
+        body: |
+          Un `HashMap` n’a pas d’ordre. Pour un affichage stable :
+
+          ```rust
+          let mut paires: Vec<(&&str, &u32)> = freq.iter().collect();
+          paires.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0))); // fréquence ↓ puis alphabétique
+          ```
+
+          Ou utiliser un `BTreeMap` dont les clés sont toujours triées.
+
+          Les clés possédées (`String`) sont déplacées dans la map ; pour éviter de les cloner, on peut utiliser des `&str` qui empruntent le texte d’origine.
+    exercises:
+      - id: rust-hm-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::collections::HashMap;
+          fn main() {
+              let mut m = HashMap::new();
+              for c in "abracadabra".chars() {
+                  *m.entry(c).or_insert(0) += 1;
+              }
+              println!("{} {} {}", m[&'a'], m[&'b'], m.get(&'z').is_none());
+          }
+        output: 5 2 true
+        concepts: [hashmap]
+      - id: rust-hm-q1
+        type: mcq
+        prompt: Que se passe-t-il avec `m.insert(k, v2)` si `k` existe déjà ?
+        choices: [Erreur, La valeur est remplacée par v2, Les deux valeurs sont gardées, Rien]
+        answer: 1
+      - id: rust-hm-fill
+        type: fill
+        prompt: Complète le comptage des mots.
+        code: |
+          use std::collections::HashMap;
+          fn main() {
+              let mut m: HashMap<&str, i32> = HashMap::new();
+              for mot in "un deux un trois un".split_whitespace() {
+                  *m.{{?}}(mot).{{?}}(0) += 1;
+              }
+              println!("{}", m["un"]);
+          }
+        blanks: [[entry], [or_insert]]
+        tests:
+          - { input: '', output: '3' }
+        concepts: [hashmap]
+      - id: rust-hm-code
+        type: code
+        title: Mot le plus fréquent
+        prompt: |
+          Lis un texte, compte les mots (en minuscules) et affiche les **3 mots les plus fréquents** au format `mot : n`, par fréquence décroissante puis ordre alphabétique.
+        starter: |
+          use std::collections::HashMap;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut t = String::new();
+              io::stdin().read_to_string(&mut t).unwrap();
+          }
+        solution: |
+          use std::collections::HashMap;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut t = String::new();
+              io::stdin().read_to_string(&mut t).unwrap();
+              let mut freq: HashMap<String, u32> = HashMap::new();
+              for m in t.split_whitespace() {
+                  *freq.entry(m.to_lowercase()).or_insert(0) += 1;
+              }
+              let mut v: Vec<(String, u32)> = freq.into_iter().collect();
+              v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+              for (m, n) in v.iter().take(3) {
+                  println!("{} : {}", m, n);
+              }
+          }
+        tests:
+          - { input: 'le chat voit le chien et le chat fuit', output: "le : 3\nchat : 2\nchien : 1" }
+          - { input: 'B a b A c', output: "a : 2\nb : 2\nc : 1", hidden: true }
+          - { input: 'solo', output: 'solo : 1', hidden: true }
+        concepts: [hashmap]
+    project:
+      id: rust-hm-projet
+      type: code
+      title: Index de livre
+      difficulty: 3
+      prompt: |
+        L’entrée contient des lignes de texte (les pages, numérotées à partir de 1). Construis un **index** : pour chaque mot (en minuscules, d’au moins 4 lettres), la liste des pages où il apparaît, sans doublon.
+
+        Affiche les mots par ordre alphabétique : `mot : p1, p2, …`.
+      starter: |
+        use std::collections::{BTreeMap, BTreeSet};
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut t = String::new();
+            io::stdin().read_to_string(&mut t).unwrap();
+        }
+      solution: |
+        use std::collections::{BTreeMap, BTreeSet};
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut t = String::new();
+            io::stdin().read_to_string(&mut t).unwrap();
+            let mut index: BTreeMap<String, BTreeSet<usize>> = BTreeMap::new();
+            for (i, page) in t.lines().enumerate() {
+                for mot in page.split_whitespace() {
+                    let m = mot.to_lowercase();
+                    if m.chars().count() >= 4 {
+                        index.entry(m).or_default().insert(i + 1);
+                    }
+                }
+            }
+            for (mot, pages) in &index {
+                let p: Vec<String> = pages.iter().map(|x| x.to_string()).collect();
+                println!("{} : {}", mot, p.join(", "));
+            }
+        }
+      tests:
+        - { input: "Rust est rapide\nRust est sûr\nle code Rust compile", output: "code : 3\ncompile : 3\nrapide : 1\nrust : 1, 2, 3" }
+        - { input: "Data data DATA\nnope\nData", output: "data : 1, 3\nnope : 2", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-hm-ex1
+          type: mcq
+          prompt: L’ordre de parcours d’un HashMap est-il garanti ?
+          choices: [Oui, ordre d’insertion, Oui, ordre alphabétique, Non]
+          answer: 2
+        - id: rust-hm-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            use std::collections::HashMap;
+            fn main() {
+                let mut m: HashMap<&str, Vec<i32>> = HashMap::new();
+                m.entry("a").or_default().push(1);
+                m.entry("a").or_default().push(2);
+                m.entry("b").or_default().push(3);
+                println!("{:?} {}", m["a"], m.len());
+            }
+          output: '[1, 2] 2'
+        - id: rust-hm-ex3
+          type: mcq
+          prompt: Que renvoie `m.get("x")` ?
+          choices: [La valeur directement, 'Option<&V>', 'Result<V, E>', Un panic si absent]
+          answer: 1
+        - id: rust-hm-ex4
+          type: fill
+          prompt: Complète pour supprimer la clé « temp ».
+          code: m.{{?}}("temp");
+          blanks: [[remove]]
+
+  # ------------------------------------------------------------------
+  - slug: rust-iterateurs
+    title: Itérateurs
+    summary: Le trait Iterator, les adaptateurs paresseux (map, filter, zip, enumerate…) et les consommateurs (collect, sum, fold…).
+    minutes: 35
+    concepts: [iterateurs]
+    sections:
+      - title: Le trait Iterator
+        body: |
+          Un itérateur produit des éléments un par un via `next()` :
+
+          ```rust
+          let v = vec![1, 2, 3];
+          let mut it = v.iter();
+          assert_eq!(it.next(), Some(&1));
+          ```
+
+          Trois façons d’itérer sur une collection :
+
+          | Méthode | Éléments | Effet sur la collection |
+          |---|---|---|
+          | `iter()` | `&T` | empruntée |
+          | `iter_mut()` | `&mut T` | empruntée mutablement |
+          | `into_iter()` | `T` | consommée |
+      - title: Adaptateurs et consommateurs
+        body: |
+          Les **adaptateurs** transforment un itérateur en un autre, **paresseusement** (rien n’est calculé tant qu’un **consommateur** ne le demande) :
+
+          ```rust
+          let resultat: Vec<i32> = (1..=10)
+              .filter(|x| x % 2 == 0)     // 2, 4, 6, 8, 10
+              .map(|x| x * x)             // 4, 16, 36, 64, 100
+              .take(3)                    // 4, 16, 36
+              .collect();                 // consommateur
+          ```
+
+          Adaptateurs : `map`, `filter`, `filter_map`, `enumerate`, `zip`, `chain`, `skip`, `take`, `rev`, `flat_map`, `take_while`, `skip_while`, `peekable`, `step_by`, `cloned`.
+
+          Consommateurs : `collect`, `sum`, `product`, `count`, `min`, `max`, `min_by_key`, `fold`, `any`, `all`, `find`, `position`, `last`, `for_each`.
+
+          ```rust
+          let total = v.iter().fold(0, |acc, x| acc + x);
+          let tous_positifs = v.iter().all(|&x| x > 0);
+          let paires: Vec<(char, i32)> = "abc".chars().zip(1..).collect();
+          ```
+      - title: Créer son propre itérateur
+        body: |
+          ```rust
+          struct Compteur { n: u32 }
+
+          impl Iterator for Compteur {
+              type Item = u32;
+              fn next(&mut self) -> Option<u32> {
+                  if self.n < 5 { self.n += 1; Some(self.n) } else { None }
+              }
+          }
+
+          let s: u32 = Compteur { n: 0 }.zip(Compteur { n: 0 }.skip(1))
+              .map(|(a, b)| a * b)
+              .sum();   // 1*2 + 2*3 + 3*4 + 4*5 = 40
+          ```
+
+          En implémentant seulement `next`, on obtient gratuitement **toutes** les méthodes d’adaptation. Et grâce à la monomorphisation, une chaîne d’itérateurs est compilée aussi efficacement qu’une boucle écrite à la main (*zero-cost abstraction*).
+    exercises:
+      - id: rust-it-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let v = vec![3, 8, 1, 6, 4];
+              let a: Vec<i32> = v.iter().filter(|&&x| x > 3).map(|x| x * 10).collect();
+              let b: i32 = v.iter().skip(1).step_by(2).sum();
+              println!("{:?} {}", a, b);
+          }
+        output: '[80, 60, 40] 14'
+        concepts: [iterateurs]
+      - id: rust-it-q1
+        type: mcq
+        prompt: Que fait `(1..1_000_000).map(|x| x * 2)` seul, sans consommateur ?
+        choices: [Calcule un million de valeurs, 'Rien : les itérateurs sont paresseux', Provoque une erreur, Alloue un vecteur]
+        answer: 1
+        explanation: 'Le compilateur signale même un avertissement `unused must be used` : sans consommateur, rien n’est exécuté.'
+      - id: rust-it-fill
+        type: fill
+        prompt: Complète pour obtenir les indices des mots qui commencent par « r ».
+        code: |
+          fn main() {
+              let mots = ["rust", "java", "ruby", "go"];
+              let idx: Vec<usize> = mots.iter()
+                  .{{?}}()
+                  .filter(|(_, m)| m.starts_with('r'))
+                  .map(|(i, _)| i)
+                  .{{?}}();
+              println!("{:?}", idx);
+          }
+        blanks: [[enumerate], [collect]]
+        tests:
+          - { input: '', output: '[0, 2]' }
+      - id: rust-it-predict2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let s = "a1b22c333";
+              let chiffres: u32 = s.chars().filter_map(|c| c.to_digit(10)).sum();
+              let lettres: String = s.chars().filter(|c| c.is_alphabetic()).rev().collect();
+              let produit = (1..=5).fold(1, |acc, x| acc * x);
+              println!("{} {} {}", chiffres, lettres, produit);
+          }
+        output: 14 cba 120
+      - id: rust-it-code
+        type: code
+        title: Sans boucle !
+        prompt: |
+          Lis des entiers séparés par des espaces. **Sans écrire de boucle** (`for`, `while`, `loop` interdits), affiche :
+
+          1. la somme des carrés des nombres pairs ;
+          2. le nombre de valeurs négatives ;
+          3. `true` si tous les nombres sont non nuls, `false` sinon.
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<i64> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+          }
+        solution: |
+          use std::io;
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<i64> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              let a: i64 = v.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).sum();
+              let b = v.iter().filter(|&&x| x < 0).count();
+              let c = v.iter().all(|&x| x != 0);
+              println!("{}\n{}\n{}", a, b, c);
+          }
+        tests:
+          - { input: '1 2 -3 4 -6', output: "56\n2\ntrue" }
+          - { input: '0 5 7', output: "0\n0\nfalse", hidden: true }
+          - { input: '-2 -2', output: "8\n2\ntrue", hidden: true }
+        forbid:
+          - { pattern: '\b(for|while|loop)\b', message: 'Pas de boucle explicite (for/while/loop)' }
+        concepts: [iterateurs]
+    project:
+      id: rust-it-projet
+      type: code
+      title: Itérateur de Fibonacci
+      difficulty: 3
+      prompt: |
+        Implémente une struct `Fibonacci` qui implémente `Iterator<Item = u64>` (0, 1, 1, 2, 3, 5, …).
+
+        Pour chaque ligne contenant `n k`, affiche, grâce aux adaptateurs :
+
+        - les `n` premiers termes séparés par des espaces ;
+        - puis la somme des termes **pairs** inférieurs à `k`.
+      starter: |
+        use std::io::{self, Read};
+
+        struct Fibonacci {
+            a: u64,
+            b: u64,
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        struct Fibonacci {
+            a: u64,
+            b: u64,
+        }
+
+        impl Fibonacci {
+            fn new() -> Self { Fibonacci { a: 0, b: 1 } }
+        }
+
+        impl Iterator for Fibonacci {
+            type Item = u64;
+            fn next(&mut self) -> Option<u64> {
+                let r = self.a;
+                self.a = self.b;
+                self.b += r;
+                Some(r)
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let p: Vec<u64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                let termes: Vec<String> = Fibonacci::new().take(p[0] as usize).map(|x| x.to_string()).collect();
+                println!("{}", termes.join(" "));
+                let s: u64 = Fibonacci::new().take_while(|&x| x < p[1]).filter(|x| x % 2 == 0).sum();
+                println!("{}", s);
+            }
+        }
+      tests:
+        - { input: '8 100', output: "0 1 1 2 3 5 8 13\n44" }
+        - { input: "1 1\n12 4000000", output: "0\n0\n0 1 1 2 3 5 8 13 21 34 55 89\n4613732", hidden: true }
+      require:
+        - { pattern: 'impl\s+Iterator\s+for\s+Fibonacci', message: Implémenter Iterator pour Fibonacci }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-it-ex1
+          type: mcq
+          prompt: Quelle méthode faut-il implémenter pour le trait Iterator ?
+          choices: [iter, next, collect, map]
+          answer: 1
+        - id: rust-it-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let a = [1, 2, 3];
+                let b = ["x", "y"];
+                let z: Vec<String> = a.iter().zip(b.iter()).map(|(n, s)| format!("{}{}", s, n)).collect();
+                println!("{:?}", z);
+            }
+          output: '["x1", "y2"]'
+        - id: rust-it-ex3
+          type: mcq
+          prompt: Quelle différence entre `iter()` et `into_iter()` sur un Vec ?
+          choices: ['iter emprunte (&T), into_iter consomme (T)', Aucune, into_iter est plus lent, iter est réservé aux tableaux]
+          answer: 0
+        - id: rust-it-ex4
+          type: fill
+          prompt: Complète pour trouver le premier multiple de 7 supérieur à 50.
+          code: 'let x = (51..).{{?}}(|n| n % 7 == 0);'
+          blanks: [[find]]

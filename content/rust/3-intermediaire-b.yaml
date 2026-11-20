@@ -1,0 +1,1591 @@
+language: rust
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-closures
+    title: Closures
+    summary: Fonctions anonymes qui capturent leur environnement — syntaxe, modes de capture, traits Fn/FnMut/FnOnce et move.
+    minutes: 30
+    concepts: [closures]
+    sections:
+      - title: Syntaxe
+        body: |
+          ```rust
+          let carre = |x: i32| x * x;              // types optionnels
+          let additionner = |a, b| a + b;
+          let saluer = || println!("Bonjour !");
+          let complexe = |x: i32| -> i32 {
+              let y = x + 1;
+              y * 2
+          };
+          println!("{} {}", carre(4), additionner(2, 3));
+          ```
+
+          Une closure peut **capturer** les variables de son environnement :
+
+          ```rust
+          let seuil = 10;
+          let grand = |x: i32| x > seuil;   // capture seuil par référence
+          let v: Vec<i32> = vec![5, 12, 30].into_iter().filter(|&x| grand(x)).collect();
+          ```
+      - title: Modes de capture et traits
+        body: |
+          Le compilateur choisit le mode de capture le plus léger possible :
+
+          | Trait | Capture | Peut être appelée |
+          |---|---|---|
+          | `Fn` | emprunt partagé `&` | plusieurs fois |
+          | `FnMut` | emprunt mutable `&mut` | plusieurs fois (modifie l’état) |
+          | `FnOnce` | par valeur (déplacement) | une seule fois |
+
+          ```rust
+          let mut compteur = 0;
+          let mut incr = || compteur += 1;   // FnMut
+          incr(); incr();
+          println!("{compteur}");            // 2
+
+          let nom = String::from("Kiri");
+          let consommer = move || nom;       // FnOnce : renvoie la String capturée
+          ```
+
+          `move` force la capture **par valeur** — indispensable pour envoyer une closure dans un autre thread.
+      - title: Passer et renvoyer des closures
+        body: |
+          ```rust
+          fn appliquer<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+          fn appliquer2(f: impl Fn(i32) -> i32, x: i32) -> i32 { f(x) }   // équivalent
+
+          fn multiplicateur(n: i32) -> impl Fn(i32) -> i32 {
+              move |x| x * n
+          }
+          let triple = multiplicateur(3);
+          println!("{}", appliquer(&triple, 5));   // 15
+
+          // Collection de closures de types différents :
+          let ops: Vec<Box<dyn Fn(i32) -> i32>> = vec![Box::new(|x| x + 1), Box::new(|x| x * 10)];
+          ```
+
+          Les fonctions normales peuvent aussi être passées là où une closure est attendue : `v.iter().map(i32::abs)`.
+    exercises:
+      - id: rust-clo-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let facteur = 3;
+              let f = |x: i32| x * facteur;
+              let mut total = 0;
+              let mut ajouter = |x: i32| total += x;
+              ajouter(f(2));
+              ajouter(f(5));
+              println!("{}", total);
+          }
+        output: '21'
+        concepts: [closures]
+      - id: rust-clo-q1
+        type: mcq
+        prompt: Quel trait implémente une closure qui modifie une variable capturée ?
+        choices: [Fn, FnMut, FnOnce uniquement, Aucun]
+        answer: 1
+      - id: rust-clo-fill
+        type: fill
+        prompt: Complète pour que la closure renvoyée possède `n` (capture par valeur).
+        code: |
+          fn ajouteur(n: i32) -> impl Fn(i32) -> i32 {
+              {{?}} |x| x + n
+          }
+
+          fn main() {
+              let plus5 = ajouteur(5);
+              println!("{}", plus5(10));
+          }
+        blanks: [[move]]
+        tests:
+          - { input: '', output: '15' }
+        concepts: [closures]
+      - id: rust-clo-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          fn main() {
+              let mut n = 0;
+              let incrementer = || n += 1;
+              incrementer();
+              println!("{}", n);
+          }
+        bugLines: [3]
+        choices:
+          - La closure modifie son état (FnMut) et doit donc être déclarée mut
+          - Les closures ne peuvent pas modifier de variables
+          - Il faut écrire fn incrementer()
+        answer: 0
+        solution: |
+          fn main() {
+              let mut n = 0;
+              let mut incrementer = || n += 1;
+              incrementer();
+              println!("{}", n);
+          }
+        tests:
+          - { input: '', output: '1' }
+      - id: rust-clo-code
+        type: code
+        title: Composer des fonctions
+        prompt: |
+          Écris `fn composer<F, G>(f: F, g: G) -> impl Fn(i64) -> i64` (avec les bornes adéquates) qui renvoie la closure `x ↦ g(f(x))`.
+
+          Le programme lit un entier et affiche `composer(|x| x + 3, |x| x * x)(n)` puis `composer(|x| x * x, |x| x + 3)(n)`.
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let n: i64 = s.trim().parse().unwrap();
+              println!("{}", composer(|x| x + 3, |x| x * x)(n));
+              println!("{}", composer(|x| x * x, |x| x + 3)(n));
+          }
+        solution: |
+          use std::io;
+
+          fn composer<F, G>(f: F, g: G) -> impl Fn(i64) -> i64
+          where
+              F: Fn(i64) -> i64,
+              G: Fn(i64) -> i64,
+          {
+              move |x| g(f(x))
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let n: i64 = s.trim().parse().unwrap();
+              println!("{}", composer(|x| x + 3, |x| x * x)(n));
+              println!("{}", composer(|x| x * x, |x| x + 3)(n));
+          }
+        tests:
+          - { input: '2', output: "25\n7" }
+          - { input: '-3', output: "0\n12", hidden: true }
+        concepts: [closures, generiques]
+    project:
+      id: rust-clo-projet
+      type: code
+      title: Pipeline de filtres
+      difficulty: 3
+      prompt: |
+        La première ligne contient des entiers. Les lignes suivantes décrivent des opérations à appliquer **dans l’ordre** sur chaque nombre : `ajouter N`, `multiplier N`, `garder_pairs`, `garder_superieurs N`.
+
+        Construis un `Vec<Box<dyn Fn(i64) -> Option<i64>>>` (une opération de filtre renvoie `None` pour éliminer le nombre) et affiche les nombres restants séparés par des espaces (ligne vide s’il n’en reste aucun).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut lignes = e.lines();
+            let nombres: Vec<i64> = lignes.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let mut etapes: Vec<Box<dyn Fn(i64) -> Option<i64>>> = Vec::new();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut lignes = e.lines();
+            let nombres: Vec<i64> = lignes.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let mut etapes: Vec<Box<dyn Fn(i64) -> Option<i64>>> = Vec::new();
+            for l in lignes {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                let arg: i64 = p.get(1).map(|x| x.parse().unwrap()).unwrap_or(0);
+                match p[0] {
+                    "ajouter" => etapes.push(Box::new(move |x| Some(x + arg))),
+                    "multiplier" => etapes.push(Box::new(move |x| Some(x * arg))),
+                    "garder_pairs" => etapes.push(Box::new(|x| if x % 2 == 0 { Some(x) } else { None })),
+                    _ => etapes.push(Box::new(move |x| if x > arg { Some(x) } else { None })),
+                }
+            }
+            let res: Vec<String> = nombres
+                .iter()
+                .filter_map(|&n| etapes.iter().try_fold(n, |acc, f| f(acc)))
+                .map(|x| x.to_string())
+                .collect();
+            println!("{}", res.join(" "));
+        }
+      tests:
+        - { input: "1 2 3 4 5\nmultiplier 3\ngarder_pairs\najouter 1", output: 7 13 }
+        - { input: "10 20 30\ngarder_superieurs 15\nmultiplier -1", output: -20 -30, hidden: true }
+        - { input: "1 3\ngarder_pairs", output: '', hidden: true }
+      hints: ['`try_fold` enchaîne des fonctions qui renvoient `Option` et s’arrête au premier `None`.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-clo-ex1
+          type: mcq
+          prompt: À quoi sert le mot-clé `move` devant une closure ?
+          choices: [À capturer les variables par valeur, À rendre la closure plus rapide, À la rendre mutable, À la déplacer dans un module]
+          answer: 0
+        - id: rust-clo-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn appliquer_deux_fois(f: impl Fn(i32) -> i32, x: i32) -> i32 { f(f(x)) }
+            fn main() {
+                println!("{}", appliquer_deux_fois(|x| x * 2 + 1, 3));
+            }
+          output: '15'
+        - id: rust-clo-ex3
+          type: mcq
+          prompt: Une closure qui renvoie une String capturée par valeur implémente…
+          choices: [Fn, FnMut, FnOnce, Copy]
+          answer: 2
+        - id: rust-clo-ex4
+          type: mcq
+          prompt: 'Quel type permet de stocker des closures différentes dans un même Vec ?'
+          choices: ['Vec<impl Fn()>', 'Vec<Box<dyn Fn()>>', 'Vec<fn>', 'Vec<Closure>']
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-traits
+    title: Traits
+    summary: Définis des comportements partagés avec les traits, implémentations par défaut, traits de la bibliothèque standard et objets dyn Trait.
+    minutes: 35
+    concepts: [traits, polymorphisme]
+    sections:
+      - title: Définir et implémenter un trait
+        body: |
+          ```rust
+          trait Forme {
+              fn aire(&self) -> f64;
+              fn nom(&self) -> String { String::from("forme") }   // implémentation par défaut
+              fn decrire(&self) -> String {
+                  format!("{} d’aire {:.2}", self.nom(), self.aire())
+              }
+          }
+
+          struct Cercle { r: f64 }
+          struct Carre { c: f64 }
+
+          impl Forme for Cercle {
+              fn aire(&self) -> f64 { std::f64::consts::PI * self.r * self.r }
+              fn nom(&self) -> String { "cercle".into() }
+          }
+          impl Forme for Carre {
+              fn aire(&self) -> f64 { self.c * self.c }
+          }
+          ```
+
+          Un trait est un **contrat** : tout type qui l’implémente garantit fournir ces méthodes.
+      - title: Polymorphisme statique et dynamique
+        body: |
+          **Statique** (génériques) : le compilateur génère une version par type, aucun surcoût.
+
+          ```rust
+          fn afficher(f: &impl Forme) { println!("{}", f.decrire()); }
+          fn plus_grande<T: Forme>(a: T, b: T) -> T { if a.aire() > b.aire() { a } else { b } }
+          ```
+
+          **Dynamique** (`dyn Trait`) : une collection hétérogène, résolution à l’exécution via une table virtuelle.
+
+          ```rust
+          let formes: Vec<Box<dyn Forme>> = vec![Box::new(Cercle { r: 1.0 }), Box::new(Carre { c: 2.0 })];
+          let total: f64 = formes.iter().map(|f| f.aire()).sum();
+          ```
+      - title: Les traits de la bibliothèque standard
+        body: |
+          | Trait | Permet | Dérivable |
+          |---|---|---|
+          | `Debug` | `{:?}` | ✅ |
+          | `Display` | `{}` | ❌ (à écrire) |
+          | `Clone` / `Copy` | dupliquer | ✅ |
+          | `PartialEq` / `Eq` | `==` | ✅ |
+          | `PartialOrd` / `Ord` | `<`, tri | ✅ |
+          | `Hash` | clé de HashMap | ✅ |
+          | `Default` | `T::default()` | ✅ |
+          | `From` / `Into` | conversions | ❌ |
+          | `Add`, `Mul`… (`std::ops`) | surcharge d’opérateurs | ❌ |
+
+          ```rust
+          use std::ops::Add;
+          #[derive(Debug, Clone, Copy, PartialEq)]
+          struct V2 { x: i32, y: i32 }
+          impl Add for V2 {
+              type Output = V2;
+              fn add(self, o: V2) -> V2 { V2 { x: self.x + o.x, y: self.y + o.y } }
+          }
+          ```
+
+          **Règle de l’orphelin** : on ne peut implémenter un trait pour un type que si le trait **ou** le type est défini dans ta crate.
+    exercises:
+      - id: rust-trait-q1
+        type: mcq
+        prompt: Que contient un trait ?
+        choices: [Des données, Des signatures de méthodes (avec éventuellement des implémentations par défaut), Uniquement des constantes, Un constructeur obligatoire]
+        answer: 1
+        concepts: [traits]
+      - id: rust-trait-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          trait Animal {
+              fn nom(&self) -> String;
+              fn cri(&self) -> String { String::from("...") }
+              fn presenter(&self) -> String { format!("{} fait {}", self.nom(), self.cri()) }
+          }
+          struct Chat;
+          struct Poisson;
+          impl Animal for Chat {
+              fn nom(&self) -> String { "Le chat".into() }
+              fn cri(&self) -> String { "miaou".into() }
+          }
+          impl Animal for Poisson {
+              fn nom(&self) -> String { "Le poisson".into() }
+          }
+          fn main() {
+              let zoo: Vec<Box<dyn Animal>> = vec![Box::new(Chat), Box::new(Poisson)];
+              for a in &zoo {
+                  println!("{}", a.presenter());
+              }
+          }
+        output: "Le chat fait miaou\nLe poisson fait ..."
+        concepts: [traits, polymorphisme]
+      - id: rust-trait-fill
+        type: fill
+        prompt: Complète l’implémentation de Display.
+        code: |
+          use std::fmt;
+          struct Temp(f64);
+          impl fmt::{{?}} for Temp {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  {{?}}!(f, "{:.1} °C", self.0)
+              }
+          }
+          fn main() {
+              println!("{}", Temp(21.456));
+          }
+        blanks: [[Display], [write]]
+        tests:
+          - { input: '', output: 21.5 °C }
+      - id: rust-trait-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0046). Trouve le problème.
+        code: |
+          trait Vehicule {
+              fn roues(&self) -> u32;
+              fn vitesse_max(&self) -> u32;
+          }
+          struct Velo;
+          impl Vehicule for Velo {
+              fn roues(&self) -> u32 { 2 }
+          }
+          fn main() {
+              let v = Velo;
+              println!("{} {}", v.roues(), v.vitesse_max());
+          }
+        bugLines: [6]
+        choices:
+          - L’implémentation ne fournit pas la méthode vitesse_max exigée par le trait
+          - Une struct vide ne peut pas implémenter de trait
+          - Il faut dériver Debug
+        answer: 0
+        solution: |
+          trait Vehicule {
+              fn roues(&self) -> u32;
+              fn vitesse_max(&self) -> u32;
+          }
+          struct Velo;
+          impl Vehicule for Velo {
+              fn roues(&self) -> u32 { 2 }
+              fn vitesse_max(&self) -> u32 { 45 }
+          }
+          fn main() {
+              let v = Velo;
+              println!("{} {}", v.roues(), v.vitesse_max());
+          }
+        tests:
+          - { input: '', output: 2 45 }
+      - id: rust-trait-code
+        type: code
+        title: Vecteurs et opérateurs
+        prompt: |
+          Définis `#[derive(Debug, Clone, Copy, PartialEq)] struct V2 { x: i64, y: i64 }` et implémente :
+
+          - `std::ops::Add` (addition composante par composante) ;
+          - `std::ops::Mul<i64>` (multiplication par un scalaire) ;
+          - `Display` au format `(x, y)`.
+
+          Chaque ligne contient `x1 y1 x2 y2 k` : affiche `(v1 + v2) * k`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let n: Vec<i64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  let v1 = V2 { x: n[0], y: n[1] };
+                  let v2 = V2 { x: n[2], y: n[3] };
+                  println!("{}", (v1 + v2) * n[4]);
+              }
+          }
+        solution: |
+          use std::fmt;
+          use std::io::{self, Read};
+          use std::ops::{Add, Mul};
+
+          #[derive(Debug, Clone, Copy, PartialEq)]
+          struct V2 {
+              x: i64,
+              y: i64,
+          }
+
+          impl Add for V2 {
+              type Output = V2;
+              fn add(self, o: V2) -> V2 {
+                  V2 { x: self.x + o.x, y: self.y + o.y }
+              }
+          }
+
+          impl Mul<i64> for V2 {
+              type Output = V2;
+              fn mul(self, k: i64) -> V2 {
+                  V2 { x: self.x * k, y: self.y * k }
+              }
+          }
+
+          impl fmt::Display for V2 {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  write!(f, "({}, {})", self.x, self.y)
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let n: Vec<i64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  let v1 = V2 { x: n[0], y: n[1] };
+                  let v2 = V2 { x: n[2], y: n[3] };
+                  println!("{}", (v1 + v2) * n[4]);
+              }
+          }
+        tests:
+          - { input: '1 2 3 4 2', output: '(8, 12)' }
+          - { input: "0 0 0 0 9\n-1 5 1 -5 3", output: "(0, 0)\n(0, 0)", hidden: true }
+          - { input: '7 -2 3 1 -1', output: '(-10, 1)', hidden: true }
+        concepts: [traits]
+    project:
+      id: rust-trait-projet
+      type: code
+      title: Ménagerie de formes
+      difficulty: 3
+      prompt: |
+        Définis un trait `Forme` avec `aire(&self) -> f64`, `perimetre(&self) -> f64` et une méthode par défaut `resume(&self) -> String` qui renvoie `"<nom> : aire A, périmètre P"` (2 décimales) en s’appuyant sur une méthode `nom(&self) -> &str`.
+
+        Implémente-le pour `Cercle`, `Rectangle` et `Triangle` (côtés a, b, c ; aire par la formule de Héron). Chaque ligne d’entrée : `cercle r`, `rectangle l h` ou `triangle a b c`.
+
+        Affiche le résumé de chaque forme, puis `Plus grande aire : <nom>` (la première en cas d’égalité), en stockant les formes dans un `Vec<Box<dyn Forme>>`. Utilise π = `std::f64::consts::PI`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::f64::consts::PI;
+        use std::io::{self, Read};
+
+        trait Forme {
+            fn nom(&self) -> &str;
+            fn aire(&self) -> f64;
+            fn perimetre(&self) -> f64;
+            fn resume(&self) -> String {
+                format!("{} : aire {:.2}, périmètre {:.2}", self.nom(), self.aire(), self.perimetre())
+            }
+        }
+
+        struct Cercle(f64);
+        struct Rectangle(f64, f64);
+        struct Triangle(f64, f64, f64);
+
+        impl Forme for Cercle {
+            fn nom(&self) -> &str { "cercle" }
+            fn aire(&self) -> f64 { PI * self.0 * self.0 }
+            fn perimetre(&self) -> f64 { 2.0 * PI * self.0 }
+        }
+        impl Forme for Rectangle {
+            fn nom(&self) -> &str { "rectangle" }
+            fn aire(&self) -> f64 { self.0 * self.1 }
+            fn perimetre(&self) -> f64 { 2.0 * (self.0 + self.1) }
+        }
+        impl Forme for Triangle {
+            fn nom(&self) -> &str { "triangle" }
+            fn aire(&self) -> f64 {
+                let s = self.perimetre() / 2.0;
+                (s * (s - self.0) * (s - self.1) * (s - self.2)).sqrt()
+            }
+            fn perimetre(&self) -> f64 { self.0 + self.1 + self.2 }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut formes: Vec<Box<dyn Forme>> = Vec::new();
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                let n: Vec<f64> = p[1..].iter().map(|x| x.parse().unwrap()).collect();
+                let f: Box<dyn Forme> = match p[0] {
+                    "cercle" => Box::new(Cercle(n[0])),
+                    "rectangle" => Box::new(Rectangle(n[0], n[1])),
+                    _ => Box::new(Triangle(n[0], n[1], n[2])),
+                };
+                println!("{}", f.resume());
+                formes.push(f);
+            }
+            let mut meilleure = &formes[0];
+            for f in &formes {
+                if f.aire() > meilleure.aire() {
+                    meilleure = f;
+                }
+            }
+            println!("Plus grande aire : {}", meilleure.nom());
+        }
+      tests:
+        - { input: "cercle 1\nrectangle 2 3\ntriangle 3 4 5", output: "cercle : aire 3.14, périmètre 6.28\nrectangle : aire 6.00, périmètre 10.00\ntriangle : aire 6.00, périmètre 12.00\nPlus grande aire : rectangle" }
+        - { input: "triangle 2 2 2\ncercle 2", output: "triangle : aire 1.73, périmètre 6.00\ncercle : aire 12.57, périmètre 12.57\nPlus grande aire : cercle", hidden: true }
+      require:
+        - { pattern: 'trait\s+Forme', message: Définir le trait Forme }
+        - { pattern: 'Box\s*<\s*dyn\s+Forme\s*>', message: 'Utiliser Box<dyn Forme>' }
+      concepts: [traits, polymorphisme]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-trait-ex1
+          type: mcq
+          prompt: Quelle différence entre `&impl Forme` et `&dyn Forme` en paramètre ?
+          choices: ['impl : résolution à la compilation (statique) ; dyn : à l’exécution (dynamique)', Aucune, dyn est plus rapide, impl permet les collections hétérogènes]
+          answer: 0
+        - id: rust-trait-ex2
+          type: mcq
+          prompt: Quel trait faut-il dériver pour comparer deux structs avec `==` ?
+          choices: [Eq seulement, PartialEq, Compare, Ord]
+          answer: 1
+        - id: rust-trait-ex3
+          type: mcq
+          prompt: Peut-on implémenter `Display` (de std) pour `Vec<i32>` (de std) dans sa propre crate ?
+          choices: [Oui, 'Non, à cause de la règle de l’orphelin', Seulement en mode unsafe, Seulement avec derive]
+          answer: 1
+        - id: rust-trait-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            trait Double { fn double(&self) -> Self; }
+            impl Double for i32 { fn double(&self) -> i32 { self * 2 } }
+            impl Double for String { fn double(&self) -> String { format!("{}{}", self, self) } }
+            fn main() {
+                println!("{} {}", 21.double(), String::from("ab").double());
+            }
+          output: 42 abab
+
+  # ------------------------------------------------------------------
+  - slug: rust-generics
+    title: Generics
+    summary: Écris du code générique avec des paramètres de type, des bornes de traits, des clauses where et des structs génériques.
+    minutes: 30
+    concepts: [generiques]
+    sections:
+      - title: Fonctions génériques
+        body: |
+          ```rust
+          fn plus_grand<T: PartialOrd>(liste: &[T]) -> &T {
+              let mut max = &liste[0];
+              for x in liste {
+                  if x > max { max = x; }
+              }
+              max
+          }
+
+          println!("{}", plus_grand(&[3, 9, 2]));        // 9
+          println!("{}", plus_grand(&['a', 'z', 'm']));  // z
+          ```
+
+          `T: PartialOrd` est une **borne** : `T` peut être n’importe quel type qui sait se comparer. Plusieurs bornes : `T: Clone + Debug`. Pour la lisibilité, on utilise `where` :
+
+          ```rust
+          fn resumer<T, U>(a: T, b: U) -> String
+          where
+              T: std::fmt::Display,
+              U: std::fmt::Debug + Clone,
+          { format!("{a} {:?}", b) }
+          ```
+      - title: Types génériques
+        body: |
+          ```rust
+          #[derive(Debug)]
+          struct Paire<T> { a: T, b: T }
+
+          impl<T: PartialOrd + Copy> Paire<T> {
+              fn max(&self) -> T { if self.a > self.b { self.a } else { self.b } }
+          }
+
+          impl Paire<f64> {                    // méthode seulement pour f64
+              fn moyenne(&self) -> f64 { (self.a + self.b) / 2.0 }
+          }
+
+          enum MonOption<T> { Rien, Quelque(T) }  // c’est exactement Option<T> !
+          ```
+
+          Les génériques sont **monomorphisés** : `Paire<i32>` et `Paire<f64>` deviennent deux types distincts compilés séparément. Aucun coût à l’exécution, mais un binaire un peu plus gros.
+      - title: Types associés et constantes génériques
+        body: |
+          Certains traits utilisent un **type associé** plutôt qu’un paramètre :
+
+          ```rust
+          trait Conteneur {
+              type Item;
+              fn premier(&self) -> Option<&Self::Item>;
+          }
+          ```
+
+          Les **const generics** paramètrent par une valeur :
+
+          ```rust
+          struct Matrice<const L: usize, const C: usize> { d: [[i32; C]; L] }
+          fn somme<const N: usize>(t: [i32; N]) -> i32 { t.iter().sum() }
+          ```
+    exercises:
+      - id: rust-gen-q1
+        type: mcq
+        prompt: 'Que signifie `fn f<T: Display>(x: T)` ?'
+        choices: [T doit être une String, T peut être tout type qui implémente Display, T est un trait, f renvoie T]
+        answer: 1
+        concepts: [generiques]
+      - id: rust-gen-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #[derive(Debug)]
+          struct Boite<T> { contenu: T }
+          impl<T: std::fmt::Debug> Boite<T> {
+              fn ouvrir(&self) -> String { format!("[{:?}]", self.contenu) }
+          }
+          fn premier<T: Clone>(v: &[T]) -> T { v[0].clone() }
+          fn main() {
+              let a = Boite { contenu: 3 };
+              let b = Boite { contenu: "trésor" };
+              println!("{} {} {}", a.ouvrir(), b.ouvrir(), premier(&[7, 8]));
+          }
+        output: '[3] ["trésor"] 7'
+      - id: rust-gen-fill
+        type: fill
+        prompt: Complète la borne pour pouvoir additionner et copier les éléments.
+        code: |
+          use std::ops::Add;
+          fn somme<T: Add<Output = T> + {{?}}>(a: T, b: T, c: T) -> T {
+              a + b + c
+          }
+          fn main() {
+              println!("{} {}", somme(1, 2, 3), somme(0.5, 0.25, 0.25));
+          }
+        blanks: [[Copy, Clone]]
+        tests:
+          - { input: '', output: 6 1 }
+      - id: rust-gen-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0369). Trouve la cause.
+        code: |
+          fn maximum<T>(a: T, b: T) -> T {
+              if a > b { a } else { b }
+          }
+          fn main() {
+              println!("{}", maximum(4, 9));
+          }
+        bugLines: [1]
+        choices:
+          - T n’a pas de borne PartialOrd, on ne peut donc pas comparer a et b
+          - Les fonctions génériques ne peuvent pas renvoyer T
+          - Il faut appeler maximum::<T>
+        answer: 0
+        solution: |
+          fn maximum<T: PartialOrd>(a: T, b: T) -> T {
+              if a > b { a } else { b }
+          }
+          fn main() {
+              println!("{}", maximum(4, 9));
+          }
+        tests:
+          - { input: '', output: '9' }
+      - id: rust-gen-code
+        type: code
+        title: Pile générique
+        prompt: |
+          Implémente `struct Pile<T> { elements: Vec<T> }` avec `new`, `empiler(&mut self, x: T)`, `depiler(&mut self) -> Option<T>`, `sommet(&self) -> Option<&T>` et `taille(&self) -> usize`.
+
+          Le programme (fourni) l’utilise avec des `String` et des `i32`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut mots: Pile<String> = Pile::new();
+              let mut longueurs: Pile<usize> = Pile::new();
+              for m in e.split_whitespace() {
+                  if m == "-" {
+                      if let Some(x) = mots.depiler() { println!("dépilé {}", x); }
+                      longueurs.depiler();
+                  } else {
+                      mots.empiler(m.to_string());
+                      longueurs.empiler(m.len());
+                  }
+              }
+              println!("{} {:?} {:?}", mots.taille(), mots.sommet(), longueurs.sommet());
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          struct Pile<T> {
+              elements: Vec<T>,
+          }
+
+          impl<T> Pile<T> {
+              fn new() -> Self { Pile { elements: Vec::new() } }
+              fn empiler(&mut self, x: T) { self.elements.push(x); }
+              fn depiler(&mut self) -> Option<T> { self.elements.pop() }
+              fn sommet(&self) -> Option<&T> { self.elements.last() }
+              fn taille(&self) -> usize { self.elements.len() }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut mots: Pile<String> = Pile::new();
+              let mut longueurs: Pile<usize> = Pile::new();
+              for m in e.split_whitespace() {
+                  if m == "-" {
+                      if let Some(x) = mots.depiler() { println!("dépilé {}", x); }
+                      longueurs.depiler();
+                  } else {
+                      mots.empiler(m.to_string());
+                      longueurs.empiler(m.len());
+                  }
+              }
+              println!("{} {:?} {:?}", mots.taille(), mots.sommet(), longueurs.sommet());
+          }
+        tests:
+          - { input: 'un deux - trois', output: "dépilé deux\n2 Some(\"trois\") Some(5)" }
+          - { input: '- -', output: 0 None None, hidden: true }
+        concepts: [generiques, structs]
+    project:
+      id: rust-gen-projet
+      type: code
+      title: Statistiques génériques
+      difficulty: 3
+      prompt: |
+        Écris une fonction générique `fn min_max<T: PartialOrd + Copy>(v: &[T]) -> Option<(T, T)>` et une struct générique `Compteur<T>` (basée sur un `Vec<(T, usize)>`) avec `ajouter(&mut self, x: T)` (nécessite `T: PartialEq`) et `plus_frequent(&self) -> Option<&T>` (le premier en cas d’égalité).
+
+        La première ligne contient des entiers, la seconde des mots. Pour chacune, affiche `min max` et l’élément le plus fréquent.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let nombres: Vec<i64> = l.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let mots: Vec<&str> = l.next().unwrap().split_whitespace().collect();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn min_max<T: PartialOrd + Copy>(v: &[T]) -> Option<(T, T)> {
+            let mut it = v.iter();
+            let premier = *it.next()?;
+            let (mut mi, mut ma) = (premier, premier);
+            for &x in it {
+                if x < mi { mi = x; }
+                if x > ma { ma = x; }
+            }
+            Some((mi, ma))
+        }
+
+        struct Compteur<T> {
+            donnees: Vec<(T, usize)>,
+        }
+
+        impl<T: PartialEq> Compteur<T> {
+            fn new() -> Self { Compteur { donnees: Vec::new() } }
+            fn ajouter(&mut self, x: T) {
+                for (v, n) in self.donnees.iter_mut() {
+                    if *v == x { *n += 1; return; }
+                }
+                self.donnees.push((x, 1));
+            }
+            fn plus_frequent(&self) -> Option<&T> {
+                let mut best: Option<&(T, usize)> = None;
+                for d in &self.donnees {
+                    if best.map_or(true, |b| d.1 > b.1) { best = Some(d); }
+                }
+                best.map(|(v, _)| v)
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let nombres: Vec<i64> = l.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let mots: Vec<&str> = l.next().unwrap().split_whitespace().collect();
+            let (a, b) = min_max(&nombres).unwrap();
+            let mut c1 = Compteur::new();
+            for &n in &nombres { c1.ajouter(n); }
+            println!("{} {} {}", a, b, c1.plus_frequent().unwrap());
+            let (a, b) = min_max(&mots).unwrap();
+            let mut c2 = Compteur::new();
+            for &m in &mots { c2.ajouter(m); }
+            println!("{} {} {}", a, b, c2.plus_frequent().unwrap());
+        }
+      tests:
+        - { input: "4 1 4 9 1 4\npomme kiwi pomme abricot", output: "1 9 4\nabricot pomme pomme" }
+        - { input: "7\nz a z a", output: "7 7 7\na z z", hidden: true }
+      concepts: [generiques]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-gen-ex1
+          type: mcq
+          prompt: Qu’est-ce que la monomorphisation ?
+          choices: [Le compilateur génère une version du code pour chaque type concret utilisé, La conversion d’un type en un autre, Un mécanisme du garbage collector, L’héritage simple]
+          answer: 0
+        - id: rust-gen-ex2
+          type: mcq
+          prompt: À quoi sert une clause `where` ?
+          choices: [À rendre les bornes plus lisibles, À filtrer un itérateur, À déclarer une boucle, À importer un module]
+          answer: 0
+        - id: rust-gen-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn somme<const N: usize>(t: [i32; N]) -> i32 { t.iter().sum::<i32>() * N as i32 }
+            fn main() {
+                println!("{} {}", somme([1, 2]), somme([1, 1, 1]));
+            }
+          output: 6 9
+        - id: rust-gen-ex4
+          type: mcq
+          prompt: '`Option<T>` est-il un type générique ?'
+          choices: ['Oui, une enum générique sur T', Non, c’est un mot-clé, Seulement pour les entiers, C’est un trait]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-lifetimes
+    title: Lifetimes (durées de vie)
+    summary: Annote les durées de vie ('a) pour relier entrées et sorties, comprends l’élision et les structs contenant des références.
+    minutes: 35
+    concepts: [lifetimes, references]
+    sections:
+      - title: Le problème
+        body: |
+          ```rust
+          fn plus_long(a: &str, b: &str) -> &str {      // ❌ E0106
+              if a.len() > b.len() { a } else { b }
+          }
+          ```
+
+          La référence renvoyée vient-elle de `a` ou de `b` ? Le compilateur ne peut pas savoir combien de temps elle reste valide. On l’annote :
+
+          ```rust
+          fn plus_long<'a>(a: &'a str, b: &'a str) -> &'a str {
+              if a.len() > b.len() { a } else { b }
+          }
+          ```
+
+          `'a` se lit « durée de vie a ». L’annotation dit : *le résultat vit au moins aussi longtemps que la plus courte des deux entrées*. Elle **ne change pas** la durée de vie des valeurs : elle décrit une relation que le compilateur vérifie.
+      - title: Vérification à l’usage
+        body: |
+          ```rust
+          let s1 = String::from("long texte");
+          let resultat;
+          {
+              let s2 = String::from("court");
+              resultat = plus_long(&s1, &s2);
+          } // s2 est détruite ici
+          println!("{resultat}"); // ❌ E0597: `s2` does not live long enough
+          ```
+
+          Le compilateur refuse : `resultat` pourrait désigner `s2`, déjà détruite.
+
+          **Règles d’élision** (pourquoi on n’écrit presque jamais `'a`) :
+
+          1. chaque référence en paramètre reçoit sa propre durée de vie ;
+          2. s’il y a **une seule** référence en entrée, la sortie reçoit sa durée de vie ;
+          3. pour une méthode avec `&self`, la sortie reçoit la durée de vie de `self`.
+      - title: Structs qui empruntent
+        body: |
+          Une struct qui contient une référence doit déclarer sa durée de vie :
+
+          ```rust
+          struct Extrait<'a> {
+              texte: &'a str,
+          }
+
+          impl<'a> Extrait<'a> {
+              fn premier_mot(&self) -> &'a str {
+                  self.texte.split_whitespace().next().unwrap_or("")
+              }
+          }
+
+          let roman = String::from("Il était une fois...");
+          let e = Extrait { texte: &roman };   // e ne doit pas survivre à roman
+          ```
+
+          `'static` désigne une référence valide pendant tout le programme (littéraux de chaînes, constantes).
+    exercises:
+      - id: rust-life-q1
+        type: mcq
+        prompt: Que fait une annotation de durée de vie `'a` ?
+        choices: [Elle prolonge la vie d’une variable, Elle décrit une relation entre durées de vie que le compilateur vérifie, Elle libère la mémoire plus tôt, Elle rend la variable globale]
+        answer: 1
+        concepts: [lifetimes]
+      - id: rust-life-fill
+        type: fill
+        prompt: Complète la signature.
+        code: |
+          fn premier<{{?}}>(a: &'a str, _b: &str) -> &'a str {
+              a
+          }
+          fn main() {
+              println!("{}", premier("gauche", "droite"));
+          }
+        blanks: [["'a"]]
+        tests:
+          - { input: '', output: gauche }
+      - id: rust-life-q2
+        type: mcq
+        prompt: 'Pourquoi `fn f(s: &str) -> &str` compile-t-il sans annotation ?'
+        choices: [Grâce aux règles d’élision (une seule référence en entrée), Parce que &str est toujours 'static, Parce que la fonction est courte, Il ne compile pas]
+        answer: 0
+      - id: rust-life-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0597). Trouve la ligne qui pose problème et corrige-le.
+        code: |
+          fn plus_long<'a>(a: &'a str, b: &'a str) -> &'a str {
+              if a.len() >= b.len() { a } else { b }
+          }
+          fn main() {
+              let s1 = String::from("bonjour");
+              let r;
+              {
+                  let s2 = String::from("salut tout le monde");
+                  r = plus_long(&s1, &s2);
+              }
+              println!("{}", r);
+          }
+        bugLines: [8, 9, 10]
+        choices:
+          - s2 est détruite à la fin du bloc alors que r pourrait encore y faire référence
+          - plus_long devrait renvoyer une String
+          - r doit être déclarée mut
+        answer: 0
+        solution: |
+          fn plus_long<'a>(a: &'a str, b: &'a str) -> &'a str {
+              if a.len() >= b.len() { a } else { b }
+          }
+          fn main() {
+              let s1 = String::from("bonjour");
+              let s2 = String::from("salut tout le monde");
+              let r = plus_long(&s1, &s2);
+              println!("{}", r);
+          }
+        tests:
+          - { input: '', output: salut tout le monde }
+      - id: rust-life-code
+        type: code
+        title: Analyseur de mots
+        prompt: |
+          Crée `struct Analyseur<'a> { texte: &'a str }` avec les méthodes :
+
+          - `mots(&self) -> Vec<&'a str>` ;
+          - `plus_long(&self) -> Option<&'a str>` (le premier en cas d’égalité, longueur en caractères).
+
+          Pour chaque ligne, affiche le nombre de mots et le plus long (`aucun` si la ligne est vide).
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for ligne in e.lines() {
+                  let a = Analyseur { texte: ligne };
+                  println!("{} {}", a.mots().len(), a.plus_long().unwrap_or("aucun"));
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          struct Analyseur<'a> {
+              texte: &'a str,
+          }
+
+          impl<'a> Analyseur<'a> {
+              fn mots(&self) -> Vec<&'a str> {
+                  self.texte.split_whitespace().collect()
+              }
+              fn plus_long(&self) -> Option<&'a str> {
+                  let mut best: Option<&'a str> = None;
+                  for m in self.mots() {
+                      if best.map_or(true, |b| m.chars().count() > b.chars().count()) {
+                          best = Some(m);
+                      }
+                  }
+                  best
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for ligne in e.lines() {
+                  let a = Analyseur { texte: ligne };
+                  println!("{} {}", a.mots().len(), a.plus_long().unwrap_or("aucun"));
+              }
+          }
+        tests:
+          - { input: "les durées de vie\nok", output: "4 durées\n1 ok" }
+          - { input: "\nab cd", output: "0 aucun\n2 ab", hidden: true }
+        concepts: [lifetimes]
+    project:
+      id: rust-life-projet
+      type: code
+      title: Découpeur sans copie
+      difficulty: 3
+      prompt: |
+        Écris un découpeur de CSV qui **ne copie aucune chaîne** : `struct LigneCsv<'a> { champs: Vec<&'a str> }` avec `fn analyser(ligne: &'a str) -> LigneCsv<'a>` (séparateur `;`, espaces autour supprimés par `trim`) et `fn champ(&self, i: usize) -> Option<&'a str>`.
+
+        La première ligne est l’en-tête. Pour chaque ligne suivante, affiche `<valeur de la colonne "nom"> (<valeur de la colonne "ville">)`, ou `?` pour une valeur manquante.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        struct LigneCsv<'a> {
+            champs: Vec<&'a str>,
+        }
+
+        impl<'a> LigneCsv<'a> {
+            fn analyser(ligne: &'a str) -> LigneCsv<'a> {
+                LigneCsv { champs: ligne.split(';').map(|c| c.trim()).collect() }
+            }
+            fn champ(&self, i: usize) -> Option<&'a str> {
+                self.champs.get(i).copied().filter(|c| !c.is_empty())
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut lignes = e.lines();
+            let entete = LigneCsv::analyser(lignes.next().unwrap());
+            let i_nom = entete.champs.iter().position(|c| *c == "nom").unwrap();
+            let i_ville = entete.champs.iter().position(|c| *c == "ville").unwrap();
+            for l in lignes {
+                let ligne = LigneCsv::analyser(l);
+                println!("{} ({})", ligne.champ(i_nom).unwrap_or("?"), ligne.champ(i_ville).unwrap_or("?"));
+            }
+        }
+      tests:
+        - { input: "id;nom;ville\n1; Ada ;Londres\n2;Linus;", output: "Ada (Londres)\nLinus (?)" }
+        - { input: "ville;nom\nParis;Kiri\n;\nLyon", output: "Kiri (Paris)\n? (?)\n? (Lyon)", hidden: true }
+      require:
+        - { pattern: "struct\\s+LigneCsv\\s*<\\s*'a\\s*>", message: "Définir LigneCsv<'a>" }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-life-ex1
+          type: mcq
+          prompt: Que signifie la durée de vie `'static` ?
+          choices: [La référence est valide pendant tout le programme, La variable est constante, La valeur est sur la pile, Elle est réservée aux threads]
+          answer: 0
+        - id: rust-life-ex2
+          type: mcq
+          prompt: 'Pour une méthode `fn f(&self, x: &str) -> &str`, quelle durée de vie l’élision donne-t-elle au résultat ?'
+          choices: ['Celle de x', 'Celle de self', "'static", 'Aucune (erreur)']
+          answer: 1
+        - id: rust-life-ex3
+          type: mcq
+          prompt: Quelle erreur indique qu’une valeur est détruite alors qu’une référence vers elle est encore utilisée ?
+          choices: [E0597 does not live long enough, E0308 mismatched types, E0382 use of moved value, E0425 cannot find value]
+          answer: 0
+        - id: rust-life-ex4
+          type: fill
+          prompt: Complète la déclaration de struct.
+          code: "struct Vue<{{?}}> { tranche: &'a [i32] }"
+          blanks: [["'a"]]
+
+  # ------------------------------------------------------------------
+  - slug: rust-tests
+    title: Tests unitaires
+    summary: 'Écris des tests avec #[test], assert!, assert_eq!, should_panic, organise-les en modules et pratique le développement piloté par les tests.'
+    minutes: 30
+    concepts: [tests]
+    sections:
+      - title: Un premier test
+        body: |
+          ```rust
+          pub fn ajouter(a: i32, b: i32) -> i32 { a + b }
+
+          #[cfg(test)]              // compilé uniquement pour les tests
+          mod tests {
+              use super::*;          // importe les fonctions du module parent
+
+              #[test]
+              fn addition_simple() {
+                  assert_eq!(ajouter(2, 3), 5);
+              }
+
+              #[test]
+              fn addition_negative() {
+                  assert_eq!(ajouter(-2, -3), -5, "les négatifs doivent fonctionner");
+              }
+          }
+          ```
+
+          `cargo test` compile le projet en mode test et exécute chaque fonction `#[test]`. Un test **échoue** s’il panique.
+      - title: Les assertions
+        body: |
+          | Macro | Vérifie |
+          |---|---|
+          | `assert!(cond)` | `cond` est vrai |
+          | `assert_eq!(a, b)` | `a == b` (affiche les deux valeurs sinon) |
+          | `assert_ne!(a, b)` | `a != b` |
+
+          Tester une panique attendue :
+
+          ```rust
+          #[test]
+          #[should_panic(expected = "division par zéro")]
+          fn division_zero() { diviser(1, 0); }
+          ```
+
+          Un test peut aussi renvoyer `Result<(), String>` et utiliser `?`. `#[ignore]` met un test de côté (`cargo test -- --ignored` pour le lancer).
+      - title: Organisation et TDD
+        body: |
+          - **Tests unitaires** : dans le même fichier, module `tests`, accès aux fonctions privées.
+          - **Tests d’intégration** : dossier `tests/` à la racine, utilisent la crate comme un utilisateur externe.
+          - **Doc-tests** : exemples dans les commentaires `///`.
+
+          Le **TDD** (*Test-Driven Development*) : 1) écrire un test qui échoue, 2) écrire le minimum de code pour le faire passer, 3) refactoriser. Répéter.
+
+          > 💡 Sur Codemori, chaque exercice de code est vérifié par une batterie de tests — visibles et cachés — selon exactement ce principe.
+    exercises:
+      - id: rust-test-q1
+        type: mcq
+        prompt: Que fait `#[cfg(test)]` devant un module ?
+        choices: [Le module n’est compilé que lors de cargo test, Il désactive les tests, Il rend le module public, Il exécute les tests à chaque compilation]
+        answer: 0
+        concepts: [tests]
+      - id: rust-test-q2
+        type: mcq
+        prompt: Quelle macro affiche les deux valeurs comparées en cas d’échec ?
+        choices: ['assert!', 'assert_eq!', 'debug_assert!', 'panic!']
+        answer: 1
+      - id: rust-test-order
+        type: order
+        prompt: Remets dans l’ordre le cycle du TDD.
+        lines:
+          - Écrire un test qui échoue
+          - Écrire le code minimal pour faire passer le test
+          - Vérifier que tous les tests passent
+          - Refactoriser le code
+      - id: rust-test-fill
+        type: fill
+        prompt: Complète ce test qui attend une panique.
+        code: |
+          #[test]
+          #[{{?}}]
+          fn indice_invalide() {
+              let v: Vec<i32> = Vec::new();
+              v[0];
+          }
+        blanks: [[should_panic]]
+      - id: rust-test-code
+        type: code
+        title: Mini framework de test
+        prompt: |
+          Le programme exécute des « tests » maison sur ta fonction `fn est_bissextile(annee: u32) -> bool`.
+
+          Une année est bissextile si elle est divisible par 4, sauf les années séculaires (divisibles par 100) qui ne le sont que si elles sont divisibles par 400.
+
+          Écris la fonction **et** au moins un module `#[cfg(test)]` avec des `#[test]` (vérifié par une consigne). Pour chaque année lue, le programme affiche `true`/`false`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn est_bissextile(annee: u32) -> bool {
+              todo!()
+          }
+
+          // Ajoute ici un module de tests
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  println!("{}", est_bissextile(l.trim().parse().unwrap()));
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn est_bissextile(annee: u32) -> bool {
+              (annee % 4 == 0 && annee % 100 != 0) || annee % 400 == 0
+          }
+
+          #[cfg(test)]
+          mod tests {
+              use super::*;
+
+              #[test]
+              fn annees_classiques() {
+                  assert!(est_bissextile(2024));
+                  assert!(!est_bissextile(2023));
+              }
+
+              #[test]
+              fn annees_seculaires() {
+                  assert!(!est_bissextile(1900));
+                  assert!(est_bissextile(2000));
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  println!("{}", est_bissextile(l.trim().parse().unwrap()));
+              }
+          }
+        tests:
+          - { input: "2024\n2023", output: "true\nfalse" }
+          - { input: "1900\n2000\n2100\n2400", output: "false\ntrue\nfalse\ntrue", hidden: true }
+        require:
+          - { pattern: '#\[cfg\(test\)\]', message: 'Ajouter un module #[cfg(test)]' }
+          - { pattern: '#\[test\]', message: 'Écrire au moins une fonction #[test]' }
+          - { pattern: 'assert', message: Utiliser une assertion }
+        concepts: [tests]
+    project:
+      id: rust-test-projet
+      type: code
+      title: Validateur de numéro de carte (Luhn)
+      difficulty: 3
+      prompt: |
+        Implémente `fn luhn_valide(numero: &str) -> bool` (algorithme de Luhn) et un module de tests complet.
+
+        Algorithme : on ignore les espaces ; tout autre caractère non numérique rend le numéro invalide ; il faut au moins 2 chiffres. En partant de la droite, on double un chiffre sur deux (le 2e, 4e…) ; si le résultat dépasse 9, on retire 9. Le numéro est valide si la somme totale est divisible par 10.
+
+        Pour chaque ligne, affiche `valide` ou `invalide`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn luhn_valide(numero: &str) -> bool {
+            todo!()
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                println!("{}", if luhn_valide(l) { "valide" } else { "invalide" });
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn luhn_valide(numero: &str) -> bool {
+            let sans_espaces: String = numero.chars().filter(|c| !c.is_whitespace()).collect();
+            if sans_espaces.len() < 2 || !sans_espaces.chars().all(|c| c.is_ascii_digit()) {
+                return false;
+            }
+            let somme: u32 = sans_espaces
+                .chars()
+                .rev()
+                .map(|c| c.to_digit(10).unwrap())
+                .enumerate()
+                .map(|(i, d)| if i % 2 == 1 { let x = d * 2; if x > 9 { x - 9 } else { x } } else { d })
+                .sum();
+            somme % 10 == 0
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+            #[test]
+            fn numero_valide() { assert!(luhn_valide("4539 3195 0343 6467")); }
+            #[test]
+            fn numero_invalide() { assert!(!luhn_valide("8273 1232 7352 0569")); }
+            #[test]
+            fn caracteres_interdits() { assert!(!luhn_valide("055-444-285")); }
+            #[test]
+            fn trop_court() { assert!(!luhn_valide("0")); }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                println!("{}", if luhn_valide(l) { "valide" } else { "invalide" });
+            }
+        }
+      tests:
+        - { input: "4539 3195 0343 6467\n8273 1232 7352 0569", output: "valide\ninvalide" }
+        - { input: "0\n 0 0 \n059a\n091", output: "invalide\nvalide\ninvalide\nvalide", hidden: true }
+        - { input: "79927398713\n79927398710", output: "valide\ninvalide", hidden: true }
+      require:
+        - { pattern: '#\[test\]', message: 'Écrire des tests #[test]' }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-test-ex1
+          type: mcq
+          prompt: Quelle commande exécute les tests d’un projet ?
+          choices: [cargo run --test, cargo test, rustc --test-all, cargo check]
+          answer: 1
+        - id: rust-test-ex2
+          type: mcq
+          prompt: Où place-t-on les tests d’intégration ?
+          choices: [Dans src/tests.rs, Dans le dossier tests/ à la racine, Dans Cargo.toml, Dans un module privé]
+          answer: 1
+        - id: rust-test-ex3
+          type: mcq
+          prompt: Quand un test Rust échoue-t-il ?
+          choices: [Quand il panique, Quand il renvoie false, Quand il affiche une erreur, Quand il est trop lent]
+          answer: 0
+        - id: rust-test-ex4
+          type: mcq
+          prompt: Pourquoi écrire `use super::*;` dans le module tests ?
+          choices: [Pour accéder aux fonctions du module parent, Pour importer la bibliothèque standard, Pour activer les assertions, C’est obligatoire pour cargo]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-cargo
+    title: Cargo en profondeur
+    summary: Profils de compilation, workspaces, features, scripts de build, publication et outils de l’écosystème Cargo.
+    minutes: 25
+    concepts: [build]
+    sections:
+      - title: Profils et commandes
+        body: |
+          | Commande | Rôle |
+          |---|---|
+          | `cargo build` / `--release` | compile (debug / optimisé) |
+          | `cargo run -- arg1` | exécute avec des arguments |
+          | `cargo test`, `cargo bench` | tests, benchmarks |
+          | `cargo doc --open` | documentation |
+          | `cargo fmt`, `cargo clippy` | formatage, analyse |
+          | `cargo tree` | arbre des dépendances |
+          | `cargo update` | met à jour Cargo.lock |
+          | `cargo publish` | publie sur crates.io |
+
+          Les profils se configurent dans `Cargo.toml` :
+
+          ```toml
+          [profile.release]
+          opt-level = 3
+          lto = true          # optimisation à l’édition de liens
+          codegen-units = 1
+          panic = "abort"
+          ```
+      - title: Workspaces et features
+        body: |
+          Un **workspace** regroupe plusieurs crates qui partagent un `Cargo.lock` et un dossier `target/` :
+
+          ```toml
+          # Cargo.toml à la racine
+          [workspace]
+          members = ["noyau", "cli", "serveur"]
+          ```
+
+          Les **features** activent du code optionnel :
+
+          ```toml
+          [features]
+          default = ["json"]
+          json = ["dep:serde_json"]
+
+          [dependencies]
+          serde_json = { version = "1", optional = true }
+          ```
+
+          ```rust
+          #[cfg(feature = "json")]
+          pub fn exporter_json() { /* … */ }
+          ```
+
+          `cargo build --no-default-features --features json` choisit précisément les features.
+      - title: build.rs et outils
+        body: |
+          Un fichier `build.rs` à la racine est exécuté **avant** la compilation (génération de code, liaison avec une bibliothèque C…).
+
+          Outils à installer avec `cargo install` :
+
+          - `cargo-watch` : recompile à chaque modification ;
+          - `cargo-audit` : vérifie les vulnérabilités connues des dépendances ;
+          - `cargo-edit`, `cargo-expand` (affiche le code après expansion des macros), `cargo-flamegraph` (profilage).
+
+          Les **dev-dependencies** (`[dev-dependencies]`) ne servent qu’aux tests et exemples.
+    exercises:
+      - id: rust-cargo-q1
+        type: mcq
+        prompt: Quelle section de Cargo.toml déclare une dépendance utilisée uniquement par les tests ?
+        choices: ['[dependencies]', '[dev-dependencies]', '[test]', '[features]']
+        answer: 1
+      - id: rust-cargo-q2
+        type: mcq
+        prompt: À quoi sert un workspace Cargo ?
+        choices: [À regrouper plusieurs crates qui partagent Cargo.lock et target/, À installer Rust, À publier sur GitHub, À créer une interface graphique]
+        answer: 0
+      - id: rust-cargo-fill
+        type: fill
+        prompt: Complète la configuration d’une dépendance optionnelle activée par une feature.
+        code: |
+          [features]
+          stats = ["dep:statrs"]
+
+          [dependencies]
+          statrs = { version = "0.16", {{?}} = true }
+        blanks: [[optional]]
+      - id: rust-cargo-order
+        type: order
+        prompt: Remets dans l’ordre la publication d’une crate.
+        lines:
+          - Créer un compte sur crates.io et récupérer un jeton
+          - cargo login <jeton>
+          - Renseigner description, licence et dépôt dans Cargo.toml
+          - cargo publish --dry-run
+          - cargo publish
+      - id: rust-cargo-code
+        type: code
+        title: Arguments de ligne de commande
+        prompt: |
+          Avec `cargo run -- add 2 3`, un programme reçoit ses arguments via `std::env::args()`. Ici, nous simulons cela : chaque ligne d’entrée contient une « ligne de commande » `commande arg1 arg2…`.
+
+          Écris `fn executer(args: &[&str]) -> Result<String, String>` qui gère :
+
+          - `add a b …` → la somme ; `max a b …` → le maximum ;
+          - `--version` → `calc 1.0.0` ;
+          - sinon → `Err("commande inconnue : X")` ; un argument non numérique → `Err("nombre invalide : X")`.
+
+          Affiche le résultat ou `erreur : <message>`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let args: Vec<&str> = l.split_whitespace().collect();
+                  match executer(&args) {
+                      Ok(r) => println!("{}", r),
+                      Err(m) => println!("erreur : {}", m),
+                  }
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn nombres(args: &[&str]) -> Result<Vec<i64>, String> {
+              args.iter().map(|a| a.parse::<i64>().map_err(|_| format!("nombre invalide : {}", a))).collect()
+          }
+
+          fn executer(args: &[&str]) -> Result<String, String> {
+              match args.first().copied() {
+                  Some("add") => Ok(nombres(&args[1..])?.iter().sum::<i64>().to_string()),
+                  Some("max") => Ok(nombres(&args[1..])?.into_iter().max().map(|m| m.to_string()).unwrap_or_default()),
+                  Some("--version") => Ok(String::from("calc 1.0.0")),
+                  Some(c) => Err(format!("commande inconnue : {}", c)),
+                  None => Err(String::from("commande inconnue : ")),
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let args: Vec<&str> = l.split_whitespace().collect();
+                  match executer(&args) {
+                      Ok(r) => println!("{}", r),
+                      Err(m) => println!("erreur : {}", m),
+                  }
+              }
+          }
+        tests:
+          - { input: "add 2 3 4\nmax 7 -1 9\n--version", output: "9\n9\ncalc 1.0.0" }
+          - { input: "mul 2 3\nadd 1 x", output: "erreur : commande inconnue : mul\nerreur : nombre invalide : x", hidden: true }
+    project:
+      id: rust-cargo-projet
+      type: code
+      title: Générateur reproductible avec rand
+      difficulty: 3
+      prompt: |
+        Avec la crate `rand` (pré-installée), crée un générateur **reproductible** : `StdRng::seed_from_u64(graine)`.
+
+        Chaque ligne contient `graine n max`. Génère `n` nombres avec `rng.gen_range(1..=max)` et affiche-les séparés par des espaces, puis sur la ligne suivante leur somme.
+
+        (Avec la même graine, le résultat est toujours identique : c’est ce qui rend les tests possibles.)
+      starter: |
+        use rand::{rngs::StdRng, Rng, SeedableRng};
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use rand::{rngs::StdRng, Rng, SeedableRng};
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let p: Vec<u64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                let mut rng = StdRng::seed_from_u64(p[0]);
+                let v: Vec<u64> = (0..p[1]).map(|_| rng.gen_range(1..=p[2])).collect();
+                let s: Vec<String> = v.iter().map(|x| x.to_string()).collect();
+                println!("{}", s.join(" "));
+                println!("{}", v.iter().sum::<u64>());
+            }
+        }
+      tests:
+        - { input: '42 5 6', output: "4 4 3 1 3\n15" }
+        - { input: '7 3 100', output: "4 31 15\n50", hidden: true }
+      require:
+        - { pattern: 'seed_from_u64', message: Utiliser StdRng::seed_from_u64 }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-cargo-ex1
+          type: mcq
+          prompt: Quelle commande affiche l’arbre des dépendances ?
+          choices: [cargo deps, cargo tree, cargo list, cargo graph]
+          answer: 1
+        - id: rust-cargo-ex2
+          type: mcq
+          prompt: Quel fichier est exécuté avant la compilation d’une crate ?
+          choices: [main.rs, build.rs, lib.rs, Cargo.lock]
+          answer: 1
+        - id: rust-cargo-ex3
+          type: mcq
+          prompt: Quel outil vérifie les vulnérabilités connues des dépendances ?
+          choices: [cargo-audit, cargo-watch, cargo-expand, cargo-fmt]
+          answer: 0
+        - id: rust-cargo-ex4
+          type: mcq
+          prompt: Que fait `lto = true` dans le profil release ?
+          choices: [Active l’optimisation à l’édition de liens, Désactive les tests, Active le mode debug, Ajoute la journalisation]
+          answer: 0
