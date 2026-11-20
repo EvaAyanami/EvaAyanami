@@ -1,0 +1,1139 @@
+import sys
+sys.path.insert(0, __file__.rsplit('/', 1)[0])
+from projgen import project, step, T, dump
+
+P = []
+
+# ====================================================================== Serveur HTTP
+H_RUST = r'''
+use std::collections::HashMap;
+use std::io::{self, BufRead};
+
+struct Requete {
+    methode: String,
+    chemin: String,
+    requete: HashMap<String, String>,
+    entetes: HashMap<String, String>,
+    corps: String,
+}
+
+/// Décode « %20 » et « + » (encodage des URL).
+fn decoder(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'+' {
+            out.push(b' ');
+        } else if b[i] == b'%' && i + 2 < b.len() {
+            let hex = std::str::from_utf8(&b[i + 1..i + 3]).unwrap_or("");
+            if let Ok(v) = u8::from_str_radix(hex, 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+            out.push(b[i]);
+        } else {
+            out.push(b[i]);
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn repondre(code: u16, corps: &str) {
+    let raison = match code {
+        200 => "OK",
+        400 => "Bad Request",
+        404 => "Not Found",
+        _ => "Method Not Allowed",
+    };
+    println!("HTTP/1.1 {} {}", code, raison);
+    println!("Content-Type: text/plain; charset=utf-8");
+    println!("Content-Length: {}", corps.len());
+    println!();
+    println!("{}", corps);
+    println!("---");
+}
+
+fn main() {
+    let stdin = io::stdin();
+    let mut lignes = stdin.lock().lines().map(|l| l.unwrap().trim_end_matches('\r').to_string()).peekable();
+    let mut compteur = 0;
+    while let Some(premiere) = lignes.next() {
+        if premiere.trim().is_empty() {
+            continue;
+        }
+        let p: Vec<&str> = premiere.split_whitespace().collect();
+        let (chemin, qs) = p.get(1).copied().unwrap_or("/").split_once('?').unwrap_or((p.get(1).copied().unwrap_or("/"), ""));
+        let mut req = Requete {
+            methode: p[0].to_string(),
+            chemin: chemin.to_string(),
+            requete: HashMap::new(),
+            entetes: HashMap::new(),
+            corps: String::new(),
+        };
+        for kv in qs.split('&').filter(|s| !s.is_empty()) {
+            let (k, v) = kv.split_once('=').unwrap_or((kv, ""));
+            req.requete.insert(decoder(k), decoder(v));
+        }
+        for l in lignes.by_ref() {
+            if l.is_empty() {
+                break;
+            }
+            if let Some((k, v)) = l.split_once(':') {
+                req.entetes.insert(k.trim().to_lowercase(), v.trim().to_string());
+            }
+        }
+        //@@CORPS
+        compteur += 1;
+        //@@ROUTES
+    }
+    let _ = compteur;
+}
+'''
+
+H1_RUST_ROUTES = '''        if req.methode != "GET" {
+            repondre(405, "Méthode non autorisée");
+        } else if req.chemin == "/" {
+            repondre(200, "Bienvenue sur le serveur Codemori");
+        } else if req.chemin == "/bonjour" {
+            let nom = req.requete.get("nom").map(String::as_str).unwrap_or("inconnu");
+            repondre(200, &format!("Bonjour {}", nom));
+        } else {
+            repondre(404, "Page introuvable");
+        }
+        let _ = (&req.entetes, &req.corps);
+'''
+
+H2_RUST_CORPS = '''        if req.methode == "POST" && req.entetes.contains_key("content-length") {
+            if let Some(c) = lignes.next() {
+                let n: usize = req.entetes["content-length"].parse().unwrap_or(0);
+                req.corps = c.chars().take(n).collect();
+            }
+        }
+'''
+
+H2_RUST_ROUTES = '''        let autorisee = match req.chemin.as_str() {
+            "/" | "/bonjour" | "/stats" => Some("GET"),
+            "/echo" => Some("POST"),
+            _ => None,
+        };
+        if !req.entetes.contains_key("host") {
+            repondre(400, "Requête invalide : en-tête Host manquant");
+        } else if autorisee.is_none() {
+            repondre(404, "Page introuvable");
+        } else if autorisee != Some(req.methode.as_str()) {
+            repondre(405, "Méthode non autorisée");
+        } else {
+            match req.chemin.as_str() {
+                "/" => repondre(200, "Bienvenue sur le serveur Codemori"),
+                "/bonjour" => {
+                    let nom = req.requete.get("nom").map(String::as_str).unwrap_or("inconnu");
+                    repondre(200, &format!("Bonjour {}", nom));
+                }
+                "/stats" => repondre(200, &format!("Requêtes traitées : {}", compteur)),
+                _ if !req.entetes.contains_key("content-length") => repondre(400, "Requête invalide : Content-Length manquant"),
+                _ => repondre(200, &req.corps.to_uppercase()),
+            }
+        }
+'''
+
+H1_RUST = H_RUST.replace('        //@@CORPS\n', '').replace('        //@@ROUTES\n', H1_RUST_ROUTES)
+H2_RUST = H_RUST.replace('        //@@CORPS\n', H2_RUST_CORPS).replace('        //@@ROUTES\n', H2_RUST_ROUTES).replace('    let _ = compteur;\n', '')
+
+H_CPP = r'''
+#include <algorithm>
+#include <cctype>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+using namespace std;
+
+struct Requete {
+    string methode, chemin, corps;
+    map<string, string> requete, entetes;
+};
+
+// Décode « %20 » et « + » (encodage des URL).
+string decoder(const string& s) {
+    string out;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == '+') out += ' ';
+        else if (s[i] == '%' && i + 2 < s.size() && isxdigit((unsigned char)s[i + 1]) && isxdigit((unsigned char)s[i + 2])) {
+            out += (char)stoi(s.substr(i + 1, 2), nullptr, 16);
+            i += 2;
+        } else out += s[i];
+    }
+    return out;
+}
+
+void repondre(int code, const string& corps) {
+    string raison = code == 200 ? "OK" : code == 400 ? "Bad Request" : code == 404 ? "Not Found" : "Method Not Allowed";
+    cout << "HTTP/1.1 " << code << " " << raison << "\n"
+         << "Content-Type: text/plain; charset=utf-8\n"
+         << "Content-Length: " << corps.size() << "\n\n"
+         << corps << "\n---\n";
+}
+
+string sansCR(string s) {
+    if (!s.empty() && s.back() == '\r') s.pop_back();
+    return s;
+}
+
+int main() {
+    string premiere;
+    int compteur = 0;
+    while (getline(cin, premiere)) {
+        premiere = sansCR(premiere);
+        if (premiere.find_first_not_of(" \t") == string::npos) continue;
+        istringstream in(premiere);
+        Requete req;
+        string cible = "/";
+        in >> req.methode >> cible;
+        size_t q = cible.find('?');
+        req.chemin = cible.substr(0, q);
+        if (q != string::npos) {
+            stringstream qs(cible.substr(q + 1));
+            for (string kv; getline(qs, kv, '&');) {
+                if (kv.empty()) continue;
+                size_t e = kv.find('=');
+                req.requete[decoder(kv.substr(0, e))] = e == string::npos ? "" : decoder(kv.substr(e + 1));
+            }
+        }
+        for (string l; getline(cin, l);) {
+            l = sansCR(l);
+            if (l.empty()) break;
+            size_t d = l.find(':');
+            if (d == string::npos) continue;
+            string k = l.substr(0, d), v = l.substr(d + 1);
+            transform(k.begin(), k.end(), k.begin(), ::tolower);
+            k.erase(k.find_last_not_of(' ') + 1);
+            v.erase(0, v.find_first_not_of(' '));
+            req.entetes[k] = v;
+        }
+        //@@CORPS
+        compteur++;
+        //@@ROUTES
+    }
+}
+'''
+
+H1_CPP_ROUTES = '''        if (req.methode != "GET") repondre(405, "Méthode non autorisée");
+        else if (req.chemin == "/") repondre(200, "Bienvenue sur le serveur Codemori");
+        else if (req.chemin == "/bonjour") repondre(200, "Bonjour " + (req.requete.count("nom") ? req.requete["nom"] : string("inconnu")));
+        else repondre(404, "Page introuvable");
+'''
+
+H2_CPP_CORPS = '''        if (req.methode == "POST" && req.entetes.count("content-length")) {
+            string c;
+            if (getline(cin, c)) req.corps = sansCR(c).substr(0, stoul(req.entetes["content-length"]));
+        }
+'''
+
+H2_CPP_ROUTES = '''        string autorisee = req.chemin == "/" || req.chemin == "/bonjour" || req.chemin == "/stats" ? "GET" : req.chemin == "/echo" ? "POST" : "";
+        if (!req.entetes.count("host")) repondre(400, "Requête invalide : en-tête Host manquant");
+        else if (autorisee.empty()) repondre(404, "Page introuvable");
+        else if (autorisee != req.methode) repondre(405, "Méthode non autorisée");
+        else if (req.chemin == "/") repondre(200, "Bienvenue sur le serveur Codemori");
+        else if (req.chemin == "/bonjour") repondre(200, "Bonjour " + (req.requete.count("nom") ? req.requete["nom"] : string("inconnu")));
+        else if (req.chemin == "/stats") repondre(200, "Requêtes traitées : " + to_string(compteur));
+        else if (!req.entetes.count("content-length")) repondre(400, "Requête invalide : Content-Length manquant");
+        else {
+            string r = req.corps;
+            transform(r.begin(), r.end(), r.begin(), ::toupper);
+            repondre(200, r);
+        }
+'''
+
+H1_CPP = H_CPP.replace('        //@@CORPS\n', '').replace('        //@@ROUTES\n', H1_CPP_ROUTES)
+H2_CPP = H_CPP.replace('        //@@CORPS\n', H2_CPP_CORPS).replace('        //@@ROUTES\n', H2_CPP_ROUTES)
+
+H_JAVA = r'''
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+public class Main {
+    static class Requete {
+        String methode, chemin, corps = "";
+        Map<String, String> requete = new HashMap<>(), entetes = new HashMap<>();
+    }
+
+    /** Décode « %20 » et « + » (encodage des URL). */
+    static String decoder(String s) {
+        return java.net.URLDecoder.decode(s, StandardCharsets.UTF_8);
+    }
+
+    static void repondre(int code, String corps) {
+        String raison = switch (code) { case 200 -> "OK"; case 400 -> "Bad Request"; case 404 -> "Not Found"; default -> "Method Not Allowed"; };
+        System.out.println("HTTP/1.1 " + code + " " + raison);
+        System.out.println("Content-Type: text/plain; charset=utf-8");
+        System.out.println("Content-Length: " + corps.getBytes(StandardCharsets.UTF_8).length);
+        System.out.println();
+        System.out.println(corps);
+        System.out.println("---");
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        int compteur = 0;
+        while (sc.hasNextLine()) {
+            String premiere = sc.nextLine().strip();
+            if (premiere.isEmpty()) continue;
+            String[] p = premiere.split("\\s+");
+            Requete req = new Requete();
+            req.methode = p[0];
+            String cible = p.length > 1 ? p[1] : "/";
+            int q = cible.indexOf('?');
+            req.chemin = q < 0 ? cible : cible.substring(0, q);
+            if (q >= 0) {
+                for (String kv : cible.substring(q + 1).split("&")) {
+                    if (kv.isEmpty()) continue;
+                    int e = kv.indexOf('=');
+                    req.requete.put(decoder(e < 0 ? kv : kv.substring(0, e)), e < 0 ? "" : decoder(kv.substring(e + 1)));
+                }
+            }
+            while (sc.hasNextLine()) {
+                String l = sc.nextLine().strip();
+                if (l.isEmpty()) break;
+                int d = l.indexOf(':');
+                if (d > 0) req.entetes.put(l.substring(0, d).trim().toLowerCase(), l.substring(d + 1).trim());
+            }
+            //@@CORPS
+            compteur++;
+            //@@ROUTES
+        }
+    }
+}
+'''
+
+H1_JAVA_ROUTES = '''            if (!req.methode.equals("GET")) repondre(405, "Méthode non autorisée");
+            else if (req.chemin.equals("/")) repondre(200, "Bienvenue sur le serveur Codemori");
+            else if (req.chemin.equals("/bonjour")) repondre(200, "Bonjour " + req.requete.getOrDefault("nom", "inconnu"));
+            else repondre(404, "Page introuvable");
+'''
+
+H2_JAVA_CORPS = '''            if (req.methode.equals("POST") && req.entetes.containsKey("content-length") && sc.hasNextLine()) {
+                String c = sc.nextLine().strip();
+                req.corps = c.substring(0, Math.min(c.length(), Integer.parseInt(req.entetes.get("content-length"))));
+            }
+'''
+
+H2_JAVA_ROUTES = '''            String autorisee = switch (req.chemin) { case "/", "/bonjour", "/stats" -> "GET"; case "/echo" -> "POST"; default -> ""; };
+            if (!req.entetes.containsKey("host")) repondre(400, "Requête invalide : en-tête Host manquant");
+            else if (autorisee.isEmpty()) repondre(404, "Page introuvable");
+            else if (!autorisee.equals(req.methode)) repondre(405, "Méthode non autorisée");
+            else if (req.chemin.equals("/")) repondre(200, "Bienvenue sur le serveur Codemori");
+            else if (req.chemin.equals("/bonjour")) repondre(200, "Bonjour " + req.requete.getOrDefault("nom", "inconnu"));
+            else if (req.chemin.equals("/stats")) repondre(200, "Requêtes traitées : " + compteur);
+            else if (!req.entetes.containsKey("content-length")) repondre(400, "Requête invalide : Content-Length manquant");
+            else repondre(200, req.corps.toUpperCase(Locale.ROOT));
+'''
+
+H1_JAVA = H_JAVA.replace('            //@@CORPS\n', '').replace('            //@@ROUTES\n', H1_JAVA_ROUTES)
+H2_JAVA = H_JAVA.replace('            //@@CORPS\n', H2_JAVA_CORPS).replace('            //@@ROUTES\n', H2_JAVA_ROUTES)
+
+
+def resp(code, raison, corps):
+    return f'HTTP/1.1 {code} {raison}\nContent-Type: text/plain; charset=utf-8\nContent-Length: {len(corps.encode())}\n\n{corps}\n---'
+
+
+R200 = lambda c: resp(200, 'OK', c)
+R400 = lambda c: resp(400, 'Bad Request', c)
+R404 = resp(404, 'Not Found', 'Page introuvable')
+R405 = resp(405, 'Method Not Allowed', 'Méthode non autorisée')
+
+P.append(project(
+    'petit-serveur-http', 3, 'Petit serveur HTTP',
+    'Comprendre le protocole du Web en écrivant le cœur d’un serveur HTTP : analyse des requêtes, routage et réponses.',
+    '''
+    Le Web repose sur **HTTP**, un protocole texte. Une requête ressemble à ceci :
+
+    ```http
+    GET /bonjour?nom=Kiri HTTP/1.1
+    Host: codemori.local
+    Accept: text/plain
+
+    ```
+
+    — une **ligne de requête** (méthode, chemin, version), des **en-têtes** `Nom: valeur`, puis une ligne vide. La réponse suit le même principe :
+
+    ```http
+    HTTP/1.1 200 OK
+    Content-Type: text/plain; charset=utf-8
+    Content-Length: 12
+
+    Bonjour Kiri
+    ```
+
+    Pour pouvoir tester ton serveur sans réseau, les requêtes arrivent sur l’**entrée standard**, les unes après les autres, et les réponses partent sur la sortie standard. Après chaque réponse, affiche une ligne `---`. Le cœur du code est identique à celui d’un vrai serveur : il suffirait de brancher une socket TCP.
+
+    `Content-Length` est la taille du corps **en octets** (UTF-8). Les codes utilisés : `200 OK`, `400 Bad Request`, `404 Not Found`, `405 Method Not Allowed`.
+    ''',
+    ['Comprendre la structure d’une requête et d’une réponse HTTP', 'Analyser du texte structuré (ligne de requête, en-têtes, paramètres)', 'Router des requêtes', 'Choisir le bon code de statut'],
+    ['Les noms d’en-têtes ne sont pas sensibles à la casse', 'Les paramètres de requête sont décodés (%20 et + deviennent des espaces)', 'Content-Length compte les octets UTF-8 du corps'],
+    [
+        step('http-routage', 'Analyse et routage',
+             '''
+             Pour chaque requête :
+
+             - méthode autre que `GET` → `405` avec le corps `Méthode non autorisée` ;
+             - `/` → `200` `Bienvenue sur le serveur Codemori` ;
+             - `/bonjour` → `200` `Bonjour NOM`, où NOM est le paramètre `nom` de la requête (décodé), ou `inconnu` ;
+             - tout autre chemin → `404` `Page introuvable`.
+             ''',
+             [T('GET / HTTP/1.1\nHost: a\n\nGET /bonjour?nom=Kiri HTTP/1.1\nHost: a\n\nGET /bonjour?nom=Neko%20Chan&age=3 HTTP/1.1\n\nGET /bonjour HTTP/1.1\n\nDELETE / HTTP/1.1\n\nGET /admin HTTP/1.1\n',
+                '\n'.join([R200('Bienvenue sur le serveur Codemori'), R200('Bonjour Kiri'), R200('Bonjour Neko Chan'), R200('Bonjour inconnu'), R405, R404])),
+              T('GET /bonjour?nom=Ren%C3%A9+Dupont HTTP/1.1', R200('Bonjour René Dupont'), hidden=True)],
+             rust=H1_RUST, cpp=H1_CPP, java=H1_JAVA,
+             hints=['Lis la première ligne, puis les en-têtes jusqu’à une ligne vide.', 'Sépare le chemin des paramètres sur le « ? », puis les paramètres sur « & » et « = ».'],
+             xp=50),
+        step('http-complet', 'En-têtes, corps et statistiques',
+             '''
+             Rends ton serveur conforme à HTTP/1.1 :
+
+             - sans en-tête `Host` (quelle que soit sa casse) → `400` `Requête invalide : en-tête Host manquant` ;
+             - chaque chemin n’accepte qu’une méthode : `GET` pour `/`, `/bonjour` et `/stats`, `POST` pour `/echo`. Chemin inconnu → `404`, mauvaise méthode → `405` ;
+             - `POST /echo` : si l’en-tête `Content-Length` est absent → `400` `Requête invalide : Content-Length manquant`. Sinon, le corps est la ligne qui suit la ligne vide (tronquée à Content-Length caractères) : réponds-le **en majuscules** ;
+             - `GET /stats` → `Requêtes traitées : N` (toutes les requêtes reçues, celle-ci comprise).
+
+             Vérifications dans l’ordre : Host, chemin, méthode, puis Content-Length.
+             ''',
+             [T('GET / HTTP/1.1\n\nGET / HTTP/1.1\nhost: codemori\n\nPOST /echo HTTP/1.1\nHost: codemori\nContent-Length: 7\n\nbonjour le monde\nPOST /echo HTTP/1.1\nHost: x\n\nGET /echo HTTP/1.1\nHost: x\n\nPUT /bonjour HTTP/1.1\nHost: x\n\nGET /stats HTTP/1.1\nHOST: x\n',
+                '\n'.join([R400('Requête invalide : en-tête Host manquant'), R200('Bienvenue sur le serveur Codemori'), R200('BONJOUR'), R400('Requête invalide : Content-Length manquant'), R405, R405, R200('Requêtes traitées : 7')])),
+              T('GET /x HTTP/1.1\nHost: y\n\nGET /bonjour?nom=Ada HTTP/1.1\nHost: y\n', '\n'.join([R404, R200('Bonjour Ada')]), hidden=True)],
+             rust=H2_RUST, cpp=H2_CPP, java=H2_JAVA,
+             hints=['Stocke les en-têtes dans un dictionnaire avec des clés en minuscules.', 'Associe à chaque chemin la seule méthode autorisée : le routage devient une simple recherche.'],
+             xp=60),
+    ]))
+
+# ====================================================================== Comptes bancaires
+B_RUST = r'''
+use std::collections::BTreeMap;
+use std::io::{self, BufRead};
+
+#[derive(Default)]
+struct Compte {
+    solde: i64,
+    historique: Vec<String>,
+}
+
+fn montant(s: &str) -> Option<i64> {
+    s.parse::<i64>().ok().filter(|m| *m > 0)
+}
+
+fn main() {
+    let mut comptes: BTreeMap<String, Compte> = BTreeMap::new();
+    for ligne in io::stdin().lock().lines() {
+        let ligne = ligne.unwrap();
+        let t: Vec<&str> = ligne.split_whitespace().collect();
+        if t.is_empty() {
+            continue;
+        }
+        let r: Result<String, &str> = match t.as_slice() {
+            ["ouvrir", nom] => {
+                if comptes.contains_key(*nom) {
+                    Err("le compte existe déjà")
+                } else {
+                    comptes.insert(nom.to_string(), Compte::default());
+                    Ok(format!("Compte {} ouvert", nom))
+                }
+            }
+            [op @ ("depot" | "retrait"), nom, m] => match (comptes.get_mut(*nom), montant(m)) {
+                (None, _) => Err("compte inconnu"),
+                (_, None) => Err("montant invalide"),
+                (Some(c), Some(m)) if *op == "retrait" && m > c.solde => Err("solde insuffisant"),
+                (Some(c), Some(m)) => {
+                    let signe = if *op == "depot" { 1 } else { -1 };
+                    c.solde += signe * m;
+                    c.historique.push(format!("{} {}{} ({})", if signe > 0 { "dépôt" } else { "retrait" }, if signe > 0 { '+' } else { '-' }, m, c.solde));
+                    Ok(format!("{} : {}{} → solde {}", nom, if signe > 0 { '+' } else { '-' }, m, c.solde))
+                }
+            },
+            ["solde", nom] => comptes.get(*nom).map(|c| format!("{} : {}", nom, c.solde)).ok_or("compte inconnu"),
+            //@@ETAPE2
+            _ => continue,
+        };
+        match r {
+            Ok(s) => println!("{}", s),
+            Err(e) => println!("Erreur : {}", e),
+        }
+    }
+}
+'''
+
+B2_RUST_EXTRA = r'''            ["virement", a, b, m] => {
+                let m = montant(m);
+                if !comptes.contains_key(*a) || !comptes.contains_key(*b) {
+                    Err("compte inconnu")
+                } else if m.is_none() {
+                    Err("montant invalide")
+                } else if a == b {
+                    Err("virement vers le même compte")
+                } else if comptes[*a].solde < m.unwrap() {
+                    Err("solde insuffisant")
+                } else {
+                    let m = m.unwrap();
+                    let ca = comptes.get_mut(*a).unwrap();
+                    ca.solde -= m;
+                    let s = ca.solde;
+                    ca.historique.push(format!("virement vers {} -{} ({})", b, m, s));
+                    let cb = comptes.get_mut(*b).unwrap();
+                    cb.solde += m;
+                    let s = cb.solde;
+                    cb.historique.push(format!("virement de {} +{} ({})", a, m, s));
+                    Ok(format!("Virement de {} : {} → {}", m, a, b))
+                }
+            }
+            ["historique", nom] => match comptes.get(*nom) {
+                None => Err("compte inconnu"),
+                Some(c) if c.historique.is_empty() => Ok("Aucune opération".to_string()),
+                Some(c) => Ok(c.historique.join("\n")),
+            },
+            ["interets", taux] => {
+                let taux: i64 = taux.parse().unwrap_or(0);
+                let mut total = 0;
+                for c in comptes.values_mut() {
+                    let gain = if c.solde > 0 { c.solde * taux / 100 } else { 0 };
+                    if gain > 0 {
+                        c.solde += gain;
+                        c.historique.push(format!("intérêts +{} ({})", gain, c.solde));
+                        total += gain;
+                    }
+                }
+                Ok(format!("Intérêts versés : {}", total))
+            }
+            ["bilan"] => {
+                let mut lignes: Vec<String> = comptes.iter().map(|(n, c)| format!("{} : {}", n, c.solde)).collect();
+                lignes.push(format!("Total : {}", comptes.values().map(|c| c.solde).sum::<i64>()));
+                Ok(lignes.join("\n"))
+            }
+'''
+
+B1_RUST = B_RUST.replace('            //@@ETAPE2\n', '')
+B2_RUST = B_RUST.replace('            //@@ETAPE2\n', B2_RUST_EXTRA)
+
+B_CPP = r'''
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
+using namespace std;
+
+struct Compte {
+    long long solde = 0;
+    vector<string> historique;
+};
+
+// Renvoie -1 si le montant n'est pas un entier strictement positif.
+long long montant(const string& s) {
+    try {
+        size_t pos;
+        long long m = stoll(s, &pos);
+        return pos == s.size() && m > 0 ? m : -1;
+    } catch (...) {
+        return -1;
+    }
+}
+
+int main() {
+    map<string, Compte> comptes;
+    string ligne;
+    while (getline(cin, ligne)) {
+        istringstream in(ligne);
+        vector<string> t;
+        for (string w; in >> w;) t.push_back(w);
+        if (t.empty()) continue;
+        string err, ok;
+        if (t[0] == "ouvrir" && t.size() == 2) {
+            if (comptes.count(t[1])) err = "le compte existe déjà";
+            else { comptes[t[1]]; ok = "Compte " + t[1] + " ouvert"; }
+        } else if ((t[0] == "depot" || t[0] == "retrait") && t.size() == 3) {
+            long long m = montant(t[2]);
+            if (!comptes.count(t[1])) err = "compte inconnu";
+            else if (m < 0) err = "montant invalide";
+            else {
+                Compte& c = comptes[t[1]];
+                bool depot = t[0] == "depot";
+                if (!depot && m > c.solde) err = "solde insuffisant";
+                else {
+                    c.solde += depot ? m : -m;
+                    string s = (depot ? "+" : "-") + to_string(m);
+                    c.historique.push_back(string(depot ? "dépôt " : "retrait ") + s + " (" + to_string(c.solde) + ")");
+                    ok = t[1] + " : " + s + " → solde " + to_string(c.solde);
+                }
+            }
+        } else if (t[0] == "solde" && t.size() == 2) {
+            if (!comptes.count(t[1])) err = "compte inconnu";
+            else ok = t[1] + " : " + to_string(comptes[t[1]].solde);
+        }
+        //@@ETAPE2
+        else continue;
+        if (!err.empty()) cout << "Erreur : " << err << "\n";
+        else cout << ok << "\n";
+    }
+}
+'''
+
+B2_CPP_EXTRA = r'''        else if (t[0] == "virement" && t.size() == 4) {
+            long long m = montant(t[3]);
+            if (!comptes.count(t[1]) || !comptes.count(t[2])) err = "compte inconnu";
+            else if (m < 0) err = "montant invalide";
+            else if (t[1] == t[2]) err = "virement vers le même compte";
+            else if (comptes[t[1]].solde < m) err = "solde insuffisant";
+            else {
+                Compte &a = comptes[t[1]], &b = comptes[t[2]];
+                a.solde -= m;
+                b.solde += m;
+                a.historique.push_back("virement vers " + t[2] + " -" + to_string(m) + " (" + to_string(a.solde) + ")");
+                b.historique.push_back("virement de " + t[1] + " +" + to_string(m) + " (" + to_string(b.solde) + ")");
+                ok = "Virement de " + to_string(m) + " : " + t[1] + " → " + t[2];
+            }
+        } else if (t[0] == "historique" && t.size() == 2) {
+            if (!comptes.count(t[1])) err = "compte inconnu";
+            else if (comptes[t[1]].historique.empty()) ok = "Aucune opération";
+            else {
+                for (const auto& h : comptes[t[1]].historique) ok += (ok.empty() ? "" : "\n") + h;
+            }
+        } else if (t[0] == "interets" && t.size() == 2) {
+            long long taux = stoll(t[1]), total = 0;
+            for (auto& [nom, c] : comptes) {
+                long long gain = c.solde > 0 ? c.solde * taux / 100 : 0;
+                if (gain > 0) {
+                    c.solde += gain;
+                    c.historique.push_back("intérêts +" + to_string(gain) + " (" + to_string(c.solde) + ")");
+                    total += gain;
+                }
+            }
+            ok = "Intérêts versés : " + to_string(total);
+        } else if (t[0] == "bilan") {
+            long long total = 0;
+            for (const auto& [nom, c] : comptes) { ok += nom + " : " + to_string(c.solde) + "\n"; total += c.solde; }
+            ok += "Total : " + to_string(total);
+        }
+'''
+
+B1_CPP = B_CPP.replace('        //@@ETAPE2\n', '')
+B2_CPP = B_CPP.replace('        //@@ETAPE2\n', B2_CPP_EXTRA)
+
+B_JAVA = r'''
+import java.util.*;
+
+public class Main {
+    static class Compte {
+        long solde;
+        final List<String> historique = new ArrayList<>();
+    }
+
+    static class ErreurBanque extends Exception {
+        ErreurBanque(String m) { super(m); }
+    }
+
+    static final TreeMap<String, Compte> comptes = new TreeMap<>();
+
+    static Compte compte(String nom) throws ErreurBanque {
+        Compte c = comptes.get(nom);
+        if (c == null) throw new ErreurBanque("compte inconnu");
+        return c;
+    }
+
+    static long montant(String s) throws ErreurBanque {
+        try {
+            long m = Long.parseLong(s);
+            if (m > 0) return m;
+        } catch (NumberFormatException e) { }
+        throw new ErreurBanque("montant invalide");
+    }
+
+    static String executer(String[] t) throws ErreurBanque {
+        switch (t[0]) {
+            case "ouvrir" -> {
+                if (comptes.containsKey(t[1])) throw new ErreurBanque("le compte existe déjà");
+                comptes.put(t[1], new Compte());
+                return "Compte " + t[1] + " ouvert";
+            }
+            case "depot", "retrait" -> {
+                Compte c = compte(t[1]);
+                long m = montant(t[2]);
+                boolean depot = t[0].equals("depot");
+                if (!depot && m > c.solde) throw new ErreurBanque("solde insuffisant");
+                c.solde += depot ? m : -m;
+                String s = (depot ? "+" : "-") + m;
+                c.historique.add((depot ? "dépôt " : "retrait ") + s + " (" + c.solde + ")");
+                return t[1] + " : " + s + " → solde " + c.solde;
+            }
+            case "solde" -> { return t[1] + " : " + compte(t[1]).solde; }
+            //@@ETAPE2
+            default -> { return null; }
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        while (sc.hasNextLine()) {
+            String l = sc.nextLine().trim();
+            if (l.isEmpty()) continue;
+            try {
+                String r = executer(l.split("\\s+"));
+                if (r != null) System.out.println(r);
+            } catch (ErreurBanque e) {
+                System.out.println("Erreur : " + e.getMessage());
+            }
+        }
+    }
+}
+'''
+
+B2_JAVA_EXTRA = r'''            case "virement" -> {
+                Compte a = compte(t[1]), b = compte(t[2]);
+                long m = montant(t[3]);
+                if (a == b) throw new ErreurBanque("virement vers le même compte");
+                if (a.solde < m) throw new ErreurBanque("solde insuffisant");
+                a.solde -= m;
+                b.solde += m;
+                a.historique.add("virement vers " + t[2] + " -" + m + " (" + a.solde + ")");
+                b.historique.add("virement de " + t[1] + " +" + m + " (" + b.solde + ")");
+                return "Virement de " + m + " : " + t[1] + " → " + t[2];
+            }
+            case "historique" -> {
+                Compte c = compte(t[1]);
+                return c.historique.isEmpty() ? "Aucune opération" : String.join("\n", c.historique);
+            }
+            case "interets" -> {
+                long taux = Long.parseLong(t[1]), total = 0;
+                for (Compte c : comptes.values()) {
+                    long gain = c.solde > 0 ? c.solde * taux / 100 : 0;
+                    if (gain > 0) {
+                        c.solde += gain;
+                        c.historique.add("intérêts +" + gain + " (" + c.solde + ")");
+                        total += gain;
+                    }
+                }
+                return "Intérêts versés : " + total;
+            }
+            case "bilan" -> {
+                StringBuilder sb = new StringBuilder();
+                comptes.forEach((n, c) -> sb.append(n).append(" : ").append(c.solde).append('\n'));
+                return sb.append("Total : ").append(comptes.values().stream().mapToLong(c -> c.solde).sum()).toString();
+            }
+'''
+
+B1_JAVA = B_JAVA.replace('            //@@ETAPE2\n', '')
+B2_JAVA = B_JAVA.replace('            //@@ETAPE2\n', B2_JAVA_EXTRA)
+
+P.append(project(
+    'gestion-comptes', 3, 'Gestion de comptes bancaires',
+    'Une mini-banque : comptes, dépôts, retraits, virements atomiques, historique et intérêts.',
+    '''
+    Tu programmes le **cœur d’une banque**. Chaque compte est identifié par le nom de son titulaire et possède un solde en euros (entiers).
+
+    Les règles métier sont strictes — c’est de l’argent :
+
+    - un montant doit être un **entier strictement positif** ;
+    - un compte ne peut jamais passer **en négatif** ;
+    - un virement est **atomique** : soit les deux comptes sont modifiés, soit aucun.
+
+    Toutes les erreurs s’affichent sous la forme `Erreur : message`. Ordre des vérifications : comptes, montant, puis règles métier.
+    ''',
+    ['Encapsuler des règles métier', 'Gérer les erreurs proprement (Result, exceptions, codes d’erreur)', 'Garantir l’atomicité d’une opération', 'Tenir un historique'],
+    ['Montants entiers en euros', 'Aucun solde négatif possible', 'Comptes affichés par ordre alphabétique'],
+    [
+        step('banque-base', 'Comptes et opérations',
+             '''
+             Commandes :
+
+             - `ouvrir NOM` → `Compte NOM ouvert` ou `Erreur : le compte existe déjà`
+             - `depot NOM M` → `NOM : +M → solde S`
+             - `retrait NOM M` → `NOM : -M → solde S` ou `Erreur : solde insuffisant`
+             - `solde NOM` → `NOM : S`
+
+             Erreurs communes : `Erreur : compte inconnu`, `Erreur : montant invalide`.
+             ''',
+             [T('ouvrir ada\nouvrir ada\ndepot ada 100\nretrait ada 30\nretrait ada 500\ndepot ada -5\ndepot ada abc\ndepot bob 10\nsolde ada\nsolde bob',
+                'Compte ada ouvert\nErreur : le compte existe déjà\nada : +100 → solde 100\nada : -30 → solde 70\nErreur : solde insuffisant\nErreur : montant invalide\nErreur : montant invalide\nErreur : compte inconnu\nada : 70\nErreur : compte inconnu'),
+              T('ouvrir z\nretrait z 1\ndepot z 0\nsolde z', 'Compte z ouvert\nErreur : solde insuffisant\nErreur : montant invalide\nz : 0', hidden=True)],
+             rust=B1_RUST, cpp=B1_CPP, java=B1_JAVA,
+             hints=['Écris une fonction qui valide un montant : elle servira partout.', 'Vérifie que le compte existe AVANT de vérifier le montant.'],
+             xp=40),
+        step('banque-virements', 'Virements, historique, intérêts',
+             '''
+             Ajoute :
+
+             - `virement A B M` → `Virement de M : A → B` ; erreurs possibles : compte inconnu, montant invalide, `virement vers le même compte`, solde insuffisant ;
+             - `historique NOM` → une ligne par opération : `dépôt +M (solde)`, `retrait -M (solde)`, `virement vers B -M (solde)`, `virement de A +M (solde)`, `intérêts +M (solde)` — ou `Aucune opération` ;
+             - `interets T` → chaque compte au solde positif gagne `solde × T / 100` (division entière) ; affiche `Intérêts versés : total` ;
+             - `bilan` → `NOM : solde` pour chaque compte, puis `Total : somme`.
+             ''',
+             [T('ouvrir ada\nouvrir bob\ndepot ada 1000\nvirement ada bob 300\nvirement ada bob 5000\nvirement ada ada 10\nvirement ada zoe 10\nvirement bob ada 0\nhistorique bob\ninterets 5\nhistorique ada\nbilan',
+                'Compte ada ouvert\nCompte bob ouvert\nada : +1000 → solde 1000\nVirement de 300 : ada → bob\nErreur : solde insuffisant\nErreur : virement vers le même compte\nErreur : compte inconnu\nErreur : montant invalide\nvirement de ada +300 (300)\nIntérêts versés : 50\ndépôt +1000 (1000)\nvirement vers bob -300 (700)\nintérêts +35 (735)\nada : 735\nbob : 315\nTotal : 1050'),
+              T('ouvrir x\nhistorique x\ninterets 10\ndepot x 9\ninterets 10\nbilan', 'Compte x ouvert\nAucune opération\nIntérêts versés : 0\nx : +9 → solde 9\nIntérêts versés : 0\nx : 9\nTotal : 9', hidden=True)],
+             rust=B2_RUST, cpp=B2_CPP, java=B2_JAVA,
+             hints=['Vérifie TOUTES les conditions d’un virement avant de modifier le moindre solde.', 'Chaque opération ajoute une ligne à l’historique du ou des comptes concernés.'],
+             xp=50),
+    ]))
+
+# ====================================================================== Jeux console
+M_RUST = r'''
+use std::io::{self, BufRead};
+
+fn gagnant(g: &[[char; 3]; 3]) -> Option<char> {
+    let lignes = [
+        [(0, 0), (0, 1), (0, 2)], [(1, 0), (1, 1), (1, 2)], [(2, 0), (2, 1), (2, 2)],
+        [(0, 0), (1, 0), (2, 0)], [(0, 1), (1, 1), (2, 1)], [(0, 2), (1, 2), (2, 2)],
+        [(0, 0), (1, 1), (2, 2)], [(0, 2), (1, 1), (2, 0)],
+    ];
+    for l in lignes {
+        let c = g[l[0].0][l[0].1];
+        if c != '.' && l.iter().all(|&(i, j)| g[i][j] == c) {
+            return Some(c);
+        }
+    }
+    None
+}
+
+fn afficher(g: &[[char; 3]; 3]) {
+    for ligne in g {
+        println!("{}", ligne.iter().map(|c| c.to_string()).collect::<Vec<_>>().join("|"));
+    }
+}
+
+fn main() {
+    let mut g = [['.'; 3]; 3];
+    let mut joueur = 'X';
+    let mut coups = 0;
+    for ligne in io::stdin().lock().lines() {
+        let ligne = ligne.unwrap();
+        let v: Vec<usize> = ligne.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+        if v.len() != 2 || !(1..=3).contains(&v[0]) || !(1..=3).contains(&v[1]) || g[v[0] - 1][v[1] - 1] != '.' {
+            println!("Coup invalide");
+            continue;
+        }
+        g[v[0] - 1][v[1] - 1] = joueur;
+        coups += 1;
+        if let Some(c) = gagnant(&g) {
+            afficher(&g);
+            println!("{} gagne !", c);
+            return;
+        }
+        if coups == 9 {
+            afficher(&g);
+            println!("Match nul !");
+            return;
+        }
+        joueur = if joueur == 'X' { 'O' } else { 'X' };
+    }
+    afficher(&g);
+    println!("Partie en cours (au tour de {})", joueur);
+}
+'''
+
+M_CPP = r'''
+#include <iostream>
+#include <sstream>
+#include <string>
+using namespace std;
+
+char g[3][3];
+
+char gagnant() {
+    int l[8][3][2] = {{{0, 0}, {0, 1}, {0, 2}}, {{1, 0}, {1, 1}, {1, 2}}, {{2, 0}, {2, 1}, {2, 2}},
+                      {{0, 0}, {1, 0}, {2, 0}}, {{0, 1}, {1, 1}, {2, 1}}, {{0, 2}, {1, 2}, {2, 2}},
+                      {{0, 0}, {1, 1}, {2, 2}}, {{0, 2}, {1, 1}, {2, 0}}};
+    for (auto& a : l) {
+        char c = g[a[0][0]][a[0][1]];
+        if (c != '.' && g[a[1][0]][a[1][1]] == c && g[a[2][0]][a[2][1]] == c) return c;
+    }
+    return 0;
+}
+
+void afficher() {
+    for (auto& ligne : g) cout << ligne[0] << '|' << ligne[1] << '|' << ligne[2] << "\n";
+}
+
+int main() {
+    for (auto& ligne : g) for (char& c : ligne) c = '.';
+    char joueur = 'X';
+    int coups = 0;
+    string s;
+    while (getline(cin, s)) {
+        istringstream in(s);
+        int i, j;
+        string reste;
+        if (!(in >> i >> j) || (in >> reste) || i < 1 || i > 3 || j < 1 || j > 3 || g[i - 1][j - 1] != '.') {
+            cout << "Coup invalide\n";
+            continue;
+        }
+        g[i - 1][j - 1] = joueur;
+        coups++;
+        if (char c = gagnant()) { afficher(); cout << c << " gagne !\n"; return 0; }
+        if (coups == 9) { afficher(); cout << "Match nul !\n"; return 0; }
+        joueur = joueur == 'X' ? 'O' : 'X';
+    }
+    afficher();
+    cout << "Partie en cours (au tour de " << joueur << ")\n";
+}
+'''
+
+M_JAVA = r'''
+import java.util.*;
+
+public class Main {
+    static final char[][] g = new char[3][3];
+    static final int[][][] LIGNES = {
+        {{0, 0}, {0, 1}, {0, 2}}, {{1, 0}, {1, 1}, {1, 2}}, {{2, 0}, {2, 1}, {2, 2}},
+        {{0, 0}, {1, 0}, {2, 0}}, {{0, 1}, {1, 1}, {2, 1}}, {{0, 2}, {1, 2}, {2, 2}},
+        {{0, 0}, {1, 1}, {2, 2}}, {{0, 2}, {1, 1}, {2, 0}}};
+
+    static char gagnant() {
+        for (int[][] l : LIGNES) {
+            char c = g[l[0][0]][l[0][1]];
+            if (c != '.' && g[l[1][0]][l[1][1]] == c && g[l[2][0]][l[2][1]] == c) return c;
+        }
+        return 0;
+    }
+
+    static void afficher() {
+        for (char[] ligne : g) System.out.println(ligne[0] + "|" + ligne[1] + "|" + ligne[2]);
+    }
+
+    public static void main(String[] args) {
+        for (char[] ligne : g) Arrays.fill(ligne, '.');
+        Scanner sc = new Scanner(System.in);
+        char joueur = 'X';
+        int coups = 0;
+        while (sc.hasNextLine()) {
+            String[] t = sc.nextLine().trim().split("\\s+");
+            int i, j;
+            try { i = Integer.parseInt(t[0]); j = Integer.parseInt(t[1]); } catch (RuntimeException e) { i = j = 0; }
+            if (t.length != 2 || i < 1 || i > 3 || j < 1 || j > 3 || g[i - 1][j - 1] != '.') { System.out.println("Coup invalide"); continue; }
+            g[i - 1][j - 1] = joueur;
+            coups++;
+            char c = gagnant();
+            if (c != 0) { afficher(); System.out.println(c + " gagne !"); return; }
+            if (coups == 9) { afficher(); System.out.println("Match nul !"); return; }
+            joueur = joueur == 'X' ? 'O' : 'X';
+        }
+        afficher();
+        System.out.println("Partie en cours (au tour de " + joueur + ")");
+    }
+}
+'''
+
+P4_RUST = r'''
+use std::io::{self, BufRead};
+
+const LIGNES: usize = 6;
+const COLONNES: usize = 7;
+
+fn compte(g: &[[char; COLONNES]; LIGNES], l: usize, c: usize, dl: i32, dc: i32) -> usize {
+    let (mut i, mut j, mut n) = (l as i32 + dl, c as i32 + dc, 0);
+    while i >= 0 && i < LIGNES as i32 && j >= 0 && j < COLONNES as i32 && g[i as usize][j as usize] == g[l][c] {
+        n += 1;
+        i += dl;
+        j += dc;
+    }
+    n
+}
+
+fn gagne(g: &[[char; COLONNES]; LIGNES], l: usize, c: usize) -> bool {
+    [(0, 1), (1, 0), (1, 1), (1, -1)].iter().any(|&(dl, dc)| 1 + compte(g, l, c, dl, dc) + compte(g, l, c, -dl, -dc) >= 4)
+}
+
+fn afficher(g: &[[char; COLONNES]; LIGNES]) {
+    for ligne in g {
+        println!("{}", ligne.iter().collect::<String>());
+    }
+    println!("1234567");
+}
+
+fn main() {
+    let mut g = [['.'; COLONNES]; LIGNES];
+    let mut joueur = 'R';
+    let mut pions = 0;
+    for ligne in io::stdin().lock().lines() {
+        let ligne = ligne.unwrap();
+        let c = match ligne.trim().parse::<usize>() {
+            Ok(c) if (1..=COLONNES).contains(&c) => c - 1,
+            _ => {
+                println!("Colonne invalide");
+                continue;
+            }
+        };
+        // Gravité : le pion tombe dans la case libre la plus basse.
+        let Some(l) = (0..LIGNES).rev().find(|&l| g[l][c] == '.') else {
+            println!("Colonne pleine");
+            continue;
+        };
+        g[l][c] = joueur;
+        pions += 1;
+        if gagne(&g, l, c) {
+            afficher(&g);
+            println!("{} gagne !", joueur);
+            return;
+        }
+        if pions == LIGNES * COLONNES {
+            afficher(&g);
+            println!("Match nul !");
+            return;
+        }
+        joueur = if joueur == 'R' { 'J' } else { 'R' };
+    }
+    afficher(&g);
+    println!("Partie en cours (au tour de {})", joueur);
+}
+'''
+
+P4_CPP = r'''
+#include <iostream>
+#include <string>
+using namespace std;
+
+const int LIGNES = 6, COLONNES = 7;
+char g[LIGNES][COLONNES];
+
+int compte(int l, int c, int dl, int dc) {
+    int n = 0;
+    for (int i = l + dl, j = c + dc; i >= 0 && i < LIGNES && j >= 0 && j < COLONNES && g[i][j] == g[l][c]; i += dl, j += dc) n++;
+    return n;
+}
+
+bool gagne(int l, int c) {
+    int dirs[4][2] = {{0, 1}, {1, 0}, {1, 1}, {1, -1}};
+    for (auto& d : dirs)
+        if (1 + compte(l, c, d[0], d[1]) + compte(l, c, -d[0], -d[1]) >= 4) return true;
+    return false;
+}
+
+void afficher() {
+    for (auto& ligne : g) cout << string(ligne, COLONNES) << "\n";
+    cout << "1234567\n";
+}
+
+int main() {
+    for (auto& ligne : g) for (char& c : ligne) c = '.';
+    char joueur = 'R';
+    int pions = 0;
+    string s;
+    while (getline(cin, s)) {
+        int c;
+        try {
+            size_t pos;
+            c = stoi(s, &pos) - 1;
+            if (s.find_first_not_of(" \r", pos) != string::npos) c = -1;
+        } catch (...) { c = -1; }
+        if (c < 0 || c >= COLONNES) { cout << "Colonne invalide\n"; continue; }
+        // Gravité : le pion tombe dans la case libre la plus basse.
+        int l = LIGNES - 1;
+        while (l >= 0 && g[l][c] != '.') l--;
+        if (l < 0) { cout << "Colonne pleine\n"; continue; }
+        g[l][c] = joueur;
+        pions++;
+        if (gagne(l, c)) { afficher(); cout << joueur << " gagne !\n"; return 0; }
+        if (pions == LIGNES * COLONNES) { afficher(); cout << "Match nul !\n"; return 0; }
+        joueur = joueur == 'R' ? 'J' : 'R';
+    }
+    afficher();
+    cout << "Partie en cours (au tour de " << joueur << ")\n";
+}
+'''
+
+P4_JAVA = r'''
+import java.util.*;
+
+public class Main {
+    static final int LIGNES = 6, COLONNES = 7;
+    static final char[][] g = new char[LIGNES][COLONNES];
+
+    static int compte(int l, int c, int dl, int dc) {
+        int n = 0;
+        for (int i = l + dl, j = c + dc; i >= 0 && i < LIGNES && j >= 0 && j < COLONNES && g[i][j] == g[l][c]; i += dl, j += dc) n++;
+        return n;
+    }
+
+    static boolean gagne(int l, int c) {
+        int[][] dirs = {{0, 1}, {1, 0}, {1, 1}, {1, -1}};
+        for (int[] d : dirs) if (1 + compte(l, c, d[0], d[1]) + compte(l, c, -d[0], -d[1]) >= 4) return true;
+        return false;
+    }
+
+    static void afficher() {
+        for (char[] ligne : g) System.out.println(new String(ligne));
+        System.out.println("1234567");
+    }
+
+    public static void main(String[] args) {
+        for (char[] ligne : g) Arrays.fill(ligne, '.');
+        Scanner sc = new Scanner(System.in);
+        char joueur = 'R';
+        int pions = 0;
+        while (sc.hasNextLine()) {
+            int c;
+            try { c = Integer.parseInt(sc.nextLine().trim()) - 1; } catch (NumberFormatException e) { c = -1; }
+            if (c < 0 || c >= COLONNES) { System.out.println("Colonne invalide"); continue; }
+            // Gravité : le pion tombe dans la case libre la plus basse.
+            int l = LIGNES - 1;
+            while (l >= 0 && g[l][c] != '.') l--;
+            if (l < 0) { System.out.println("Colonne pleine"); continue; }
+            g[l][c] = joueur;
+            pions++;
+            if (gagne(l, c)) { afficher(); System.out.println(joueur + " gagne !"); return; }
+            if (pions == LIGNES * COLONNES) { afficher(); System.out.println("Match nul !"); return; }
+            joueur = joueur == 'R' ? 'J' : 'R';
+        }
+        afficher();
+        System.out.println("Partie en cours (au tour de " + joueur + ")");
+    }
+}
+'''
+
+P.append(project(
+    'jeux-console', 3, 'Jeux en console : morpion et puissance 4',
+    'Programmer deux jeux de plateau : représenter une grille, valider les coups, détecter victoire et match nul.',
+    '''
+    Les jeux de plateau sont d’excellents exercices : il faut **représenter un état** (la grille), **valider** chaque coup et **détecter la fin** de la partie.
+
+    Les coups arrivent un par ligne sur l’entrée standard (comme si deux joueurs tapaient au clavier). Les coups invalides sont signalés et le **même joueur rejoue**. Dès qu’une partie se termine, le programme affiche la grille et le résultat, puis s’arrête sans lire la suite.
+
+    Si l’entrée se termine avant la fin, affiche la grille puis `Partie en cours (au tour de J)`.
+    ''',
+    ['Représenter une grille avec un tableau à deux dimensions', 'Valider des saisies', 'Détecter des alignements dans toutes les directions', 'Structurer une boucle de jeu'],
+    ['Les cases vides sont affichées avec un point', 'Aucune saisie ne doit faire planter le programme'],
+    [
+        step('jeux-morpion', 'Le morpion',
+             '''
+             Grille 3 × 3, `X` commence. Chaque coup : `ligne colonne` (de 1 à 3).
+
+             - coup invalide (hors grille, case occupée, saisie incorrecte) → `Coup invalide` ;
+             - victoire (3 alignés en ligne, colonne ou diagonale) → grille puis `X gagne !` ;
+             - grille pleine sans gagnant → grille puis `Match nul !`.
+
+             La grille s’affiche sur 3 lignes, cases séparées par `|`, par exemple `X|O|.`.
+             ''',
+             [T('2 2\n1 1\n2 2\n2 1\n1 2\n4 1\nabc\n3 3\n1 3\n2 3', 'Coup invalide\nCoup invalide\nCoup invalide\nO|O|O\nX|X|.\n.|.|X\nO gagne !'),
+              T('1 1\n1 2\n1 3\n2 2\n2 1\n2 3\n3 2\n3 1\n3 3', 'X|O|X\nX|O|O\nO|X|X\nMatch nul !', hidden=True),
+              T('3 1\n1 1', 'O|.|.\n.|.|.\nX|.|.\nPartie en cours (au tour de X)', hidden=True),
+              T('1 3\n1 1\n2 2\n1 2\n3 1', 'O|O|X\n.|X|.\nX|.|.\nX gagne !', hidden=True)],
+             rust=M_RUST, cpp=M_CPP, java=M_JAVA,
+             hints=['Liste les 8 alignements gagnants possibles et teste-les après chaque coup.', 'Ne change de joueur qu’après un coup VALIDE.'],
+             xp=40),
+        step('jeux-puissance4', 'Puissance 4',
+             '''
+             Grille de 6 lignes × 7 colonnes. `R` (rouge) commence, puis `J` (jaune). Chaque coup est un numéro de colonne (1 à 7) : le pion **tombe** dans la case libre la plus basse.
+
+             - colonne invalide → `Colonne invalide` ; colonne pleine → `Colonne pleine` ;
+             - 4 pions alignés (horizontal, vertical ou diagonal) → grille puis `R gagne !` ;
+             - grille pleine → `Match nul !`.
+
+             La grille s’affiche ligne par ligne, du haut vers le bas, sans séparateur, suivie de la ligne `1234567`.
+             ''',
+             [T('4\n4\n5\n5\n8\n6\n6\n7', 'Colonne invalide\n.......\n.......\n.......\n.......\n...JJJ.\n...RRRR\n1234567\nR gagne !'),
+              T('1\n2\n2\n3\n3\n4\n3\n4\n4\n7\n4', '.......\n.......\n...R...\n..RR...\n.RRJ...\nRJJJ..J\n1234567\nR gagne !', hidden=True),
+              T('1\n1\n1\n1\n1\n1\n1\nx', 'Colonne pleine\nColonne invalide\nJ......\nR......\nJ......\nR......\nJ......\nR......\n1234567\nPartie en cours (au tour de R)', hidden=True)],
+             rust=P4_RUST, cpp=P4_CPP, java=P4_JAVA,
+             hints=['Pour détecter une victoire, compte les pions identiques consécutifs dans les deux sens de chacune des 4 directions, à partir du pion joué.', 'La gravité : parcours la colonne de bas en haut et prends la première case vide.'],
+             xp=60),
+    ]))
+
+dump(P, sys.argv[1], 'Projets — niveau intermédiaire (2/2)')

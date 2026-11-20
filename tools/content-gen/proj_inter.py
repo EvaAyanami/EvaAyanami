@@ -1,0 +1,1203 @@
+import sys
+sys.path.insert(0, __file__.rsplit('/', 1)[0])
+from projgen import project, step, T, dump
+
+P = []
+
+# ====================================================================== Fichiers
+F1_RUST = r'''
+use std::fs;
+use std::io::{self, BufRead};
+use std::path::PathBuf;
+
+/// Refuse les noms dangereux (« ../secret », chemins absolus…) : jamais de chemin fourni par l'utilisateur tel quel !
+fn nom_valide(n: &str) -> bool {
+    !n.is_empty() && !n.starts_with('.') && n.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+}
+
+fn main() {
+    let dossier: PathBuf = std::env::temp_dir().join(format!("codemori-fichiers-{}", std::process::id()));
+    fs::create_dir_all(&dossier).unwrap();
+    let stdin = io::stdin();
+    let mut lignes = stdin.lock().lines().map(|l| l.unwrap());
+    while let Some(l) = lignes.next() {
+        let t: Vec<&str> = l.split_whitespace().collect();
+        if t.is_empty() {
+            continue;
+        }
+        let nom = t.get(1).copied().unwrap_or("");
+        match t[0] {
+            "ecrire" => {
+                let mut contenu = String::new();
+                for c in lignes.by_ref() {
+                    if c == "FIN" {
+                        break;
+                    }
+                    contenu.push_str(&c);
+                    contenu.push('\n');
+                }
+                if !nom_valide(nom) {
+                    println!("Erreur : nom invalide");
+                    continue;
+                }
+                fs::write(dossier.join(nom), &contenu).unwrap();
+                println!("{} : {} octet(s) écrit(s)", nom, contenu.len());
+            }
+            "lire" | "stats" => {
+                if !nom_valide(nom) {
+                    println!("Erreur : nom invalide");
+                    continue;
+                }
+                match fs::read_to_string(dossier.join(nom)) {
+                    Err(_) => println!("Erreur : fichier introuvable"),
+                    Ok(c) if t[0] == "lire" => print!("{}", c),
+                    Ok(c) => println!(
+                        "{} : {} ligne(s), {} mot(s), {} octet(s)",
+                        nom,
+                        c.matches('\n').count(),
+                        c.split_whitespace().count(),
+                        c.len()
+                    ),
+                }
+            }
+            "lister" => {
+                let mut noms: Vec<(String, u64)> = fs::read_dir(&dossier)
+                    .unwrap()
+                    .map(|e| {
+                        let e = e.unwrap();
+                        (e.file_name().to_string_lossy().into_owned(), e.metadata().unwrap().len())
+                    })
+                    .collect();
+                noms.sort();
+                if noms.is_empty() {
+                    println!("Aucun fichier");
+                }
+                for (n, taille) in noms {
+                    println!("{} ({} octets)", n, taille);
+                }
+            }
+            _ => {}
+        }
+    }
+    fs::remove_dir_all(&dossier).ok();
+}
+'''
+
+F2_RUST = r'''
+use std::fs;
+use std::io::{self, BufRead};
+use std::path::PathBuf;
+
+fn nom_valide(n: &str) -> bool {
+    !n.is_empty() && !n.starts_with('.') && n.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+}
+
+fn main() {
+    let dossier: PathBuf = std::env::temp_dir().join(format!("codemori-fichiers-{}", std::process::id()));
+    fs::create_dir_all(&dossier).unwrap();
+    let stdin = io::stdin();
+    let mut lignes = stdin.lock().lines().map(|l| l.unwrap());
+    while let Some(l) = lignes.next() {
+        let t: Vec<&str> = l.split_whitespace().collect();
+        if t.is_empty() {
+            continue;
+        }
+        // Le nom du fichier est toujours le dernier argument.
+        let nom = if t.len() > 1 { t[t.len() - 1] } else { "" };
+        if t[0] == "ecrire" {
+            let mut contenu = String::new();
+            for c in lignes.by_ref() {
+                if c == "FIN" {
+                    break;
+                }
+                contenu.push_str(&c);
+                contenu.push('\n');
+            }
+            if !nom_valide(nom) {
+                println!("Erreur : nom invalide");
+            } else {
+                fs::write(dossier.join(nom), &contenu).unwrap();
+                println!("{} : {} octet(s) écrit(s)", nom, contenu.len());
+            }
+            continue;
+        }
+        if t[0] == "lister" {
+            let mut noms: Vec<(String, u64)> = fs::read_dir(&dossier)
+                .unwrap()
+                .map(|e| {
+                    let e = e.unwrap();
+                    (e.file_name().to_string_lossy().into_owned(), e.metadata().unwrap().len())
+                })
+                .collect();
+            noms.sort();
+            if noms.is_empty() {
+                println!("Aucun fichier");
+            }
+            for (n, taille) in noms {
+                println!("{} ({} octets)", n, taille);
+            }
+            continue;
+        }
+        if !nom_valide(nom) {
+            println!("Erreur : nom invalide");
+            continue;
+        }
+        let chemin = dossier.join(nom);
+        let Ok(c) = fs::read_to_string(&chemin) else {
+            println!("Erreur : fichier introuvable");
+            continue;
+        };
+        match t[0] {
+            "lire" => print!("{}", c),
+            "stats" => println!(
+                "{} : {} ligne(s), {} mot(s), {} octet(s)",
+                nom,
+                c.matches('\n').count(),
+                c.split_whitespace().count(),
+                c.len()
+            ),
+            "chercher" => {
+                let mut n = 0;
+                for (i, ligne) in c.lines().enumerate() {
+                    if ligne.contains(t[1]) {
+                        println!("{}: {}", i + 1, ligne);
+                        n += 1;
+                    }
+                }
+                println!("{} ligne(s) trouvée(s)", n);
+            }
+            "remplacer" => {
+                let n = c.matches(t[1]).count();
+                fs::write(&chemin, c.replace(t[1], t[2])).unwrap();
+                println!("{} remplacement(s)", n);
+            }
+            "supprimer" => {
+                fs::remove_file(&chemin).unwrap();
+                println!("{} supprimé", nom);
+            }
+            _ => {}
+        }
+    }
+    fs::remove_dir_all(&dossier).ok();
+}
+'''
+
+F_CPP_HEAD = r'''
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <unistd.h>
+using namespace std;
+namespace fs = std::filesystem;
+
+// Refuse les noms dangereux (« ../secret », chemins absolus…).
+bool nomValide(const string& n) {
+    if (n.empty() || n[0] == '.') return false;
+    for (char c : n)
+        if (!isalnum((unsigned char)c) && c != '.' && c != '_' && c != '-') return false;
+    return true;
+}
+
+bool lireFichier(const fs::path& p, string& out) {
+    ifstream f(p, ios::binary);
+    if (!f) return false;
+    ostringstream ss;
+    ss << f.rdbuf();
+    out = ss.str();
+    return true;
+}
+
+void lister(const fs::path& dossier) {
+    vector<pair<string, uintmax_t>> v;
+    for (auto& e : fs::directory_iterator(dossier)) v.push_back({e.path().filename().string(), e.file_size()});
+    sort(v.begin(), v.end());
+    if (v.empty()) cout << "Aucun fichier\n";
+    for (auto& [n, t] : v) cout << n << " (" << t << " octets)\n";
+}
+
+void stats(const string& nom, const string& c) {
+    istringstream ws(c);
+    string w;
+    size_t mots = 0;
+    while (ws >> w) mots++;
+    cout << nom << " : " << count(c.begin(), c.end(), '\n') << " ligne(s), " << mots << " mot(s), " << c.size() << " octet(s)\n";
+}
+'''
+
+F1_CPP = F_CPP_HEAD + r'''
+int main() {
+    fs::path dossier = fs::temp_directory_path() / ("codemori-fichiers-" + to_string(getpid()));
+    fs::create_directories(dossier);
+    string l;
+    while (getline(cin, l)) {
+        istringstream in(l);
+        string cmd, nom;
+        if (!(in >> cmd)) continue;
+        in >> nom;
+        if (cmd == "ecrire") {
+            string contenu, c;
+            while (getline(cin, c) && c != "FIN") contenu += c + "\n";
+            if (!nomValide(nom)) { cout << "Erreur : nom invalide\n"; continue; }
+            ofstream(dossier / nom, ios::binary) << contenu;
+            cout << nom << " : " << contenu.size() << " octet(s) écrit(s)\n";
+        } else if (cmd == "lire" || cmd == "stats") {
+            string c;
+            if (!nomValide(nom)) { cout << "Erreur : nom invalide\n"; continue; }
+            if (!lireFichier(dossier / nom, c)) { cout << "Erreur : fichier introuvable\n"; continue; }
+            if (cmd == "lire") cout << c;
+            else stats(nom, c);
+        } else if (cmd == "lister") {
+            lister(dossier);
+        }
+    }
+    fs::remove_all(dossier);
+}
+'''
+
+F2_CPP = F_CPP_HEAD + r'''
+int main() {
+    fs::path dossier = fs::temp_directory_path() / ("codemori-fichiers-" + to_string(getpid()));
+    fs::create_directories(dossier);
+    string l;
+    while (getline(cin, l)) {
+        istringstream in(l);
+        vector<string> t;
+        for (string w; in >> w;) t.push_back(w);
+        if (t.empty()) continue;
+        string nom = t.size() > 1 ? t.back() : "";
+        if (t[0] == "ecrire") {
+            string contenu, c;
+            while (getline(cin, c) && c != "FIN") contenu += c + "\n";
+            if (!nomValide(nom)) { cout << "Erreur : nom invalide\n"; continue; }
+            ofstream(dossier / nom, ios::binary) << contenu;
+            cout << nom << " : " << contenu.size() << " octet(s) écrit(s)\n";
+            continue;
+        }
+        if (t[0] == "lister") { lister(dossier); continue; }
+        if (!nomValide(nom)) { cout << "Erreur : nom invalide\n"; continue; }
+        fs::path chemin = dossier / nom;
+        string c;
+        if (!lireFichier(chemin, c)) { cout << "Erreur : fichier introuvable\n"; continue; }
+        if (t[0] == "lire") cout << c;
+        else if (t[0] == "stats") stats(nom, c);
+        else if (t[0] == "chercher") {
+            istringstream ls(c);
+            string ligne;
+            int i = 0, n = 0;
+            while (getline(ls, ligne)) {
+                i++;
+                if (ligne.find(t[1]) != string::npos) { cout << i << ": " << ligne << "\n"; n++; }
+            }
+            cout << n << " ligne(s) trouvée(s)\n";
+        } else if (t[0] == "remplacer") {
+            string res;
+            size_t pos = 0, n = 0;
+            for (size_t p; (p = c.find(t[1], pos)) != string::npos; pos = p + t[1].size(), n++) res += c.substr(pos, p - pos) + t[2];
+            res += c.substr(pos);
+            ofstream(chemin, ios::binary) << res;
+            cout << n << " remplacement(s)\n";
+        } else if (t[0] == "supprimer") {
+            fs::remove(chemin);
+            cout << nom << " supprimé\n";
+        }
+    }
+    fs::remove_all(dossier);
+}
+'''
+
+F_JAVA_HEAD = r'''
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.*;
+
+public class Main {
+    // Refuse les noms dangereux (« ../secret », chemins absolus…).
+    static boolean nomValide(String n) { return n.matches("[A-Za-z0-9_.-]+") && !n.startsWith("."); }
+
+    static void lister(Path dossier) throws IOException {
+        List<Path> fichiers;
+        try (Stream<Path> s = Files.list(dossier)) { fichiers = s.sorted().toList(); }
+        if (fichiers.isEmpty()) System.out.println("Aucun fichier");
+        for (Path p : fichiers) System.out.println(p.getFileName() + " (" + Files.size(p) + " octets)");
+    }
+
+    static void stats(String nom, String c) {
+        long lignes = c.chars().filter(ch -> ch == '\n').count();
+        int mots = c.isBlank() ? 0 : c.trim().split("\\s+").length;
+        System.out.println(nom + " : " + lignes + " ligne(s), " + mots + " mot(s), " + c.getBytes(StandardCharsets.UTF_8).length + " octet(s)");
+    }
+
+    static String lireContenu(Scanner sc) {
+        StringBuilder sb = new StringBuilder();
+        while (sc.hasNextLine()) {
+            String c = sc.nextLine();
+            if (c.equals("FIN")) break;
+            sb.append(c).append('\n');
+        }
+        return sb.toString();
+    }
+
+    static void nettoyer(Path dossier) throws IOException {
+        try (Stream<Path> s = Files.list(dossier)) { for (Path p : s.toList()) Files.delete(p); }
+        Files.delete(dossier);
+    }
+'''
+
+F1_JAVA = F_JAVA_HEAD + r'''
+    public static void main(String[] args) throws IOException {
+        Path dossier = Files.createTempDirectory("codemori-fichiers-");
+        Scanner sc = new Scanner(System.in);
+        while (sc.hasNextLine()) {
+            String[] t = sc.nextLine().trim().split("\\s+");
+            String nom = t.length > 1 ? t[1] : "";
+            if (t[0].equals("ecrire")) {
+                String contenu = lireContenu(sc);
+                if (!nomValide(nom)) { System.out.println("Erreur : nom invalide"); continue; }
+                byte[] b = contenu.getBytes(StandardCharsets.UTF_8);
+                Files.write(dossier.resolve(nom), b);
+                System.out.println(nom + " : " + b.length + " octet(s) écrit(s)");
+            } else if (t[0].equals("lire") || t[0].equals("stats")) {
+                if (!nomValide(nom)) { System.out.println("Erreur : nom invalide"); continue; }
+                Path p = dossier.resolve(nom);
+                if (!Files.exists(p)) { System.out.println("Erreur : fichier introuvable"); continue; }
+                String c = Files.readString(p);
+                if (t[0].equals("lire")) System.out.print(c);
+                else stats(nom, c);
+            } else if (t[0].equals("lister")) {
+                lister(dossier);
+            }
+        }
+        nettoyer(dossier);
+    }
+}
+'''
+
+F2_JAVA = F_JAVA_HEAD + r'''
+    public static void main(String[] args) throws IOException {
+        Path dossier = Files.createTempDirectory("codemori-fichiers-");
+        Scanner sc = new Scanner(System.in);
+        while (sc.hasNextLine()) {
+            String l = sc.nextLine().trim();
+            if (l.isEmpty()) continue;
+            String[] t = l.split("\\s+");
+            String nom = t.length > 1 ? t[t.length - 1] : "";
+            if (t[0].equals("ecrire")) {
+                String contenu = lireContenu(sc);
+                if (!nomValide(nom)) { System.out.println("Erreur : nom invalide"); continue; }
+                byte[] b = contenu.getBytes(StandardCharsets.UTF_8);
+                Files.write(dossier.resolve(nom), b);
+                System.out.println(nom + " : " + b.length + " octet(s) écrit(s)");
+                continue;
+            }
+            if (t[0].equals("lister")) { lister(dossier); continue; }
+            if (!nomValide(nom)) { System.out.println("Erreur : nom invalide"); continue; }
+            Path p = dossier.resolve(nom);
+            if (!Files.exists(p)) { System.out.println("Erreur : fichier introuvable"); continue; }
+            String c = Files.readString(p);
+            switch (t[0]) {
+                case "lire" -> System.out.print(c);
+                case "stats" -> stats(nom, c);
+                case "chercher" -> {
+                    String[] lignes = c.split("\n");
+                    int n = 0;
+                    for (int i = 0; i < lignes.length; i++) {
+                        if (!c.isEmpty() && lignes[i].contains(t[1])) { System.out.println((i + 1) + ": " + lignes[i]); n++; }
+                    }
+                    System.out.println(n + " ligne(s) trouvée(s)");
+                }
+                case "remplacer" -> {
+                    int n = 0;
+                    for (int i = c.indexOf(t[1]); i >= 0; i = c.indexOf(t[1], i + t[1].length())) n++;
+                    Files.writeString(p, c.replace(t[1], t[2]));
+                    System.out.println(n + " remplacement(s)");
+                }
+                case "supprimer" -> { Files.delete(p); System.out.println(nom + " supprimé"); }
+                default -> { }
+            }
+        }
+        nettoyer(dossier);
+    }
+}
+'''
+
+P.append(project(
+    'gestionnaire-fichiers', 3, 'Gestionnaire de fichiers texte',
+    'Créer, lire, analyser, rechercher et modifier de vrais fichiers sur le disque — en toute sécurité.',
+    '''
+    Ton programme manipule de **vrais fichiers** dans un dossier de travail temporaire (créé au démarrage, supprimé à la fin).
+
+    Les commandes arrivent ligne par ligne. La commande `ecrire NOM` est suivie du contenu du fichier, ligne par ligne, terminé par une ligne `FIN`. Chaque ligne écrite se termine par un saut de ligne `\\n`.
+
+    ### Sécurité : la traversée de répertoires
+
+    Un nom de fichier fourni par un utilisateur ne doit **jamais** être utilisé tel quel : `../../etc/passwd` permettrait de lire n’importe quel fichier du serveur ! C’est la faille *path traversal*. Ici, un nom est valide uniquement s’il est composé de lettres, chiffres, `.`, `_` ou `-` et ne commence pas par un point.
+    ''',
+    ['Lire et écrire des fichiers', 'Parcourir un dossier', 'Compter lignes, mots et octets', 'Se protéger contre la traversée de répertoires'],
+    ['Travailler dans un dossier temporaire unique et le supprimer à la fin', 'Ne jamais faire confiance à un nom de fichier fourni par l’utilisateur', 'Les tailles sont en octets (UTF-8)'],
+    [
+        step('fichiers-base', 'Écrire, lire, analyser',
+             '''
+             Commandes :
+
+             - `ecrire NOM` + lignes + `FIN` → `NOM : N octet(s) écrit(s)`
+             - `lire NOM` → affiche le contenu
+             - `stats NOM` → `NOM : L ligne(s), M mot(s), N octet(s)`
+             - `lister` → `NOM (N octets)` pour chaque fichier, par ordre alphabétique, ou `Aucun fichier`
+
+             Erreurs : `Erreur : nom invalide`, `Erreur : fichier introuvable`.
+             ''',
+             [T('lister\necrire notes.txt\nBonjour Kiri\nRust est rapide\nFIN\nlire notes.txt\nstats notes.txt\necrire ../secret\nx\nFIN\nlire absent.txt\necrire vide.txt\nFIN\nlister',
+                'Aucun fichier\nnotes.txt : 29 octet(s) écrit(s)\nBonjour Kiri\nRust est rapide\nnotes.txt : 2 ligne(s), 5 mot(s), 29 octet(s)\nErreur : nom invalide\nErreur : fichier introuvable\nvide.txt : 0 octet(s) écrit(s)\nnotes.txt (29 octets)\nvide.txt (0 octets)'),
+              T('ecrire a.txt\nun\nFIN\necrire a.txt\ndeux trois\nFIN\nstats a.txt\nlire /etc/passwd', 'a.txt : 3 octet(s) écrit(s)\na.txt : 11 octet(s) écrit(s)\na.txt : 1 ligne(s), 2 mot(s), 11 octet(s)\nErreur : nom invalide', hidden=True)],
+             rust=F1_RUST, cpp=F1_CPP, java=F1_JAVA,
+             hints=['Lis les lignes de contenu dans une boucle jusqu’à « FIN », AVANT de valider le nom (pour bien consommer l’entrée).', 'Le nombre de lignes est le nombre de « \\n » ; les octets, la longueur de la chaîne en UTF-8.'],
+             xp=40),
+        step('fichiers-edition', 'Rechercher, remplacer, supprimer',
+             '''
+             Ajoute :
+
+             - `chercher MOTIF NOM` → chaque ligne contenant le motif, sous la forme `numéro: ligne`, puis `K ligne(s) trouvée(s)`
+             - `remplacer ANCIEN NOUVEAU NOM` → remplace toutes les occurrences dans le fichier et affiche `K remplacement(s)`
+             - `supprimer NOM` → `NOM supprimé`
+
+             Le nom du fichier est toujours le **dernier** argument. Les mêmes erreurs s’appliquent.
+             ''',
+             [T('ecrire todo.md\n- apprendre rust\n- apprendre java\n- dormir\nFIN\nchercher apprendre todo.md\nremplacer apprendre réviser todo.md\nlire todo.md\nsupprimer todo.md\nsupprimer todo.md\nchercher x ../../etc/passwd\nlister',
+                'todo.md : 43 octet(s) écrit(s)\n1: - apprendre rust\n2: - apprendre java\n2 ligne(s) trouvée(s)\n2 remplacement(s)\n- réviser rust\n- réviser java\n- dormir\ntodo.md supprimé\nErreur : fichier introuvable\nErreur : nom invalide\nAucun fichier'),
+              T('ecrire t.txt\naaaa\nFIN\nremplacer aa b t.txt\nlire t.txt\nchercher z t.txt\nstats t.txt', 't.txt : 5 octet(s) écrit(s)\n2 remplacement(s)\nbb\n0 ligne(s) trouvée(s)\nt.txt : 1 ligne(s), 1 mot(s), 3 octet(s)', hidden=True)],
+             rust=F2_RUST, cpp=F2_CPP, java=F2_JAVA,
+             hints=['Pour remplacer, lis tout le fichier, transforme la chaîne puis réécris le fichier.', 'Compte les occurrences sans chevauchement : après une trouvaille, reprends la recherche après le motif.'],
+             xp=50),
+    ]))
+
+# ====================================================================== Contacts
+C_RUST_COMMON = r'''
+use std::collections::BTreeMap;
+use std::io::{self, BufRead};
+
+struct Contact {
+    tel: String,
+    email: String,
+}
+
+fn tel_valide(t: &str) -> bool {
+    t.len() == 10 && t.chars().all(|c| c.is_ascii_digit())
+}
+
+fn email_valide(e: &str) -> bool {
+    let parties: Vec<&str> = e.split('@').collect();
+    parties.len() == 2
+        && !parties[0].is_empty()
+        && parties[1].contains('.')
+        && !parties[1].starts_with('.')
+        && !parties[1].ends_with('.')
+}
+
+/// Vérifie un nouveau contact ; renvoie le message d'erreur éventuel.
+fn verifier(carnet: &BTreeMap<String, Contact>, nom: &str, tel: &str, email: &str) -> Result<(), String> {
+    if carnet.contains_key(nom) {
+        return Err(format!("{} existe déjà", nom));
+    }
+    if !tel_valide(tel) {
+        return Err("téléphone invalide".into());
+    }
+    if !email_valide(email) {
+        return Err("email invalide".into());
+    }
+    Ok(())
+}
+
+fn afficher<'a>(contacts: impl Iterator<Item = (&'a String, &'a Contact)>, vide: &str) {
+    let mut n = 0;
+    for (nom, c) in contacts {
+        println!("{} | {} | {}", nom, c.tel, c.email);
+        n += 1;
+    }
+    if n == 0 {
+        println!("{}", vide);
+    }
+}
+'''
+
+C1_RUST = C_RUST_COMMON + r'''
+fn main() {
+    let mut carnet: BTreeMap<String, Contact> = BTreeMap::new();
+    for ligne in io::stdin().lock().lines() {
+        let ligne = ligne.unwrap();
+        let t: Vec<&str> = ligne.split_whitespace().collect();
+        match t.as_slice() {
+            ["ajouter", nom, tel, email] => match verifier(&carnet, nom, tel, email) {
+                Ok(()) => {
+                    carnet.insert(nom.to_string(), Contact { tel: tel.to_string(), email: email.to_string() });
+                    println!("Contact {} ajouté", nom);
+                }
+                Err(e) => println!("Erreur : {}", e),
+            },
+            ["chercher", texte] => {
+                let t = texte.to_lowercase();
+                afficher(carnet.iter().filter(|(n, _)| n.to_lowercase().contains(&t)), "Aucun résultat");
+            }
+            ["liste"] => afficher(carnet.iter(), "Carnet vide"),
+            ["supprimer", nom] => match carnet.remove(*nom) {
+                Some(_) => println!("Contact {} supprimé", nom),
+                None => println!("Erreur : contact introuvable"),
+            },
+            _ => {}
+        }
+    }
+}
+'''
+
+C2_RUST = C_RUST_COMMON + r'''
+fn main() {
+    let mut carnet: BTreeMap<String, Contact> = BTreeMap::new();
+    let stdin = io::stdin();
+    let mut lignes = stdin.lock().lines().map(|l| l.unwrap());
+    while let Some(ligne) = lignes.next() {
+        let t: Vec<&str> = ligne.split_whitespace().collect();
+        match t.as_slice() {
+            ["ajouter", nom, tel, email] => match verifier(&carnet, nom, tel, email) {
+                Ok(()) => {
+                    carnet.insert(nom.to_string(), Contact { tel: tel.to_string(), email: email.to_string() });
+                    println!("Contact {} ajouté", nom);
+                }
+                Err(e) => println!("Erreur : {}", e),
+            },
+            ["chercher", texte] => {
+                let t = texte.to_lowercase();
+                afficher(carnet.iter().filter(|(n, _)| n.to_lowercase().contains(&t)), "Aucun résultat");
+            }
+            ["liste"] => afficher(carnet.iter(), "Carnet vide"),
+            ["supprimer", nom] => match carnet.remove(*nom) {
+                Some(_) => println!("Contact {} supprimé", nom),
+                None => println!("Erreur : contact introuvable"),
+            },
+            ["modifier", nom, champ, valeur] => {
+                let ok = match *champ {
+                    "tel" => tel_valide(valeur),
+                    "email" => email_valide(valeur),
+                    _ => false,
+                };
+                match carnet.get_mut(*nom) {
+                    None => println!("Erreur : contact introuvable"),
+                    Some(_) if !ok => println!("Erreur : {} invalide", if *champ == "tel" { "téléphone" } else { "champ ou email" }),
+                    Some(c) => {
+                        if *champ == "tel" {
+                            c.tel = valeur.to_string();
+                        } else {
+                            c.email = valeur.to_string();
+                        }
+                        println!("Contact {} modifié", nom);
+                    }
+                }
+            }
+            ["exporter"] => {
+                println!("nom;tel;email");
+                for (nom, c) in &carnet {
+                    println!("{};{};{}", nom, c.tel, c.email);
+                }
+            }
+            ["importer"] => {
+                let (mut ok, mut ignores) = (0, 0);
+                for l in lignes.by_ref() {
+                    if l == "FIN" {
+                        break;
+                    }
+                    if l == "nom;tel;email" {
+                        continue;
+                    }
+                    let c: Vec<&str> = l.split(';').collect();
+                    if c.len() == 3 && !c[0].is_empty() && verifier(&carnet, c[0], c[1], c[2]).is_ok() {
+                        carnet.insert(c[0].to_string(), Contact { tel: c[1].to_string(), email: c[2].to_string() });
+                        ok += 1;
+                    } else {
+                        ignores += 1;
+                    }
+                }
+                println!("{} importé(s), {} ignoré(s)", ok, ignores);
+            }
+            _ => {}
+        }
+    }
+}
+'''
+
+C_CPP_COMMON = r'''
+#include <algorithm>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
+using namespace std;
+
+struct Contact {
+    string tel, email;
+};
+
+bool telValide(const string& t) {
+    return t.size() == 10 && all_of(t.begin(), t.end(), [](char c) { return isdigit((unsigned char)c); });
+}
+
+bool emailValide(const string& e) {
+    size_t at = e.find('@');
+    if (at == string::npos || at == 0 || e.find('@', at + 1) != string::npos) return false;
+    string dom = e.substr(at + 1);
+    return dom.find('.') != string::npos && dom.front() != '.' && dom.back() != '.';
+}
+
+// Renvoie une chaîne vide si le contact est valide, sinon le message d'erreur.
+string verifier(const map<string, Contact>& carnet, const string& nom, const string& tel, const string& email) {
+    if (carnet.count(nom)) return nom + " existe déjà";
+    if (!telValide(tel)) return "téléphone invalide";
+    if (!emailValide(email)) return "email invalide";
+    return "";
+}
+
+string minuscules(string s) {
+    for (char& c : s) c = tolower((unsigned char)c);
+    return s;
+}
+
+vector<string> mots(const string& l) {
+    istringstream in(l);
+    vector<string> t;
+    for (string w; in >> w;) t.push_back(w);
+    return t;
+}
+'''
+
+C1_CPP = C_CPP_COMMON + r'''
+int main() {
+    map<string, Contact> carnet;
+    string ligne;
+    while (getline(cin, ligne)) {
+        auto t = mots(ligne);
+        if (t.empty()) continue;
+        if (t[0] == "ajouter" && t.size() == 4) {
+            string err = verifier(carnet, t[1], t[2], t[3]);
+            if (!err.empty()) cout << "Erreur : " << err << "\n";
+            else { carnet[t[1]] = {t[2], t[3]}; cout << "Contact " << t[1] << " ajouté\n"; }
+        } else if ((t[0] == "chercher" && t.size() == 2) || t[0] == "liste") {
+            bool recherche = t[0] == "chercher";
+            int n = 0;
+            for (const auto& [nom, c] : carnet) {
+                if (recherche && minuscules(nom).find(minuscules(t[1])) == string::npos) continue;
+                cout << nom << " | " << c.tel << " | " << c.email << "\n";
+                n++;
+            }
+            if (n == 0) cout << (recherche ? "Aucun résultat" : "Carnet vide") << "\n";
+        } else if (t[0] == "supprimer" && t.size() == 2) {
+            if (carnet.erase(t[1])) cout << "Contact " << t[1] << " supprimé\n";
+            else cout << "Erreur : contact introuvable\n";
+        }
+    }
+}
+'''
+
+C2_CPP = C_CPP_COMMON + r'''
+int main() {
+    map<string, Contact> carnet;
+    string ligne;
+    while (getline(cin, ligne)) {
+        auto t = mots(ligne);
+        if (t.empty()) continue;
+        if (t[0] == "ajouter" && t.size() == 4) {
+            string err = verifier(carnet, t[1], t[2], t[3]);
+            if (!err.empty()) cout << "Erreur : " << err << "\n";
+            else { carnet[t[1]] = {t[2], t[3]}; cout << "Contact " << t[1] << " ajouté\n"; }
+        } else if ((t[0] == "chercher" && t.size() == 2) || t[0] == "liste") {
+            bool recherche = t[0] == "chercher";
+            int n = 0;
+            for (const auto& [nom, c] : carnet) {
+                if (recherche && minuscules(nom).find(minuscules(t[1])) == string::npos) continue;
+                cout << nom << " | " << c.tel << " | " << c.email << "\n";
+                n++;
+            }
+            if (n == 0) cout << (recherche ? "Aucun résultat" : "Carnet vide") << "\n";
+        } else if (t[0] == "supprimer" && t.size() == 2) {
+            if (carnet.erase(t[1])) cout << "Contact " << t[1] << " supprimé\n";
+            else cout << "Erreur : contact introuvable\n";
+        } else if (t[0] == "modifier" && t.size() == 4) {
+            auto it = carnet.find(t[1]);
+            bool ok = (t[2] == "tel" && telValide(t[3])) || (t[2] == "email" && emailValide(t[3]));
+            if (it == carnet.end()) cout << "Erreur : contact introuvable\n";
+            else if (!ok) cout << "Erreur : " << (t[2] == "tel" ? "téléphone" : "champ ou email") << " invalide\n";
+            else {
+                (t[2] == "tel" ? it->second.tel : it->second.email) = t[3];
+                cout << "Contact " << t[1] << " modifié\n";
+            }
+        } else if (t[0] == "exporter") {
+            cout << "nom;tel;email\n";
+            for (const auto& [nom, c] : carnet) cout << nom << ";" << c.tel << ";" << c.email << "\n";
+        } else if (t[0] == "importer") {
+            int ok = 0, ignores = 0;
+            string l;
+            while (getline(cin, l) && l != "FIN") {
+                if (l == "nom;tel;email") continue;
+                vector<string> c;
+                stringstream ss(l);
+                for (string champ; getline(ss, champ, ';');) c.push_back(champ);
+                if (!l.empty() && l.back() == ';') c.push_back("");
+                if (c.size() == 3 && !c[0].empty() && verifier(carnet, c[0], c[1], c[2]).empty()) { carnet[c[0]] = {c[1], c[2]}; ok++; }
+                else ignores++;
+            }
+            cout << ok << " importé(s), " << ignores << " ignoré(s)\n";
+        }
+    }
+}
+'''
+
+C_JAVA_COMMON = r'''
+import java.util.*;
+
+public class Main {
+    record Contact(String tel, String email) {}
+
+    static final TreeMap<String, Contact> carnet = new TreeMap<>();
+
+    static boolean telValide(String t) { return t.matches("\\d{10}"); }
+
+    static boolean emailValide(String e) {
+        String[] p = e.split("@", -1);
+        return p.length == 2 && !p[0].isEmpty() && p[1].contains(".") && !p[1].startsWith(".") && !p[1].endsWith(".");
+    }
+
+    /** Renvoie null si le contact est valide, sinon le message d'erreur. */
+    static String verifier(String nom, String tel, String email) {
+        if (carnet.containsKey(nom)) return nom + " existe déjà";
+        if (!telValide(tel)) return "téléphone invalide";
+        if (!emailValide(email)) return "email invalide";
+        return null;
+    }
+
+    static void afficher(String filtre, String vide) {
+        int n = 0;
+        for (var e : carnet.entrySet()) {
+            if (filtre != null && !e.getKey().toLowerCase().contains(filtre.toLowerCase())) continue;
+            System.out.println(e.getKey() + " | " + e.getValue().tel() + " | " + e.getValue().email());
+            n++;
+        }
+        if (n == 0) System.out.println(vide);
+    }
+'''
+
+C1_JAVA = C_JAVA_COMMON + r'''
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        while (sc.hasNextLine()) {
+            String l = sc.nextLine().trim();
+            if (l.isEmpty()) continue;
+            String[] t = l.split("\\s+");
+            if (t[0].equals("ajouter") && t.length == 4) {
+                String err = verifier(t[1], t[2], t[3]);
+                if (err != null) System.out.println("Erreur : " + err);
+                else { carnet.put(t[1], new Contact(t[2], t[3])); System.out.println("Contact " + t[1] + " ajouté"); }
+            } else if (t[0].equals("chercher") && t.length == 2) afficher(t[1], "Aucun résultat");
+            else if (t[0].equals("liste")) afficher(null, "Carnet vide");
+            else if (t[0].equals("supprimer") && t.length == 2) {
+                System.out.println(carnet.remove(t[1]) != null ? "Contact " + t[1] + " supprimé" : "Erreur : contact introuvable");
+            }
+        }
+    }
+}
+'''
+
+C2_JAVA = C_JAVA_COMMON + r'''
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        while (sc.hasNextLine()) {
+            String l = sc.nextLine().trim();
+            if (l.isEmpty()) continue;
+            String[] t = l.split("\\s+");
+            if (t[0].equals("ajouter") && t.length == 4) {
+                String err = verifier(t[1], t[2], t[3]);
+                if (err != null) System.out.println("Erreur : " + err);
+                else { carnet.put(t[1], new Contact(t[2], t[3])); System.out.println("Contact " + t[1] + " ajouté"); }
+            } else if (t[0].equals("chercher") && t.length == 2) afficher(t[1], "Aucun résultat");
+            else if (t[0].equals("liste")) afficher(null, "Carnet vide");
+            else if (t[0].equals("supprimer") && t.length == 2) {
+                System.out.println(carnet.remove(t[1]) != null ? "Contact " + t[1] + " supprimé" : "Erreur : contact introuvable");
+            } else if (t[0].equals("modifier") && t.length == 4) {
+                Contact c = carnet.get(t[1]);
+                boolean ok = (t[2].equals("tel") && telValide(t[3])) || (t[2].equals("email") && emailValide(t[3]));
+                if (c == null) System.out.println("Erreur : contact introuvable");
+                else if (!ok) System.out.println("Erreur : " + (t[2].equals("tel") ? "téléphone" : "champ ou email") + " invalide");
+                else {
+                    carnet.put(t[1], t[2].equals("tel") ? new Contact(t[3], c.email()) : new Contact(c.tel(), t[3]));
+                    System.out.println("Contact " + t[1] + " modifié");
+                }
+            } else if (t[0].equals("exporter")) {
+                System.out.println("nom;tel;email");
+                carnet.forEach((nom, c) -> System.out.println(nom + ";" + c.tel() + ";" + c.email()));
+            } else if (t[0].equals("importer")) {
+                int ok = 0, ignores = 0;
+                while (sc.hasNextLine()) {
+                    String ligne = sc.nextLine();
+                    if (ligne.equals("FIN")) break;
+                    if (ligne.equals("nom;tel;email")) continue;
+                    String[] c = ligne.split(";", -1);
+                    if (c.length == 3 && !c[0].isEmpty() && verifier(c[0], c[1], c[2]) == null) { carnet.put(c[0], new Contact(c[1], c[2])); ok++; }
+                    else ignores++;
+                }
+                System.out.println(ok + " importé(s), " + ignores + " ignoré(s)");
+            }
+        }
+    }
+}
+'''
+
+P.append(project(
+    'carnet-contacts', 3, 'Carnet de contacts',
+    'Un carnet d’adresses avec validation des données, recherche, modification et import/export CSV.',
+    '''
+    Tu développes un **carnet de contacts** : chaque contact a un nom (un seul mot), un téléphone et un e-mail.
+
+    Règles de validation :
+
+    - le **téléphone** comporte exactement 10 chiffres ;
+    - l’**e-mail** contient exactement un `@`, une partie non vide avant, et un domaine contenant un point, qui ne commence ni ne finit par un point.
+
+    Les contacts sont toujours affichés **triés par nom** au format `NOM | TEL | EMAIL`. Utilise une structure de données triée (`BTreeMap`, `std::map`, `TreeMap`).
+    ''',
+    ['Valider des données saisies', 'Utiliser un dictionnaire trié', 'Rechercher sans tenir compte de la casse', 'Lire et produire du CSV'],
+    ['Le nom est unique et sensible à la casse', 'Les recherches ne tiennent pas compte de la casse', 'Ordre de vérification à l’ajout : doublon, téléphone, e-mail'],
+    [
+        step('contacts-base', 'Ajouter, chercher, supprimer',
+             '''
+             Commandes :
+
+             - `ajouter NOM TEL EMAIL` → `Contact NOM ajouté`, ou `Erreur : NOM existe déjà` / `Erreur : téléphone invalide` / `Erreur : email invalide`
+             - `chercher TEXTE` → les contacts dont le nom contient le texte (sans tenir compte de la casse), ou `Aucun résultat`
+             - `liste` → tous les contacts, ou `Carnet vide`
+             - `supprimer NOM` → `Contact NOM supprimé` ou `Erreur : contact introuvable`
+             ''',
+             [T('liste\najouter Linus 0601020304 linus@kernel.org\najouter Ada 0700000000 ada@lovelace.uk\najouter Ada 0611111111 ada2@x.fr\najouter Bob 12345 bob@x.fr\najouter Bob 0612345678 bob@x\najouter Grace 0698765432 grace@navy.mil\nchercher A\nchercher zzz\nsupprimer Linus\nsupprimer Linus\nliste',
+                'Carnet vide\nContact Linus ajouté\nContact Ada ajouté\nErreur : Ada existe déjà\nErreur : téléphone invalide\nErreur : email invalide\nContact Grace ajouté\nAda | 0700000000 | ada@lovelace.uk\nGrace | 0698765432 | grace@navy.mil\nAucun résultat\nContact Linus supprimé\nErreur : contact introuvable\nAda | 0700000000 | ada@lovelace.uk\nGrace | 0698765432 | grace@navy.mil'),
+              T('ajouter Z 0123456789 a@@b.fr\najouter Z 0123456789 @b.fr\najouter Z 0123456789 a@.fr\najouter Z 0123456789 a@b.fr.\najouter Z 012345678a z@b.fr\najouter Z 0123456789 z@b.fr\nchercher z', 'Erreur : email invalide\nErreur : email invalide\nErreur : email invalide\nErreur : email invalide\nErreur : téléphone invalide\nContact Z ajouté\nZ | 0123456789 | z@b.fr', hidden=True)],
+             rust=C1_RUST, cpp=C1_CPP, java=C1_JAVA,
+             hints=['Écris une fonction de validation par champ : elles serviront aussi à l’étape 2.', 'Compare les versions en minuscules du nom et du texte recherché.'],
+             xp=40),
+        step('contacts-csv', 'Modification et import/export CSV',
+             '''
+             Ajoute :
+
+             - `modifier NOM tel|email VALEUR` → `Contact NOM modifié`, `Erreur : contact introuvable`, `Erreur : téléphone invalide` (si le champ est `tel`) ou `Erreur : champ ou email invalide` (sinon) ;
+             - `exporter` → l’en-tête `nom;tel;email` puis une ligne CSV par contact (triés) ;
+             - `importer` suivi de lignes CSV terminées par `FIN` : l’en-tête éventuel est ignoré sans être compté ; une ligne est importée si elle a 3 champs, un nom non vide et passe les validations (doublons compris). Affiche `K importé(s), J ignoré(s)`.
+             ''',
+             [T('ajouter Ada 0700000000 ada@lovelace.uk\nimporter\nnom;tel;email\nLinus;0601020304;linus@kernel.org\nAda;0600000000;autre@x.fr\nBob;123;bob@x.fr\nGrace;0698765432;grace@navy.mil;extra\nKiri;0611223344;kiri@codemori.fr\nFIN\nmodifier Kiri tel 0699999999\nmodifier Kiri email pas-un-email\nmodifier Kiri age 16\nmodifier Zoe tel 0612345678\nexporter',
+                '' + 'Contact Ada ajouté\n2 importé(s), 3 ignoré(s)\nContact Kiri modifié\nErreur : champ ou email invalide\nErreur : champ ou email invalide\nErreur : contact introuvable\nnom;tel;email\nAda;0700000000;ada@lovelace.uk\nKiri;0699999999;kiri@codemori.fr\nLinus;0601020304;linus@kernel.org'),
+              T('importer\n;0601020304;a@b.fr\nX;0601020304;x@b.fr;\nFIN\nexporter\nmodifier Y tel 1', '0 importé(s), 2 ignoré(s)\nnom;tel;email\nErreur : contact introuvable', hidden=True)],
+             rust=C2_RUST, cpp=C2_CPP, java=C2_JAVA,
+             hints=['Réutilise la fonction de vérification de l’ajout pour l’import.', 'Attention aux champs vides : « a;;b » contient bien 3 champs.'],
+             xp=50),
+    ]))
+
+# ====================================================================== Stock
+S_RUST = r'''
+use std::collections::BTreeMap;
+use std::io::{self, BufRead};
+
+struct Produit {
+    nom: String,
+    prix: i64, // en centimes : jamais de nombres à virgule pour de l'argent !
+    qte: i64,
+    seuil: i64,
+}
+
+fn centimes(s: &str) -> i64 {
+    let (e, c) = s.split_once('.').unwrap_or((s, "0"));
+    e.parse::<i64>().unwrap() * 100 + format!("{:0<2}", c)[..2].parse::<i64>().unwrap()
+}
+
+fn euros(c: i64) -> String {
+    format!("{}.{:02} €", c / 100, c % 100)
+}
+
+fn main() {
+    let mut stock: BTreeMap<String, Produit> = BTreeMap::new();
+    for ligne in io::stdin().lock().lines() {
+        let ligne = ligne.unwrap();
+        let t: Vec<&str> = ligne.split_whitespace().collect();
+        if t.is_empty() {
+            continue;
+        }
+        if t[0] == "produit" {
+            if stock.contains_key(t[1]) {
+                println!("Erreur : {} existe déjà", t[1]);
+            } else {
+                stock.insert(t[1].to_string(), Produit { nom: t[2].to_string(), prix: centimes(t[3]), qte: t[4].parse().unwrap(), seuil: 0 });
+                println!("Produit {} créé", t[1]);
+            }
+            continue;
+        }
+        if t[0] == "etat" {
+            for (r, p) in &stock {
+                println!("{} {} : {} x {}", r, p.nom, p.qte, euros(p.prix));
+            }
+            continue;
+        }
+        //@@SUITE
+        let Some(p) = stock.get_mut(t[1]) else {
+            println!("Erreur : référence inconnue");
+            continue;
+        };
+        let q: i64 = t[2].parse().unwrap();
+        match t[0] {
+            "entree" => {
+                p.qte += q;
+                println!("{} : +{} (stock : {})", t[1], q, p.qte);
+            }
+            "sortie" if q > p.qte => println!("Erreur : stock insuffisant ({} disponible(s))", p.qte),
+            "sortie" => {
+                p.qte -= q;
+                println!("{} : -{} (stock : {})", t[1], q, p.qte);
+                //@@ALERTE
+            }
+            //@@SEUIL
+            _ => {}
+        }
+    }
+}
+'''
+
+S1_RUST = S_RUST.replace('        //@@SUITE\n', '').replace('                //@@ALERTE\n', '').replace('            //@@SEUIL\n', '')
+S2_RUST = (S_RUST
+           .replace('        //@@SUITE\n', '''        if t[0] == "valeur" {
+            println!("Valeur du stock : {}", euros(stock.values().map(|p| p.prix * p.qte).sum()));
+            continue;
+        }
+        if t[0] == "rapport" {
+            let mut v: Vec<(&String, i64)> = stock.iter().map(|(r, p)| (r, p.prix * p.qte)).collect();
+            v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+            for (r, val) in v {
+                println!("{} : {}", r, euros(val));
+            }
+            continue;
+        }
+''')
+           .replace('                //@@ALERTE\n', '''                if p.qte < p.seuil {
+                    println!("⚠ Alerte : {} sous le seuil ({} < {})", t[1], p.qte, p.seuil);
+                }
+''')
+           .replace('            //@@SEUIL\n', '''            "seuil" => {
+                p.seuil = q;
+                println!("Seuil de {} fixé à {}", t[1], q);
+            }
+'''))
+
+S_CPP = r'''
+#include <algorithm>
+#include <cstdio>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
+using namespace std;
+
+struct Produit {
+    string nom;
+    long long prix;  // en centimes : jamais de nombres à virgule pour de l'argent !
+    long long qte;
+    long long seuil = 0;
+};
+
+long long centimes(const string& s) {
+    size_t p = s.find('.');
+    string e = s.substr(0, p), c = p == string::npos ? "00" : (s.substr(p + 1) + "00").substr(0, 2);
+    return stoll(e) * 100 + stoll(c);
+}
+
+string euros(long long c) {
+    char buf[64];
+    snprintf(buf, sizeof buf, "%lld.%02lld €", c / 100, c % 100);
+    return buf;
+}
+
+int main() {
+    map<string, Produit> stock;
+    string ligne;
+    while (getline(cin, ligne)) {
+        istringstream in(ligne);
+        vector<string> t;
+        for (string w; in >> w;) t.push_back(w);
+        if (t.empty()) continue;
+        if (t[0] == "produit") {
+            if (stock.count(t[1])) cout << "Erreur : " << t[1] << " existe déjà\n";
+            else { stock[t[1]] = {t[2], centimes(t[3]), stoll(t[4])}; cout << "Produit " << t[1] << " créé\n"; }
+            continue;
+        }
+        if (t[0] == "etat") {
+            for (const auto& [r, p] : stock) cout << r << " " << p.nom << " : " << p.qte << " x " << euros(p.prix) << "\n";
+            continue;
+        }
+        //@@SUITE
+        auto it = stock.find(t[1]);
+        if (it == stock.end()) { cout << "Erreur : référence inconnue\n"; continue; }
+        Produit& p = it->second;
+        long long q = stoll(t[2]);
+        if (t[0] == "entree") {
+            p.qte += q;
+            cout << t[1] << " : +" << q << " (stock : " << p.qte << ")\n";
+        } else if (t[0] == "sortie") {
+            if (q > p.qte) { cout << "Erreur : stock insuffisant (" << p.qte << " disponible(s))\n"; continue; }
+            p.qte -= q;
+            cout << t[1] << " : -" << q << " (stock : " << p.qte << ")\n";
+            //@@ALERTE
+        }
+        //@@SEUIL
+    }
+}
+'''
+
+S1_CPP = S_CPP.replace('        //@@SUITE\n', '').replace('            //@@ALERTE\n', '').replace('        //@@SEUIL\n', '')
+S2_CPP = (S_CPP
+          .replace('        //@@SUITE\n', '''        if (t[0] == "valeur") {
+            long long total = 0;
+            for (const auto& [r, p] : stock) total += p.prix * p.qte;
+            cout << "Valeur du stock : " << euros(total) << "\\n";
+            continue;
+        }
+        if (t[0] == "rapport") {
+            vector<pair<long long, string>> v;
+            for (const auto& [r, p] : stock) v.push_back({-p.prix * p.qte, r});
+            sort(v.begin(), v.end());
+            for (const auto& [val, r] : v) cout << r << " : " << euros(-val) << "\\n";
+            continue;
+        }
+''')
+          .replace('            //@@ALERTE\n', '            if (p.qte < p.seuil) cout << "⚠ Alerte : " << t[1] << " sous le seuil (" << p.qte << " < " << p.seuil << ")\\n";\n')
+          .replace('        //@@SEUIL\n', '''        else if (t[0] == "seuil") {
+            p.seuil = q;
+            cout << "Seuil de " << t[1] << " fixé à " << q << "\\n";
+        }
+'''))
+
+S_JAVA = r'''
+import java.util.*;
+
+public class Main {
+    static class Produit {
+        final String nom;
+        final long prix; // en centimes : jamais de nombres à virgule pour de l'argent !
+        long qte, seuil;
+        Produit(String nom, long prix, long qte) { this.nom = nom; this.prix = prix; this.qte = qte; }
+    }
+
+    static long centimes(String s) {
+        String[] p = s.split("\\.");
+        String c = p.length > 1 ? (p[1] + "00").substring(0, 2) : "00";
+        return Long.parseLong(p[0]) * 100 + Long.parseLong(c);
+    }
+
+    static String euros(long c) { return String.format("%d.%02d €", c / 100, c % 100); }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        TreeMap<String, Produit> stock = new TreeMap<>();
+        while (sc.hasNextLine()) {
+            String l = sc.nextLine().trim();
+            if (l.isEmpty()) continue;
+            String[] t = l.split("\\s+");
+            if (t[0].equals("produit")) {
+                if (stock.containsKey(t[1])) System.out.println("Erreur : " + t[1] + " existe déjà");
+                else { stock.put(t[1], new Produit(t[2], centimes(t[3]), Long.parseLong(t[4]))); System.out.println("Produit " + t[1] + " créé"); }
+                continue;
+            }
+            if (t[0].equals("etat")) {
+                stock.forEach((r, p) -> System.out.println(r + " " + p.nom + " : " + p.qte + " x " + euros(p.prix)));
+                continue;
+            }
+            //@@SUITE
+            Produit p = stock.get(t[1]);
+            if (p == null) { System.out.println("Erreur : référence inconnue"); continue; }
+            long q = Long.parseLong(t[2]);
+            if (t[0].equals("entree")) {
+                p.qte += q;
+                System.out.println(t[1] + " : +" + q + " (stock : " + p.qte + ")");
+            } else if (t[0].equals("sortie")) {
+                if (q > p.qte) { System.out.println("Erreur : stock insuffisant (" + p.qte + " disponible(s))"); continue; }
+                p.qte -= q;
+                System.out.println(t[1] + " : -" + q + " (stock : " + p.qte + ")");
+                //@@ALERTE
+            }
+            //@@SEUIL
+        }
+    }
+}
+'''
+
+S1_JAVA = S_JAVA.replace('            //@@SUITE\n', '').replace('                //@@ALERTE\n', '').replace('            //@@SEUIL\n', '')
+S2_JAVA = (S_JAVA
+           .replace('            //@@SUITE\n', '''            if (t[0].equals("valeur")) {
+                System.out.println("Valeur du stock : " + euros(stock.values().stream().mapToLong(p -> p.prix * p.qte).sum()));
+                continue;
+            }
+            if (t[0].equals("rapport")) {
+                stock.entrySet().stream()
+                    .sorted(Comparator.comparingLong((Map.Entry<String, Produit> e) -> -e.getValue().prix * e.getValue().qte).thenComparing(Map.Entry::getKey))
+                    .forEach(e -> System.out.println(e.getKey() + " : " + euros(e.getValue().prix * e.getValue().qte)));
+                continue;
+            }
+''')
+           .replace('                //@@ALERTE\n', '                if (p.qte < p.seuil) System.out.println("⚠ Alerte : " + t[1] + " sous le seuil (" + p.qte + " < " + p.seuil + ")");\n')
+           .replace('            //@@SEUIL\n', '''            else if (t[0].equals("seuil")) {
+                p.seuil = q;
+                System.out.println("Seuil de " + t[1] + " fixé à " + q);
+            }
+'''))
+
+P.append(project(
+    'gestion-stock', 3, 'Gestion de stock',
+    'Le logiciel d’un magasin : produits, entrées, sorties, alertes de réapprovisionnement et valorisation.',
+    '''
+    Tu programmes le **logiciel de stock** d’une petite boutique. Chaque produit a une référence (ex. `STY01`), un nom (un mot), un prix unitaire et une quantité.
+
+    ### L’argent et les nombres à virgule
+
+    `0.1 + 0.2` ne vaut pas exactement `0.3` avec les nombres flottants ! Pour de l’argent, on stocke des **centimes entiers** : `12.50` € devient `1250`. Les prix sont saisis avec un point (`12.50`, `3.9`, `7`) et affichés avec 2 décimales suivies de ` €`.
+    ''',
+    ['Modéliser des produits', 'Manipuler de l’argent sans erreur d’arrondi', 'Contrôler des règles métier (stock suffisant)', 'Produire des rapports triés'],
+    ['Montants en centimes entiers', 'Produits affichés par référence croissante (sauf le rapport)', 'Aucune sortie ne peut rendre le stock négatif'],
+    [
+        step('stock-base', 'Produits et mouvements',
+             '''
+             Commandes :
+
+             - `produit REF NOM PRIX QTE` → `Produit REF créé` ou `Erreur : REF existe déjà`
+             - `entree REF Q` → `REF : +Q (stock : S)`
+             - `sortie REF Q` → `REF : -Q (stock : S)` ou `Erreur : stock insuffisant (D disponible(s))`
+             - `etat` → `REF NOM : QTE x PRIX €` pour chaque produit
+             - référence inconnue → `Erreur : référence inconnue`
+             ''',
+             [T('produit STY01 stylo 1.20 50\nproduit CAH02 cahier 3.9 10\nproduit STY01 feutre 2 5\nentree CAH02 5\nsortie STY01 20\nsortie CAH02 99\nsortie GOM03 1\netat',
+                'Produit STY01 créé\nProduit CAH02 créé\nErreur : STY01 existe déjà\nCAH02 : +5 (stock : 15)\nSTY01 : -20 (stock : 30)\nErreur : stock insuffisant (15 disponible(s))\nErreur : référence inconnue\nCAH02 cahier : 15 x 3.90 €\nSTY01 stylo : 30 x 1.20 €'),
+              T('produit A a 7 0\nsortie A 1\nentree A 3\netat', 'Produit A créé\nErreur : stock insuffisant (0 disponible(s))\nA : +3 (stock : 3)\nA a : 3 x 7.00 €', hidden=True)],
+             rust=S1_RUST, cpp=S1_CPP, java=S1_JAVA,
+             hints=['Convertis « 3.9 » en centimes : partie entière × 100 + deux premiers chiffres après le point (complétés par des 0).', 'Pour afficher : centimes / 100, un point, puis centimes % 100 sur deux chiffres.'],
+             xp=40),
+        step('stock-alertes', 'Alertes et valorisation',
+             '''
+             Ajoute :
+
+             - `seuil REF S` → `Seuil de REF fixé à S`. Après une sortie, si le stock passe **sous** le seuil : `⚠ Alerte : REF sous le seuil (stock < seuil)`
+             - `valeur` → `Valeur du stock : X.YY €` (somme des prix × quantités)
+             - `rapport` → `REF : X.YY €` (valeur de chaque produit), par valeur décroissante puis par référence
+             ''',
+             [T('produit STY01 stylo 1.20 50\nproduit CAH02 cahier 3.90 10\nproduit SAC03 cartable 24.99 2\nseuil STY01 25\nsortie STY01 20\nsortie STY01 10\nseuil INC 1\nvaleur\nrapport',
+                'Produit STY01 créé\nProduit CAH02 créé\nProduit SAC03 créé\nSeuil de STY01 fixé à 25\nSTY01 : -20 (stock : 30)\nSTY01 : -10 (stock : 20)\n⚠ Alerte : STY01 sous le seuil (20 < 25)\nErreur : référence inconnue\nValeur du stock : 112.98 €\nSAC03 : 49.98 €\nCAH02 : 39.00 €\nSTY01 : 24.00 €'),
+              T('produit B b 1.5 2\nproduit A a 3 1\nrapport\nvaleur', 'Produit B créé\nProduit A créé\nA : 3.00 €\nB : 3.00 €\nValeur du stock : 6.00 €', hidden=True)],
+             rust=S2_RUST, cpp=S2_CPP, java=S2_JAVA,
+             hints=['Ajoute un champ « seuil » (0 par défaut) à ton produit.', 'Pour le rapport, trie par valeur décroissante puis par référence croissante.'],
+             xp=50),
+    ]))
+
+dump(P, sys.argv[1], 'Projets — niveau intermédiaire (1/2)')
