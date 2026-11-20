@@ -1,0 +1,2001 @@
+language: java
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: java-poo
+    title: Programmation orientée objet
+    summary: Les principes de la POO — objets, état et comportement, encapsulation, héritage, polymorphisme et abstraction.
+    minutes: 20
+    concepts: [classes, poo]
+    sections:
+      - title: Penser en objets
+        body: |
+          La **programmation orientée objet** (POO) organise un programme autour d’**objets** qui regroupent :
+
+          - un **état** (des attributs : le solde d’un compte, la position d’un joueur) ;
+          - un **comportement** (des méthodes : déposer, se déplacer).
+
+          Une **classe** est le plan de construction ; un **objet** (ou **instance**) est un exemplaire construit à partir de ce plan.
+
+          ```java
+          class Chien {
+              String nom;
+              void aboyer() { System.out.println(nom + " : Wouf !"); }
+          }
+          Chien rex = new Chien();   // création d’une instance
+          rex.nom = "Rex";
+          rex.aboyer();
+          ```
+      - title: Les quatre piliers
+        body: |
+          | Pilier | Idée | En Java |
+          |---|---|---|
+          | **Encapsulation** | cacher l’état interne, exposer des méthodes | `private`, getters, méthodes métier |
+          | **Héritage** | réutiliser et spécialiser | `extends` |
+          | **Polymorphisme** | un même appel, des comportements différents | redéfinition (`@Override`), interfaces |
+          | **Abstraction** | ne garder que l’essentiel | `interface`, `abstract` |
+
+          En Java, **tout** est dans une classe, et toutes les classes héritent implicitement de `java.lang.Object` (qui fournit `toString`, `equals`, `hashCode`).
+    exercises:
+      - id: java-poo-q1
+        type: mcq
+        prompt: Quelle est la différence entre une classe et un objet ?
+        choices: ['La classe est le plan, l’objet une instance construite à partir de ce plan', 'Aucune', 'Un objet contient plusieurs classes', 'Une classe est un objet spécial sans méthode']
+        answer: 0
+        concepts: [classes]
+      - id: java-poo-q2
+        type: mcq
+        prompt: Quel pilier consiste à cacher l’état interne d’un objet ?
+        choices: ['L’encapsulation', 'L’héritage', 'Le polymorphisme', 'La récursivité']
+        answer: 0
+      - id: java-poo-q3
+        type: mcq
+        prompt: De quelle classe héritent toutes les classes Java ?
+        choices: ['java.lang.Object', 'java.lang.Class', 'java.util.Base', 'Aucune']
+        answer: 0
+      - id: java-poo-code
+        type: code
+        title: Première classe
+        prompt: |
+          Écris une classe `Compteur` avec un attribut `int valeur` et deux méthodes `void incrementer()` et `int lire()`.
+
+          Pour chaque mot lu (`+` ou `?`), incrémente le compteur ou affiche sa valeur.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Compteur c = new Compteur();
+                  while (sc.hasNext()) {
+                      if (sc.next().equals("+")) c.incrementer();
+                      else System.out.println(c.lire());
+                  }
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          class Compteur {
+              private int valeur;
+              void incrementer() { valeur++; }
+              int lire() { return valeur; }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Compteur c = new Compteur();
+                  while (sc.hasNext()) {
+                      if (sc.next().equals("+")) c.incrementer();
+                      else System.out.println(c.lire());
+                  }
+              }
+          }
+        tests:
+          - { input: + + ? + ?, output: "2\n3" }
+          - { input: '?', output: '0', hidden: true }
+        concepts: [classes]
+    project:
+      id: java-poo-projet
+      type: code
+      title: Modéliser une lampe
+      difficulty: 2
+      prompt: |
+        Écris une classe `Lampe` (attributs privés `allumee` et `intensite` de 0 à 100) avec `allumer()`, `eteindre()`, `regler(int)` (bornée entre 0 et 100, sans effet si la lampe est éteinte) et `toString()` qui renvoie `Lampe[allumée, 70%]` ou `Lampe[éteinte]`.
+
+        Intensité initiale : 50. Commandes : `allumer`, `eteindre`, `regler N`, `etat`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        class Lampe {
+            private boolean allumee;
+            private int intensite = 50;
+            void allumer() { allumee = true; }
+            void eteindre() { allumee = false; }
+            void regler(int i) { if (allumee) intensite = Math.max(0, Math.min(100, i)); }
+            @Override
+            public String toString() { return allumee ? "Lampe[allumée, " + intensite + "%]" : "Lampe[éteinte]"; }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Lampe l = new Lampe();
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "allumer" -> l.allumer();
+                        case "eteindre" -> l.eteindre();
+                        case "regler" -> l.regler(sc.nextInt());
+                        default -> System.out.println(l);
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "etat\nregler 80\nallumer\netat\nregler 150\netat\neteindre\netat", output: "Lampe[éteinte]\nLampe[allumée, 50%]\nLampe[allumée, 100%]\nLampe[éteinte]" }
+        - { input: "allumer\nregler -5\netat", output: 'Lampe[allumée, 0%]', hidden: true }
+      concepts: [classes]
+    exam:
+      pass: 70
+      questions:
+        - id: java-poo-ex1
+          type: mcq
+          prompt: Quel mot-clé crée une nouvelle instance ?
+          choices: ['new', 'create', 'make', 'instance']
+          answer: 0
+        - id: java-poo-ex2
+          type: mcq
+          prompt: Quel pilier permet un même appel de méthode avec des comportements différents ?
+          choices: ['Le polymorphisme', 'L’encapsulation', 'L’abstraction', 'La composition']
+          answer: 0
+        - id: java-poo-ex3
+          type: mcq
+          prompt: Quelles méthodes toute classe hérite-t-elle d’Object ?
+          choices: ['toString, equals, hashCode…', 'main et run', 'get et set', 'Aucune']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-classes
+    title: Classes
+    summary: Attributs, méthodes d’instance et de classe, this, toString, equals et hashCode, records.
+    minutes: 30
+    concepts: [classes]
+    sections:
+      - title: Anatomie d’une classe
+        body: |
+          ```java
+          public class Rectangle {
+              private double largeur;                 // attributs (état)
+              private double hauteur;
+              private static int crees = 0;           // attribut de classe (partagé)
+
+              public Rectangle(double largeur, double hauteur) {
+                  this.largeur = largeur;             // this = l’objet courant
+                  this.hauteur = hauteur;
+                  crees++;
+              }
+              public double aire() { return largeur * hauteur; }      // méthode d’instance
+              public static int nombreCrees() { return crees; }       // méthode de classe
+
+              @Override
+              public String toString() { return "Rectangle(" + largeur + " x " + hauteur + ")"; }
+          }
+          ```
+
+          Une seule classe `public` par fichier, du même nom que le fichier. Les autres classes du fichier sont « package-private ».
+      - title: equals, hashCode et records
+        body: |
+          Par défaut, `equals` compare les **références** (même objet ?). Pour comparer le **contenu**, on redéfinit `equals` **et** `hashCode` (indispensable pour `HashMap`/`HashSet`) :
+
+          ```java
+          @Override public boolean equals(Object o) {
+              return o instanceof Rectangle r && r.largeur == largeur && r.hauteur == hauteur;
+          }
+          @Override public int hashCode() { return java.util.Objects.hash(largeur, hauteur); }
+          ```
+
+          Les **records** (Java 16) génèrent tout cela pour les classes de données immuables :
+
+          ```java
+          record Point(int x, int y) {
+              Point {                                     // constructeur compact : validation
+                  if (x < 0) throw new IllegalArgumentException("x négatif");
+              }
+              double norme() { return Math.hypot(x, y); }
+          }
+          var p = new Point(3, 4);
+          p.x();            // accesseur généré
+          p.equals(new Point(3, 4));  // true
+          ```
+    exercises:
+      - id: java-class-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              record Point(int x, int y) {
+                  int somme() { return x + y; }
+              }
+              static class Boite { int v; Boite(int v) { this.v = v; } }
+              public static void main(String[] args) {
+                  Point a = new Point(1, 2), b = new Point(1, 2);
+                  Boite c = new Boite(1), d = new Boite(1);
+                  System.out.println(a.equals(b) + " " + c.equals(d) + " " + a + " " + a.somme());
+              }
+          }
+        output: true false Point[x=1, y=2] 3
+        concepts: [classes]
+      - id: java-class-q1
+        type: mcq
+        prompt: Que faut-il redéfinir avec equals pour qu’un objet fonctionne correctement dans un HashSet ?
+        choices: ['hashCode', 'toString', 'compareTo', 'clone']
+        answer: 0
+      - id: java-class-fill
+        type: fill
+        prompt: Complète le constructeur avec this.
+        code: |
+          public class Main {
+              static class Joueur {
+                  private String nom;
+                  Joueur(String nom) { {{?}}.nom = nom; }
+                  String getNom() { return nom; }
+              }
+              public static void main(String[] args) { System.out.println(new Joueur("Kiri").getNom()); }
+          }
+        blanks: [[this]]
+        tests:
+          - { input: '', output: Kiri }
+      - id: java-class-code
+        type: code
+        title: Fraction
+        prompt: |
+          Écris un `record Fraction(long num, long den)` avec un constructeur compact qui **simplifie** (PGCD, dénominateur positif) et une méthode `Fraction plus(Fraction o)`. Son `toString()` doit renvoyer `num/den`.
+
+          Lis deux fractions `a b c d` et affiche leur somme.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Fraction f = new Fraction(sc.nextLong(), sc.nextLong());
+                  Fraction g = new Fraction(sc.nextLong(), sc.nextLong());
+                  System.out.println(f.plus(g));
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          record Fraction(long num, long den) {
+              Fraction {
+                  if (den < 0) { num = -num; den = -den; }
+                  long g = pgcd(Math.abs(num), den);
+                  if (g == 0) g = 1;
+                  num /= g;
+                  den /= g;
+              }
+              static long pgcd(long a, long b) { return b == 0 ? a : pgcd(b, a % b); }
+              Fraction plus(Fraction o) { return new Fraction(num * o.den + o.num * den, den * o.den); }
+              @Override public String toString() { return num + "/" + den; }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Fraction f = new Fraction(sc.nextLong(), sc.nextLong());
+                  Fraction g = new Fraction(sc.nextLong(), sc.nextLong());
+                  System.out.println(f.plus(g));
+              }
+          }
+        tests:
+          - { input: 1 2 1 3, output: 5/6 }
+          - { input: 1 4 1 4, output: 1/2, hidden: true }
+          - { input: -1 2 1 2, output: 0/1, hidden: true }
+        concepts: [classes]
+    project:
+      id: java-class-projet
+      type: code
+      title: Inventaire
+      difficulty: 3
+      prompt: |
+        Écris un `record Objet(String nom, int quantite, double prix)` et une classe `Inventaire` (liste privée) avec `ajouter(String nom, int q, double prix)` (cumule les quantités si l’objet existe), `double valeurTotale()` et `afficher()` (`nom x quantite`, ordre d’ajout).
+
+        Chaque ligne : `nom quantite prix`. Affiche l’inventaire puis `Total : X.XX` (Locale.US).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        record Objet(String nom, int quantite, double prix) {}
+
+        class Inventaire {
+            private final List<Objet> objets = new ArrayList<>();
+            void ajouter(String nom, int q, double prix) {
+                for (int i = 0; i < objets.size(); i++) {
+                    Objet o = objets.get(i);
+                    if (o.nom().equals(nom)) { objets.set(i, new Objet(nom, o.quantite() + q, o.prix())); return; }
+                }
+                objets.add(new Objet(nom, q, prix));
+            }
+            double valeurTotale() {
+                double t = 0;
+                for (Objet o : objets) t += o.quantite() * o.prix();
+                return t;
+            }
+            void afficher() { for (Objet o : objets) System.out.println(o.nom() + " x " + o.quantite()); }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+                Inventaire inv = new Inventaire();
+                while (sc.hasNext()) inv.ajouter(sc.next(), sc.nextInt(), sc.nextDouble());
+                inv.afficher();
+                System.out.println(String.format(Locale.US, "Total : %.2f", inv.valeurTotale()));
+            }
+        }
+      tests:
+        - { input: "potion 3 2.5\nepee 1 40\npotion 2 2.5", output: "potion x 5\nepee x 1\nTotal : 52.50" }
+        - { input: pomme 10 0.3, output: "pomme x 10\nTotal : 3.00", hidden: true }
+      concepts: [classes]
+    exam:
+      pass: 70
+      questions:
+        - id: java-class-ex1
+          type: mcq
+          prompt: Que compare equals par défaut (non redéfini) ?
+          choices: ['Les références (même objet)', 'Le contenu des attributs', 'Le nom de la classe', 'Le hashCode']
+          answer: 0
+        - id: java-class-ex2
+          type: mcq
+          prompt: Que génère automatiquement un record ?
+          choices: ['Constructeur, accesseurs, equals, hashCode et toString', 'Seulement un constructeur', 'Des setters', 'Rien']
+          answer: 0
+        - id: java-class-ex3
+          type: mcq
+          prompt: Combien de classes public peut contenir un fichier .java ?
+          choices: ['Une seule, du nom du fichier', 'Autant qu’on veut', 'Aucune', 'Deux']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-objets
+    title: Objets
+    summary: Références, null, alias, cycle de vie et ramasse-miettes, comparaison et copie d’objets.
+    minutes: 25
+    concepts: [classes, references]
+    sections:
+      - title: Des références
+        body: |
+          Une variable d’objet contient une **référence** (une sorte d’adresse gérée par la JVM), pas l’objet lui-même :
+
+          ```java
+          StringBuilder a = new StringBuilder("ab");
+          StringBuilder b = a;     // b et a désignent LE MÊME objet
+          b.append("c");
+          System.out.println(a);   // abc
+          ```
+
+          `null` signifie « aucune référence ». Appeler une méthode sur `null` lève une **NullPointerException** (le bug le plus fréquent en Java).
+
+          ```java
+          String s = null;
+          s.length();                         // 💥 NullPointerException
+          if (s != null && s.length() > 0) {} // garde
+          Objects.requireNonNull(param, "param ne doit pas être null");
+          ```
+      - title: Cycle de vie
+        body: |
+          1. `new` alloue l’objet sur le **tas** et appelle le constructeur.
+          2. L’objet vit tant qu’il est **atteignable** depuis une référence active.
+          3. Quand plus rien ne le référence, le **ramasse-miettes** (GC) peut récupérer sa mémoire, à un moment non déterminé.
+
+          Pas de destructeur en Java : pour libérer une ressource (fichier, connexion), on utilise `try-with-resources` avec `AutoCloseable` (chapitre Exceptions).
+
+          Copier un objet : écrire un constructeur de copie (`new Point(autre)`) ou une méthode `copier()`. Les records et `String` étant immuables, les partager est sans danger.
+    exercises:
+      - id: java-obj-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> a = new ArrayList<>(List.of(1, 2));
+                  List<Integer> b = a;
+                  List<Integer> c = new ArrayList<>(a);
+                  b.add(3);
+                  c.add(4);
+                  System.out.println(a + " " + b + " " + c + " " + (a == b));
+              }
+          }
+        output: '[1, 2, 3] [1, 2, 3] [1, 2, 4] true'
+      - id: java-obj-q1
+        type: mcq
+        prompt: Quand un objet peut-il être récupéré par le ramasse-miettes ?
+        choices: ['Quand il n’est plus atteignable depuis aucune référence active', 'À la fin de la méthode qui l’a créé', 'Quand on appelle delete', 'Jamais']
+        answer: 0
+      - id: java-obj-bug
+        type: bugfix
+        prompt: Ce programme lève une NullPointerException. Trouve la ligne à l’origine du problème.
+        code: |
+          public class Main {
+              static String nom;
+              public static void main(String[] args) {
+                  int longueur = nom.length();
+                  System.out.println(longueur);
+              }
+          }
+        bugLines: [2]
+        choices:
+          - L’attribut nom n’est jamais initialisé, il vaut null
+          - length() n’existe pas
+          - main doit être non static
+        answer: 0
+        solution: |
+          public class Main {
+              static String nom = "Kiri";
+              public static void main(String[] args) {
+                  int longueur = nom.length();
+                  System.out.println(longueur);
+              }
+          }
+        tests:
+          - { input: '', output: '4' }
+      - id: java-obj-code
+        type: code
+        title: Copie défensive
+        prompt: |
+          Écris une classe `Equipe` qui stocke une liste de noms. Son constructeur et son accesseur `getMembres()` doivent faire des **copies défensives** (`new ArrayList<>(…)` et `List.copyOf(…)`) pour que l’extérieur ne puisse pas modifier l’état interne.
+
+          Le programme (fourni) essaie de tricher : il modifie la liste d’origine et tente de modifier la liste renvoyée.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> noms = new ArrayList<>();
+                  while (sc.hasNext()) noms.add(sc.next());
+                  Equipe e = new Equipe(noms);
+                  noms.add("intrus");
+                  try { e.getMembres().add("pirate"); } catch (UnsupportedOperationException ex) { System.out.println("modification refusée"); }
+                  System.out.println(e.getMembres());
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          class Equipe {
+              private final List<String> membres;
+              Equipe(List<String> membres) { this.membres = new ArrayList<>(membres); }
+              List<String> getMembres() { return List.copyOf(membres); }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> noms = new ArrayList<>();
+                  while (sc.hasNext()) noms.add(sc.next());
+                  Equipe e = new Equipe(noms);
+                  noms.add("intrus");
+                  try { e.getMembres().add("pirate"); } catch (UnsupportedOperationException ex) { System.out.println("modification refusée"); }
+                  System.out.println(e.getMembres());
+              }
+          }
+        tests:
+          - { input: Ada Kiri, output: "modification refusée\n[Ada, Kiri]" }
+          - { input: '', output: "modification refusée\n[]", hidden: true }
+    project:
+      id: java-obj-projet
+      type: code
+      title: Liste chaînée
+      difficulty: 3
+      prompt: |
+        Implémente une **liste chaînée** d’entiers : une classe `Noeud { int valeur; Noeud suivant; }` et une classe `Liste` avec `ajouterEnTete(int)`, `ajouterEnFin(int)`, `boolean supprimer(int)` (première occurrence), `int taille()` et `toString()` au format `[a -> b -> c]` (`[]` si vide).
+
+        Commandes : `tete X`, `fin X`, `suppr X` (affiche `supprimé` ou `absent`), `afficher`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        class Noeud {
+            int valeur;
+            Noeud suivant;
+            Noeud(int v, Noeud s) { valeur = v; suivant = s; }
+        }
+
+        class Liste {
+            private Noeud tete;
+            private int taille;
+            void ajouterEnTete(int v) { tete = new Noeud(v, tete); taille++; }
+            void ajouterEnFin(int v) {
+                Noeud n = new Noeud(v, null);
+                if (tete == null) tete = n;
+                else { Noeud c = tete; while (c.suivant != null) c = c.suivant; c.suivant = n; }
+                taille++;
+            }
+            boolean supprimer(int v) {
+                if (tete == null) return false;
+                if (tete.valeur == v) { tete = tete.suivant; taille--; return true; }
+                for (Noeud c = tete; c.suivant != null; c = c.suivant) {
+                    if (c.suivant.valeur == v) { c.suivant = c.suivant.suivant; taille--; return true; }
+                }
+                return false;
+            }
+            int taille() { return taille; }
+            @Override public String toString() {
+                StringBuilder sb = new StringBuilder("[");
+                for (Noeud c = tete; c != null; c = c.suivant) sb.append(c == tete ? "" : " -> ").append(c.valeur);
+                return sb.append("]").toString();
+            }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Liste l = new Liste();
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "tete" -> l.ajouterEnTete(sc.nextInt());
+                        case "fin" -> l.ajouterEnFin(sc.nextInt());
+                        case "suppr" -> System.out.println(l.supprimer(sc.nextInt()) ? "supprimé" : "absent");
+                        default -> System.out.println(l + " (" + l.taille() + ")");
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "fin 2\ntete 1\nfin 3\nafficher\nsuppr 2\nsuppr 9\nafficher", output: "[1 -> 2 -> 3] (3)\nsupprimé\nabsent\n[1 -> 3] (2)" }
+        - { input: "afficher\nsuppr 1", output: "[] (0)\nabsent", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-obj-ex1
+          type: mcq
+          prompt: Que contient une variable de type objet en Java ?
+          choices: ['Une référence vers l’objet', 'L’objet lui-même', 'Une copie de l’objet', 'Un pointeur modifiable par arithmétique']
+          answer: 0
+        - id: java-obj-ex2
+          type: mcq
+          prompt: Quelle méthode utilitaire vérifie qu’un paramètre n’est pas null ?
+          choices: ['Objects.requireNonNull', 'Object.check', 'assertNotNull', 'Optional.of uniquement']
+          answer: 0
+        - id: java-obj-ex3
+          type: mcq
+          prompt: Comment libérer proprement une ressource (fichier) en Java ?
+          choices: ['try-with-resources avec AutoCloseable', 'Un destructeur', 'delete', 'System.gc()']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-constructeurs
+    title: Constructeurs
+    summary: Constructeur par défaut, surcharge, chaînage avec this(...), validation, blocs d’initialisation et fabriques statiques.
+    minutes: 25
+    concepts: [classes, constructeurs]
+    sections:
+      - title: Construire des objets valides
+        body: |
+          ```java
+          public class Temperature {
+              private final double celsius;
+
+              public Temperature() { this(20.0); }                 // chaînage vers l’autre constructeur
+              public Temperature(double celsius) {
+                  if (celsius < -273.15) throw new IllegalArgumentException("sous le zéro absolu");
+                  this.celsius = celsius;
+              }
+              public static Temperature depuisFahrenheit(double f) {   // fabrique statique nommée
+                  return new Temperature((f - 32) * 5 / 9);
+              }
+          }
+          ```
+
+          - Si aucun constructeur n’est écrit, Java fournit un **constructeur par défaut** sans paramètre. Dès qu’on en écrit un, il disparaît.
+          - `this(…)` doit être la **première** instruction du constructeur.
+          - Les attributs `final` doivent être initialisés dans chaque constructeur.
+      - title: Ordre d’initialisation
+        body: |
+          1. Les attributs reçoivent leur valeur par défaut (`0`, `false`, `null`) ;
+          2. les initialisations d’attributs et blocs d’initialisation `{ … }` s’exécutent dans l’ordre ;
+          3. puis le corps du constructeur.
+
+          Les **fabriques statiques** (`of`, `from`, `valueOf`) ont des noms parlants, peuvent renvoyer un objet en cache ou un sous-type : `List.of(1, 2)`, `Integer.valueOf(42)`, `LocalDate.of(2026, 11, 20)`.
+    exercises:
+      - id: java-ctor-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              static class A {
+                  int x = 1;
+                  { x += 10; System.out.print("bloc "); }
+                  A() { this(5); System.out.print("défaut "); }
+                  A(int v) { x += v; System.out.print("param "); }
+              }
+              public static void main(String[] args) {
+                  A a = new A();
+                  System.out.println(a.x);
+              }
+          }
+        output: bloc param défaut 16
+      - id: java-ctor-q1
+        type: mcq
+        prompt: Que devient le constructeur par défaut si on écrit un constructeur avec paramètres ?
+        choices: ['Il n’est plus fourni automatiquement', 'Il reste disponible', 'Il devient privé', 'Il est appelé en premier']
+        answer: 0
+      - id: java-ctor-fill
+        type: fill
+        prompt: Complète le chaînage de constructeurs.
+        code: |
+          public class Main {
+              static class Point {
+                  final int x, y;
+                  Point() { {{?}}(0, 0); }
+                  Point(int x, int y) { this.x = x; this.y = y; }
+              }
+              public static void main(String[] args) { Point p = new Point(); System.out.println(p.x + p.y); }
+          }
+        blanks: [[this]]
+        tests:
+          - { input: '', output: '0' }
+      - id: java-ctor-code
+        type: code
+        title: Horloge
+        prompt: |
+          Écris une classe `Horloge` avec un constructeur `Horloge(int h, int m)` qui normalise (`(25, 70)` → `02:10`, valeurs négatives gérées), une méthode `avancer(int minutes)` et `toString()` au format `HH:MM`.
+
+          Entrée : `h m` puis des durées. Affiche l’heure initiale puis après chaque avance.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          class Horloge {
+              private int minutes;
+              Horloge(int h, int m) { avancer(h * 60 + m); }
+              void avancer(int m) { minutes = Math.floorMod(minutes + m, 1440); }
+              @Override public String toString() { return String.format("%02d:%02d", minutes / 60, minutes % 60); }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Horloge c = new Horloge(sc.nextInt(), sc.nextInt());
+                  System.out.println(c);
+                  while (sc.hasNextInt()) { c.avancer(sc.nextInt()); System.out.println(c); }
+              }
+          }
+        tests:
+          - { input: "25 70\n50\n-130", output: "02:10\n03:00\n00:50" }
+          - { input: "23 59\n1", output: "23:59\n00:00", hidden: true }
+    project:
+      id: java-ctor-projet
+      type: code
+      title: Date validée
+      difficulty: 3
+      prompt: |
+        Écris une classe immuable `Date` dont le constructeur lève `IllegalArgumentException("date invalide")` si la date n’existe pas (années bissextiles comprises), une fabrique `static Date parse(String "JJ/MM/AAAA")`, une méthode `Date lendemain()` et `toString()` au format `JJ/MM/AAAA`.
+
+        Pour chaque ligne, affiche `date -> lendemain` ou `date invalide` (n’utilise pas java.time).
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        final class Date {
+            private final int jour, mois, annee;
+            Date(int j, int m, int a) {
+                if (m < 1 || m > 12 || j < 1 || j > joursDansMois(m, a)) throw new IllegalArgumentException("date invalide");
+                jour = j; mois = m; annee = a;
+            }
+            static Date parse(String s) {
+                String[] p = s.split("/");
+                return new Date(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]));
+            }
+            static boolean bissextile(int a) { return (a % 4 == 0 && a % 100 != 0) || a % 400 == 0; }
+            static int joursDansMois(int m, int a) {
+                int[] j = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+                return m == 2 && bissextile(a) ? 29 : j[m - 1];
+            }
+            Date lendemain() {
+                if (jour < joursDansMois(mois, annee)) return new Date(jour + 1, mois, annee);
+                if (mois < 12) return new Date(1, mois + 1, annee);
+                return new Date(1, 1, annee + 1);
+            }
+            @Override public String toString() { return String.format("%02d/%02d/%d", jour, mois, annee); }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine().trim();
+                    if (l.isEmpty()) continue;
+                    try {
+                        Date d = Date.parse(l);
+                        System.out.println(d + " -> " + d.lendemain());
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("date invalide");
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "28/02/2024\n31/12/2025\n30/02/2023", output: "28/02/2024 -> 29/02/2024\n31/12/2025 -> 01/01/2026\ndate invalide" }
+        - { input: "29/02/1900\n29/02/2000", output: "date invalide\n29/02/2000 -> 01/03/2000", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-ctor-ex1
+          type: mcq
+          prompt: Où doit se trouver l’appel this(…) dans un constructeur ?
+          choices: ['En première instruction', 'En dernière instruction', 'N’importe où', 'Dans une méthode séparée']
+          answer: 0
+        - id: java-ctor-ex2
+          type: mcq
+          prompt: Quel avantage a une fabrique statique comme List.of sur un constructeur ?
+          choices: ['Un nom parlant et la possibilité de renvoyer un objet existant ou un sous-type', 'Elle est plus rapide à écrire', 'Elle évite le GC', 'Aucun']
+          answer: 0
+        - id: java-ctor-ex3
+          type: mcq
+          prompt: Quelle valeur par défaut reçoit un attribut int non initialisé ?
+          choices: ['0', 'null', 'Valeur aléatoire', '-1']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-encapsulation
+    title: Encapsulation
+    summary: Modificateurs d’accès, getters et setters raisonnés, invariants, immuabilité et méthodes métier.
+    minutes: 25
+    concepts: [classes, encapsulation]
+    sections:
+      - title: Modificateurs d’accès
+        body: |
+          | Modificateur | Classe | Package | Sous-classe | Partout |
+          |---|---|---|---|---|
+          | `private` | ✅ | ❌ | ❌ | ❌ |
+          | *(aucun)* package-private | ✅ | ✅ | ❌ | ❌ |
+          | `protected` | ✅ | ✅ | ✅ | ❌ |
+          | `public` | ✅ | ✅ | ✅ | ✅ |
+
+          Règle : **attributs `private`**, méthodes aussi restreintes que possible.
+      - title: Protéger les invariants
+        body: |
+          ```java
+          public class CompteBancaire {
+              private final String titulaire;
+              private long solde;                         // invariant : solde >= 0
+
+              public CompteBancaire(String titulaire) { this.titulaire = Objects.requireNonNull(titulaire); }
+              public void deposer(long montant) {
+                  if (montant <= 0) throw new IllegalArgumentException("montant invalide");
+                  solde += montant;
+              }
+              public boolean retirer(long montant) {
+                  if (montant <= 0 || montant > solde) return false;
+                  solde -= montant;
+                  return true;
+              }
+              public long getSolde() { return solde; }    // lecture seule : pas de setSolde !
+          }
+          ```
+
+          - Des **méthodes métier** (`deposer`, `retirer`) plutôt que des setters génériques.
+          - **Immuabilité** (classe `final`, attributs `final`, pas de setter) : objets plus simples et sûrs, partageables entre threads.
+          - Ne jamais exposer une collection interne modifiable (copie défensive ou `List.copyOf`).
+    exercises:
+      - id: java-enc-q1
+        type: mcq
+        prompt: Un membre sans modificateur (package-private) est visible…
+        choices: ['Dans les classes du même package', 'Partout', 'Seulement dans la classe', 'Seulement dans les sous-classes']
+        answer: 0
+        concepts: [encapsulation]
+      - id: java-enc-q2
+        type: mcq
+        prompt: Pourquoi éviter setSolde(long) sur un compte bancaire ?
+        choices: ['Il permettrait de contourner les règles métier (solde négatif, dépôt invalide)', 'C’est plus long à écrire', 'Les setters sont interdits', 'Pour la performance']
+        answer: 0
+      - id: java-enc-bug
+        type: bugfix
+        prompt: L’invariant « la note est entre 0 et 20 » peut être violé. Trouve la ligne fautive.
+        code: |
+          public class Main {
+              static class Note {
+                  public int valeur;
+                  Note(int v) { if (v < 0 || v > 20) throw new IllegalArgumentException(); valeur = v; }
+              }
+              public static void main(String[] args) {
+                  Note n = new Note(15);
+                  n.valeur = 42;
+                  System.out.println(n.valeur);
+              }
+          }
+        bugLines: [3]
+        choices:
+          - L’attribut public peut être modifié directement de l’extérieur ; il doit être private (avec un accesseur)
+          - Le constructeur ne vérifie rien
+          - Il faut un setter public
+        answer: 0
+        solution: |
+          public class Main {
+              static class Note {
+                  private final int valeur;
+                  Note(int v) { if (v < 0 || v > 20) throw new IllegalArgumentException(); valeur = v; }
+                  int getValeur() { return valeur; }
+              }
+              public static void main(String[] args) {
+                  Note n = new Note(15);
+                  System.out.println(n.getValeur());
+              }
+          }
+        tests:
+          - { input: '', output: '15' }
+      - id: java-enc-code
+        type: code
+        title: Thermostat
+        prompt: |
+          Écris une classe `Thermostat` dont la consigne reste **toujours entre 5.0 et 30.0** : `boolean regler(double)` (refuse hors limites), `augmenter()` / `diminuer()` (pas de 0.5, bornés), `double getConsigne()`. Consigne initiale : 19.
+
+          Commandes : `regler X`, `+`, `-`. Affiche la consigne (1 décimale, Locale.US) après chaque commande.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          class Thermostat {
+              private double consigne = 19;
+              boolean regler(double c) {
+                  if (c < 5 || c > 30) return false;
+                  consigne = c;
+                  return true;
+              }
+              void augmenter() { consigne = Math.min(30, consigne + 0.5); }
+              void diminuer() { consigne = Math.max(5, consigne - 0.5); }
+              double getConsigne() { return consigne; }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+                  Thermostat t = new Thermostat();
+                  while (sc.hasNext()) {
+                      String c = sc.next();
+                      if (c.equals("regler")) t.regler(sc.nextDouble());
+                      else if (c.equals("+")) t.augmenter();
+                      else t.diminuer();
+                      System.out.println(String.format(Locale.US, "%.1f", t.getConsigne()));
+                  }
+              }
+          }
+        tests:
+          - { input: "+\nregler 40\nregler 29.8\n+\n+", output: "19.5\n19.5\n29.8\n30.0\n30.0" }
+          - { input: "regler 5\n-", output: "5.0\n5.0", hidden: true }
+        concepts: [encapsulation]
+    project:
+      id: java-enc-projet
+      type: code
+      title: Compte bancaire encapsulé
+      difficulty: 2
+      prompt: |
+        Écris la classe `CompteBancaire` du cours (titulaire `final`, solde privé, `deposer` qui lève `IllegalArgumentException` pour un montant ≤ 0, `retirer` qui renvoie `false` si impossible, `getSolde`).
+
+        Première ligne : titulaire. Puis `depot X` / `retrait X`. Affiche le solde après chaque opération réussie, `refusé` pour un retrait impossible, `montant invalide` pour un dépôt invalide. Termine par `titulaire : solde`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        class CompteBancaire {
+            private final String titulaire;
+            private long solde;
+            CompteBancaire(String titulaire) { this.titulaire = Objects.requireNonNull(titulaire); }
+            void deposer(long m) {
+                if (m <= 0) throw new IllegalArgumentException("montant invalide");
+                solde += m;
+            }
+            boolean retirer(long m) {
+                if (m <= 0 || m > solde) return false;
+                solde -= m;
+                return true;
+            }
+            long getSolde() { return solde; }
+            String getTitulaire() { return titulaire; }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                CompteBancaire c = new CompteBancaire(sc.next());
+                while (sc.hasNext()) {
+                    String op = sc.next();
+                    long m = sc.nextLong();
+                    if (op.equals("depot")) {
+                        try { c.deposer(m); System.out.println(c.getSolde()); }
+                        catch (IllegalArgumentException e) { System.out.println(e.getMessage()); }
+                    } else {
+                        System.out.println(c.retirer(m) ? String.valueOf(c.getSolde()) : "refusé");
+                    }
+                }
+                System.out.println(c.getTitulaire() + " : " + c.getSolde());
+            }
+        }
+      tests:
+        - { input: "Kiri\ndepot 100\nretrait 30\nretrait 500\ndepot -5", output: "100\n70\nrefusé\nmontant invalide\nKiri : 70" }
+        - { input: Ada, output: 'Ada : 0', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-enc-ex1
+          type: mcq
+          prompt: Quel modificateur rend un membre visible uniquement dans sa classe ?
+          choices: ['private', 'protected', 'public', 'static']
+          answer: 0
+        - id: java-enc-ex2
+          type: mcq
+          prompt: Quel est un avantage des objets immuables ?
+          choices: ['Ils peuvent être partagés sans risque, y compris entre threads', 'Ils sont plus gros', 'Ils évitent le GC', 'Ils sont modifiables partout']
+          answer: 0
+        - id: java-enc-ex3
+          type: mcq
+          prompt: Que doit renvoyer un accesseur vers une liste interne ?
+          choices: ['Une copie ou une vue non modifiable', 'La liste interne elle-même', 'null', 'Un tableau vide']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-heritage
+    title: Héritage
+    summary: extends, super, redéfinition avec @Override, protected, final, et quand préférer la composition.
+    minutes: 30
+    concepts: [heritage, classes]
+    sections:
+      - title: Étendre une classe
+        body: |
+          ```java
+          class Animal {
+              protected final String nom;
+              Animal(String nom) { this.nom = nom; }
+              String cri() { return "..."; }
+              String presenter() { return nom + " fait " + cri(); }
+          }
+
+          class Chien extends Animal {
+              private final String race;
+              Chien(String nom, String race) {
+                  super(nom);                  // appel du constructeur parent (première instruction)
+                  this.race = race;
+              }
+              @Override
+              String cri() { return "Wouf"; }  // redéfinition
+              @Override
+              String presenter() { return super.presenter() + " (" + race + ")"; }  // réutilise le parent
+          }
+          ```
+
+          Java n’autorise l’héritage que d’**une seule** classe (mais plusieurs interfaces).
+      - title: Règles et bonnes pratiques
+        body: |
+          - `@Override` fait vérifier par le compilateur qu’on redéfinit bien une méthode.
+          - Une redéfinition ne peut pas réduire la visibilité.
+          - `final` sur une classe interdit d’en hériter (`String` est `final`) ; sur une méthode, interdit de la redéfinir.
+          - **Composition plutôt qu’héritage** : si la relation est « a-un » (une voiture a un moteur), utilise un attribut. L’héritage profond rend le code fragile.
+          - Principe de substitution de Liskov : une sous-classe doit pouvoir remplacer sa classe mère sans surprise.
+    exercises:
+      - id: java-her-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              static class A {
+                  A() { System.out.print("A "); }
+                  String nom() { return "a"; }
+                  String decrire() { return "je suis " + nom(); }
+              }
+              static class B extends A {
+                  B() { super(); System.out.print("B "); }
+                  @Override String nom() { return "b"; }
+              }
+              public static void main(String[] args) {
+                  A x = new B();
+                  System.out.println(x.decrire());
+              }
+          }
+        output: A B je suis b
+        concepts: [heritage]
+      - id: java-her-q1
+        type: mcq
+        prompt: Combien de classes une classe Java peut-elle étendre directement ?
+        choices: ['Une seule', 'Autant qu’elle veut', 'Deux', 'Aucune']
+        answer: 0
+      - id: java-her-fill
+        type: fill
+        prompt: Complète l’héritage et l’appel au constructeur parent.
+        code: |
+          public class Main {
+              static class Vehicule { final int roues; Vehicule(int r) { roues = r; } }
+              static class Moto {{?}} Vehicule {
+                  Moto() { {{?}}(2); }
+              }
+              public static void main(String[] args) { System.out.println(new Moto().roues); }
+          }
+        blanks: [[extends], [super]]
+        tests:
+          - { input: '', output: '2' }
+      - id: java-her-code
+        type: code
+        title: Employés et managers
+        prompt: |
+          Écris `Employe` (nom, salaire de base, `double salaire()`) et `Manager extends Employe` qui redéfinit `salaire()` en ajoutant 200 par membre d’équipe.
+
+          Lignes : `E nom base` ou `M nom base equipe`. Stocke tout dans une `List<Employe>`, affiche `nom : salaire` (0 décimale) puis `masse salariale : total`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          class Employe {
+              protected final String nom;
+              protected final double base;
+              Employe(String nom, double base) { this.nom = nom; this.base = base; }
+              double salaire() { return base; }
+              String getNom() { return nom; }
+          }
+
+          class Manager extends Employe {
+              private final int equipe;
+              Manager(String nom, double base, int equipe) { super(nom, base); this.equipe = equipe; }
+              @Override double salaire() { return super.salaire() + 200.0 * equipe; }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<Employe> l = new ArrayList<>();
+                  while (sc.hasNext()) {
+                      String t = sc.next();
+                      String nom = sc.next();
+                      double base = sc.nextDouble();
+                      l.add(t.equals("M") ? new Manager(nom, base, sc.nextInt()) : new Employe(nom, base));
+                  }
+                  double total = 0;
+                  for (Employe e : l) {
+                      System.out.println(e.getNom() + " : " + Math.round(e.salaire()));
+                      total += e.salaire();
+                  }
+                  System.out.println("masse salariale : " + Math.round(total));
+              }
+          }
+        tests:
+          - { input: "E Ada 3000\nM Linus 4000 5", output: "Ada : 3000\nLinus : 5000\nmasse salariale : 8000" }
+          - { input: M Solo 2500 0, output: "Solo : 2500\nmasse salariale : 2500", hidden: true }
+        require:
+          - { pattern: 'extends\s+Employe', message: Manager doit étendre Employe }
+          - { pattern: '@Override', message: Utiliser @Override }
+        concepts: [heritage]
+    project:
+      id: java-her-projet
+      type: code
+      title: Comptes spécialisés
+      difficulty: 3
+      prompt: |
+        Classe `Compte` (solde protégé, `deposer`, `boolean retirer(double)` qui refuse un solde négatif), `CompteEpargne extends Compte` (taux, `appliquerInterets()`), `CompteCourant extends Compte` qui **redéfinit** `retirer` pour autoriser un découvert.
+
+        Première ligne : `epargne taux` ou `courant decouvert`. Puis `depot X`, `retrait X`, `interets` (sans effet sur un compte courant). Affiche le solde (2 décimales, Locale.US) après chaque opération ou `refusé`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        class Compte {
+            protected double solde;
+            void deposer(double m) { solde += m; }
+            boolean retirer(double m) {
+                if (m > solde) return false;
+                solde -= m;
+                return true;
+            }
+            double getSolde() { return solde; }
+        }
+
+        class CompteEpargne extends Compte {
+            private final double taux;
+            CompteEpargne(double taux) { this.taux = taux; }
+            void appliquerInterets() { solde *= 1 + taux; }
+        }
+
+        class CompteCourant extends Compte {
+            private final double decouvert;
+            CompteCourant(double decouvert) { this.decouvert = decouvert; }
+            @Override boolean retirer(double m) {
+                if (solde - m < -decouvert) return false;
+                solde -= m;
+                return true;
+            }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+                String type = sc.next();
+                double p = sc.nextDouble();
+                Compte c = type.equals("epargne") ? new CompteEpargne(p) : new CompteCourant(p);
+                while (sc.hasNext()) {
+                    String cmd = sc.next();
+                    boolean ok = true;
+                    switch (cmd) {
+                        case "depot" -> c.deposer(sc.nextDouble());
+                        case "retrait" -> ok = c.retirer(sc.nextDouble());
+                        default -> { if (c instanceof CompteEpargne e) e.appliquerInterets(); }
+                    }
+                    System.out.println(ok ? String.format(Locale.US, "%.2f", c.getSolde()) : "refusé");
+                }
+            }
+        }
+      tests:
+        - { input: "epargne 0.1\ndepot 100\ninterets\nretrait 200\nretrait 10", output: "100.00\n110.00\nrefusé\n100.00" }
+        - { input: "courant 50\nretrait 30\nretrait 30\ndepot 100\ninterets", output: "-30.00\nrefusé\n70.00\n70.00", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-her-ex1
+          type: mcq
+          prompt: Que fait super.methode() ?
+          choices: ['Appelle la version de la classe parente', 'Appelle une méthode statique', 'Crée un objet parent', 'Rien']
+          answer: 0
+        - id: java-her-ex2
+          type: mcq
+          prompt: Pourquoi ne peut-on pas étendre String ?
+          choices: ['String est final', 'String est une interface', 'String est privée', 'On peut']
+          answer: 0
+        - id: java-her-ex3
+          type: mcq
+          prompt: Une voiture a un moteur. Quelle conception choisir ?
+          choices: ['Un attribut Moteur (composition)', 'Voiture extends Moteur', 'Moteur extends Voiture', 'Une interface Moteur que Voiture implémente']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-polymorphisme
+    title: Polymorphisme
+    summary: Liaison dynamique, références de type parent, instanceof et filtrage par motif, classes scellées et switch sur types.
+    minutes: 30
+    concepts: [polymorphisme]
+    sections:
+      - title: Liaison dynamique
+        body: |
+          Une référence de type parent peut désigner un objet d’une sous-classe ; la méthode appelée est celle du **type réel** de l’objet (toutes les méthodes d’instance sont « virtuelles » en Java) :
+
+          ```java
+          List<Animal> zoo = List.of(new Chien("Rex"), new Chat("Tom"));
+          for (Animal a : zoo) {
+              System.out.println(a.cri());   // Wouf puis Miaou
+          }
+          ```
+
+          Les méthodes `static`, `private` et `final` ne sont pas redéfinissables (pas de liaison dynamique).
+      - title: instanceof, sealed et switch
+        body: |
+          ```java
+          if (a instanceof Chien c) {          // filtrage par motif (Java 16)
+              c.rapporterBalle();
+          }
+
+          sealed interface Forme permits Cercle, Rectangle {}     // hiérarchie fermée (Java 17)
+          record Cercle(double r) implements Forme {}
+          record Rectangle(double l, double h) implements Forme {}
+
+          static double aire(Forme f) {
+              return switch (f) {                                     // switch sur les types (Java 21)
+                  case Cercle c -> Math.PI * c.r() * c.r();
+                  case Rectangle(double l, double h) -> l * h;        // déconstruction de record
+              };                                                      // exhaustif : pas de default
+          }
+          ```
+
+          Avec une interface **scellée**, le compilateur sait que tous les cas sont couverts.
+    exercises:
+      - id: java-poly-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              static class Forme { String nom() { return "forme"; } static String type() { return "F"; } }
+              static class Carre extends Forme { @Override String nom() { return "carré"; } static String type() { return "C"; } }
+              public static void main(String[] args) {
+                  Forme f = new Carre();
+                  Object o = f;
+                  String s = o instanceof Carre c ? c.nom() : "?";
+                  System.out.println(f.nom() + " " + Forme.type() + " " + s);
+              }
+          }
+        output: carré F carré
+        concepts: [polymorphisme]
+      - id: java-poly-q1
+        type: mcq
+        prompt: Quelle méthode est appelée par a.cri() si a est déclaré Animal mais désigne un Chien ?
+        choices: ['Celle de Chien (type réel)', 'Celle d’Animal (type déclaré)', 'Les deux', 'Aucune']
+        answer: 0
+      - id: java-poly-q2
+        type: mcq
+        prompt: Qu’apporte une interface sealed ?
+        choices: ['Une liste fermée de sous-types connue du compilateur (switch exhaustif)', 'Elle est plus rapide', 'Elle empêche toute implémentation', 'Elle remplace les génériques']
+        answer: 0
+      - id: java-poly-code
+        type: code
+        title: Formes scellées
+        prompt: |
+          Déclare `sealed interface Forme permits Cercle, Rectangle, Triangle` et trois records (`Triangle(a, b, c)` : formule de Héron). Écris `static double aire(Forme)` et `static double perimetre(Forme)` avec un **switch sur les types**.
+
+          Chaque ligne : `cercle r`, `rectangle l h` ou `triangle a b c`. Affiche `aire A périmètre P` (2 décimales, Locale.US).
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          sealed interface Forme permits Cercle, Rectangle, Triangle {}
+          record Cercle(double r) implements Forme {}
+          record Rectangle(double l, double h) implements Forme {}
+          record Triangle(double a, double b, double c) implements Forme {}
+
+          public class Main {
+              static double perimetre(Forme f) {
+                  return switch (f) {
+                      case Cercle c -> 2 * Math.PI * c.r();
+                      case Rectangle(double l, double h) -> 2 * (l + h);
+                      case Triangle(double a, double b, double c) -> a + b + c;
+                  };
+              }
+              static double aire(Forme f) {
+                  return switch (f) {
+                      case Cercle c -> Math.PI * c.r() * c.r();
+                      case Rectangle(double l, double h) -> l * h;
+                      case Triangle t -> {
+                          double s = perimetre(t) / 2;
+                          yield Math.sqrt(s * (s - t.a()) * (s - t.b()) * (s - t.c()));
+                      }
+                  };
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+                  while (sc.hasNext()) {
+                      Forme f = switch (sc.next()) {
+                          case "cercle" -> new Cercle(sc.nextDouble());
+                          case "rectangle" -> new Rectangle(sc.nextDouble(), sc.nextDouble());
+                          default -> new Triangle(sc.nextDouble(), sc.nextDouble(), sc.nextDouble());
+                      };
+                      System.out.println(String.format(Locale.US, "aire %.2f périmètre %.2f", aire(f), perimetre(f)));
+                  }
+              }
+          }
+        tests:
+          - { input: "cercle 1\nrectangle 2 3\ntriangle 3 4 5", output: "aire 3.14 périmètre 6.28\naire 6.00 périmètre 10.00\naire 6.00 périmètre 12.00" }
+          - { input: triangle 2 2 2, output: aire 1.73 périmètre 6.00, hidden: true }
+        require:
+          - { pattern: 'sealed\s+interface', message: Déclarer une interface sealed }
+        concepts: [polymorphisme]
+    project:
+      id: java-poly-projet
+      type: code
+      title: Zoo polymorphe
+      difficulty: 3
+      prompt: |
+        Classe abstraite `Animal` (nom, méthodes abstraites `cri()`, `nourriture()` en grammes et `espece()`, méthode concrète `presentation()` → `"<nom> le <espece> fait <cri>"`). Sous-classes `Lion` (roar, 7000), `Perroquet` (coco, 50), `Tortue` (…, 200).
+
+        Chaque ligne : `espece nom`. Affiche les présentations puis `Nourriture totale : N g`, et enfin le nombre de chaque espèce triées par nom (`lion=1 perroquet=1 …`) calculé avec `instanceof`/`getClass`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        abstract class Animal {
+            protected final String nom;
+            Animal(String nom) { this.nom = nom; }
+            abstract String cri();
+            abstract int nourriture();
+            abstract String espece();
+            String presentation() { return nom + " le " + espece() + " fait " + cri(); }
+        }
+        class Lion extends Animal { Lion(String n) { super(n); } String cri() { return "roar"; } int nourriture() { return 7000; } String espece() { return "lion"; } }
+        class Perroquet extends Animal { Perroquet(String n) { super(n); } String cri() { return "coco"; } int nourriture() { return 50; } String espece() { return "perroquet"; } }
+        class Tortue extends Animal { Tortue(String n) { super(n); } String cri() { return "…"; } int nourriture() { return 200; } String espece() { return "tortue"; } }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<Animal> zoo = new ArrayList<>();
+                while (sc.hasNext()) {
+                    String e = sc.next(), n = sc.next();
+                    zoo.add(switch (e) { case "lion" -> new Lion(n); case "perroquet" -> new Perroquet(n); default -> new Tortue(n); });
+                }
+                int total = 0;
+                Map<String, Integer> compte = new TreeMap<>();
+                for (Animal a : zoo) {
+                    System.out.println(a.presentation());
+                    total += a.nourriture();
+                    compte.merge(a.espece(), 1, Integer::sum);
+                }
+                System.out.println("Nourriture totale : " + total + " g");
+                StringBuilder sb = new StringBuilder();
+                compte.forEach((k, v) -> sb.append(sb.length() > 0 ? " " : "").append(k).append('=').append(v));
+                System.out.println(sb);
+            }
+        }
+      tests:
+        - { input: "lion Simba\nperroquet Coco\ntortue Franklin\nlion Nala", output: "Simba le lion fait roar\nCoco le perroquet fait coco\nFranklin le tortue fait …\nNala le lion fait roar\nNourriture totale : 14250 g\nlion=2 perroquet=1 tortue=1" }
+        - { input: '', output: "Nourriture totale : 0 g\n", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-poly-ex1
+          type: mcq
+          prompt: Les méthodes static sont-elles concernées par la liaison dynamique ?
+          choices: ['Non', 'Oui', 'Seulement si public', 'Seulement dans une interface']
+          answer: 0
+        - id: java-poly-ex2
+          type: mcq
+          prompt: Que fait `if (o instanceof Chien c)` ?
+          choices: ['Teste le type et déclare c déjà converti en Chien', 'Crée un nouveau Chien', 'Compare deux objets', 'Lance une exception']
+          answer: 0
+        - id: java-poly-ex3
+          type: mcq
+          prompt: Pourquoi un switch sur une interface sealed peut-il se passer de default ?
+          choices: ['Le compilateur connaît tous les sous-types possibles', 'default est interdit', 'Les records n’ont pas de default', 'C’est une erreur']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-interfaces
+    title: Interfaces
+    summary: Définir des contrats avec les interfaces, implémentations multiples, méthodes default et static, interfaces fonctionnelles.
+    minutes: 30
+    concepts: [traits, interfaces]
+    sections:
+      - title: Un contrat
+        body: |
+          ```java
+          interface Payable {
+              double montant();                                   // abstraite
+              default String resume() { return "à payer : " + montant(); }   // méthode par défaut
+              static Payable gratuit() { return () -> 0; }        // méthode statique
+          }
+
+          class Facture implements Payable, Comparable<Facture> {   // plusieurs interfaces
+              private final double total;
+              Facture(double t) { total = t; }
+              public double montant() { return total; }
+              public int compareTo(Facture o) { return Double.compare(total, o.total); }
+          }
+          ```
+
+          Une classe peut implémenter **plusieurs** interfaces. Les interfaces décrivent **ce que sait faire** un objet, indépendamment de ce qu’il **est** (sa classe mère).
+      - title: Interfaces de la bibliothèque standard
+        body: |
+          | Interface | Rôle |
+          |---|---|
+          | `Comparable<T>` | ordre naturel (`compareTo`) → `Collections.sort` |
+          | `Comparator<T>` | ordre externe (`Comparator.comparing(…)`) |
+          | `Iterable<T>` | utilisable dans un for-each |
+          | `AutoCloseable` | utilisable dans try-with-resources |
+          | `Runnable`, `Callable<V>` | tâches pour les threads |
+          | `Function`, `Predicate`, `Supplier`, `Consumer` | interfaces fonctionnelles (lambdas) |
+
+          Une **interface fonctionnelle** (une seule méthode abstraite) peut être implémentée par une **lambda** : `Payable p = () -> 42.0;`.
+    exercises:
+      - id: java-itf-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              interface Salut { String nom(); default String saluer() { return "Bonjour " + nom(); } }
+              record Personne(String nom) implements Salut, Comparable<Personne> {
+                  public int compareTo(Personne o) { return nom.compareTo(o.nom); }
+              }
+              public static void main(String[] args) {
+                  List<Personne> l = new ArrayList<>(List.of(new Personne("Zoe"), new Personne("Ada")));
+                  Collections.sort(l);
+                  Salut anonyme = () -> "inconnu";
+                  System.out.println(l.get(0).saluer() + " / " + anonyme.saluer());
+              }
+          }
+        output: Bonjour Ada / Bonjour inconnu
+        concepts: [interfaces]
+      - id: java-itf-q1
+        type: mcq
+        prompt: Combien d’interfaces une classe peut-elle implémenter ?
+        choices: ['Autant qu’elle veut', 'Une seule', 'Deux', 'Aucune si elle hérite déjà']
+        answer: 0
+      - id: java-itf-q2
+        type: mcq
+        prompt: Qu’est-ce qu’une interface fonctionnelle ?
+        choices: ['Une interface avec une seule méthode abstraite, implémentable par une lambda', 'Une interface sans méthode', 'Une classe abstraite', 'Une interface de la JVM']
+        answer: 0
+      - id: java-itf-code
+        type: code
+        title: Tri multicritère
+        prompt: |
+          Écris un `record Eleve(String nom, int note, int age)`. Lis des lignes `nom note age` et trie la liste avec un `Comparator` : note décroissante, puis âge croissant, puis nom (`Comparator.comparing(...).reversed().thenComparing(...)`). Affiche `nom note age` par ligne.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          record Eleve(String nom, int note, int age) {}
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<Eleve> l = new ArrayList<>();
+                  while (sc.hasNext()) l.add(new Eleve(sc.next(), sc.nextInt(), sc.nextInt()));
+                  l.sort(Comparator.comparingInt(Eleve::note).reversed()
+                          .thenComparingInt(Eleve::age)
+                          .thenComparing(Eleve::nom));
+                  for (Eleve e : l) System.out.println(e.nom() + " " + e.note() + " " + e.age());
+              }
+          }
+        tests:
+          - { input: "Zoe 15 17\nAda 18 16\nBob 15 16\nAli 15 16", output: "Ada 18 16\nAli 15 16\nBob 15 16\nZoe 15 17" }
+          - { input: Solo 10 20, output: Solo 10 20, hidden: true }
+        require:
+          - { pattern: 'Comparator', message: Utiliser un Comparator }
+    project:
+      id: java-itf-projet
+      type: code
+      title: Moyens de paiement
+      difficulty: 3
+      prompt: |
+        Définis `interface MoyenPaiement { String nom(); boolean payer(double montant); default String recu(double m) { … } }` où `recu` renvoie `"<nom> : <montant 2 déc.> €"`. Implémente :
+
+        - `CarteBancaire(plafond)` : refuse au-delà du plafond **cumulé** ;
+        - `Portefeuille(solde)` : refuse si solde insuffisant ;
+        - `BonAchat(valeur)` : utilisable une seule fois, pour un montant ≤ valeur.
+
+        Première ligne : `plafond solde valeur`. Puis des achats `moyen montant` (`carte`, `portefeuille`, `bon`). Affiche le reçu ou `refusé (<nom>)`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        interface MoyenPaiement {
+            String nom();
+            boolean payer(double montant);
+            default String recu(double m) { return String.format(Locale.US, "%s : %.2f €", nom(), m); }
+        }
+
+        class CarteBancaire implements MoyenPaiement {
+            private final double plafond;
+            private double depense;
+            CarteBancaire(double plafond) { this.plafond = plafond; }
+            public String nom() { return "carte"; }
+            public boolean payer(double m) {
+                if (depense + m > plafond) return false;
+                depense += m;
+                return true;
+            }
+        }
+
+        class Portefeuille implements MoyenPaiement {
+            private double solde;
+            Portefeuille(double s) { solde = s; }
+            public String nom() { return "portefeuille"; }
+            public boolean payer(double m) {
+                if (m > solde) return false;
+                solde -= m;
+                return true;
+            }
+        }
+
+        class BonAchat implements MoyenPaiement {
+            private final double valeur;
+            private boolean utilise;
+            BonAchat(double v) { valeur = v; }
+            public String nom() { return "bon"; }
+            public boolean payer(double m) {
+                if (utilise || m > valeur) return false;
+                utilise = true;
+                return true;
+            }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in).useLocale(Locale.US);
+                Map<String, MoyenPaiement> moyens = Map.of(
+                        "carte", new CarteBancaire(sc.nextDouble()),
+                        "portefeuille", new Portefeuille(sc.nextDouble()),
+                        "bon", new BonAchat(sc.nextDouble()));
+                while (sc.hasNext()) {
+                    MoyenPaiement mp = moyens.get(sc.next());
+                    double m = sc.nextDouble();
+                    System.out.println(mp.payer(m) ? mp.recu(m) : "refusé (" + mp.nom() + ")");
+                }
+            }
+        }
+      tests:
+        - { input: "100 50 20\ncarte 60\ncarte 50\nportefeuille 30\nportefeuille 30\nbon 15\nbon 5", output: "carte : 60.00 €\nrefusé (carte)\nportefeuille : 30.00 €\nrefusé (portefeuille)\nbon : 15.00 €\nrefusé (bon)" }
+        - { input: "0 0 10\nbon 11", output: refusé (bon), hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-itf-ex1
+          type: mcq
+          prompt: Que permet une méthode default dans une interface ?
+          choices: ['Fournir une implémentation par défaut sans casser les classes existantes', 'Rendre l’interface abstraite', 'Déclarer un attribut', 'Rien']
+          answer: 0
+        - id: java-itf-ex2
+          type: mcq
+          prompt: Quelle interface permet d’utiliser un objet dans un try-with-resources ?
+          choices: ['AutoCloseable', 'Runnable', 'Comparable', 'Iterable']
+          answer: 0
+        - id: java-itf-ex3
+          type: mcq
+          prompt: Quelle interface définit l’ordre naturel d’une classe ?
+          choices: ['Comparable', 'Comparator', 'Iterable', 'Serializable']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-abstraites
+    title: Classes abstraites
+    summary: Classes et méthodes abstraites, patron de méthode (template method), et choix entre classe abstraite et interface.
+    minutes: 25
+    concepts: [heritage, polymorphisme]
+    sections:
+      - title: abstract
+        body: |
+          Une **classe abstraite** ne peut pas être instanciée ; elle sert de base commune et peut contenir :
+
+          - de l’**état** (attributs) et des constructeurs ;
+          - des méthodes concrètes ;
+          - des méthodes **abstraites** (sans corps) que les sous-classes **doivent** implémenter.
+
+          ```java
+          abstract class Rapport {
+              private final String titre;
+              protected Rapport(String titre) { this.titre = titre; }
+
+              public final String generer() {                // patron de méthode (template method)
+                  return entete() + "\n" + corps() + "\n" + pied();
+              }
+              private String entete() { return "== " + titre + " =="; }
+              protected abstract String corps();             // à fournir par chaque sous-classe
+              protected String pied() { return "-- fin --"; }  // redéfinissable
+          }
+          ```
+      - title: Abstraite ou interface ?
+        body: |
+          | | Classe abstraite | Interface |
+          |---|---|---|
+          | Héritage | une seule | plusieurs |
+          | État (attributs) | ✅ | ❌ (constantes uniquement) |
+          | Constructeur | ✅ | ❌ |
+          | Méthodes concrètes | ✅ | `default` / `static` |
+
+          Choisis une **interface** pour décrire une capacité (« sait se comparer », « est payable ») ; une **classe abstraite** pour partager du code et de l’état entre des classes étroitement liées. On combine souvent les deux (`AbstractList` implémente `List`).
+    exercises:
+      - id: java-abs-q1
+        type: mcq
+        prompt: Peut-on instancier une classe abstraite avec new ?
+        choices: ['Non', 'Oui', 'Seulement sans paramètre', 'Seulement dans un test']
+        answer: 0
+      - id: java-abs-q2
+        type: mcq
+        prompt: Qu’est-ce que le patron de méthode (template method) ?
+        choices: ['Une méthode qui fixe le squelette d’un algorithme et délègue certaines étapes aux sous-classes', 'Une méthode générique', 'Une méthode statique', 'Une annotation']
+        answer: 0
+      - id: java-abs-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              static abstract class Boisson {
+                  final String preparer() { return chauffer() + ", " + infuser() + ", " + servir(); }
+                  String chauffer() { return "eau chaude"; }
+                  abstract String infuser();
+                  String servir() { return "tasse"; }
+              }
+              static class The extends Boisson { String infuser() { return "thé"; } }
+              static class Cafe extends Boisson { String infuser() { return "café"; } @Override String servir() { return "mug"; } }
+              public static void main(String[] args) {
+                  System.out.println(new The().preparer());
+                  System.out.println(new Cafe().preparer());
+              }
+          }
+        output: "eau chaude, thé, tasse\neau chaude, café, mug"
+      - id: java-abs-code
+        type: code
+        title: Rapports
+        prompt: |
+          Écris la classe abstraite `Rapport` du cours (titre, `generer()` final), et deux sous-classes : `RapportVentes(List<Integer> ventes)` dont le corps est `total : T` et `RapportNotes(List<Integer> notes)` dont le corps est `moyenne : M` (1 décimale, Locale.US) et qui redéfinit `pied()` en `-- confidentiel --`.
+
+          Entrée : une ligne de ventes, puis une ligne de notes. Affiche les deux rapports (titres `Ventes` et `Notes`).
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          abstract class Rapport {
+              private final String titre;
+              protected Rapport(String titre) { this.titre = titre; }
+              public final String generer() { return "== " + titre + " ==\n" + corps() + "\n" + pied(); }
+              protected abstract String corps();
+              protected String pied() { return "-- fin --"; }
+          }
+
+          class RapportVentes extends Rapport {
+              private final List<Integer> ventes;
+              RapportVentes(List<Integer> v) { super("Ventes"); ventes = v; }
+              protected String corps() { return "total : " + ventes.stream().mapToInt(Integer::intValue).sum(); }
+          }
+
+          class RapportNotes extends Rapport {
+              private final List<Integer> notes;
+              RapportNotes(List<Integer> n) { super("Notes"); notes = n; }
+              protected String corps() { return String.format(Locale.US, "moyenne : %.1f", notes.stream().mapToInt(Integer::intValue).average().orElse(0)); }
+              @Override protected String pied() { return "-- confidentiel --"; }
+          }
+
+          public class Main {
+              static List<Integer> lire(String l) {
+                  List<Integer> r = new ArrayList<>();
+                  for (String s : l.trim().split("\\s+")) if (!s.isEmpty()) r.add(Integer.parseInt(s));
+                  return r;
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<Rapport> rapports = List.of(new RapportVentes(lire(sc.nextLine())), new RapportNotes(lire(sc.nextLine())));
+                  for (Rapport r : rapports) System.out.println(r.generer());
+              }
+          }
+        tests:
+          - { input: "100 250 50\n12 15 17", output: "== Ventes ==\ntotal : 400\n-- fin --\n== Notes ==\nmoyenne : 14.7\n-- confidentiel --" }
+          - { input: "\n\n", output: "== Ventes ==\ntotal : 0\n-- fin --\n== Notes ==\nmoyenne : 0.0\n-- confidentiel --", hidden: true }
+        require:
+          - { pattern: 'abstract\s+class\s+Rapport', message: Rapport doit être abstraite }
+    project:
+      id: java-abs-projet
+      type: code
+      title: Jeu de personnages
+      difficulty: 3
+      prompt: |
+        Classe abstraite `Personnage` (nom, points de vie, `boolean estVivant()`, `void subir(int degats)` qui ne descend pas sous 0, méthode abstraite `int attaque(int tour)`). Sous-classes : `Guerrier` (attaque 10 à chaque tour), `Mage` (25 un tour sur deux — tours impairs — sinon 0), `Archer` (7 + numéro du tour).
+
+        Entrée : deux lignes `classe nom pv`. Les personnages s’attaquent **à tour de rôle** (le premier commence au tour 1, chaque attaque compte comme un tour) jusqu’à la mort de l’un. Affiche chaque attaque `tour T : A inflige D à B (pv restants)`, puis `vainqueur : nom`. Arrête au tour 100 au plus (`match nul`).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        abstract class Personnage {
+            protected final String nom;
+            protected int pv;
+            Personnage(String nom, int pv) { this.nom = nom; this.pv = pv; }
+            boolean estVivant() { return pv > 0; }
+            void subir(int d) { pv = Math.max(0, pv - d); }
+            abstract int attaque(int tour);
+        }
+        class Guerrier extends Personnage { Guerrier(String n, int p) { super(n, p); } int attaque(int t) { return 10; } }
+        class Mage extends Personnage { Mage(String n, int p) { super(n, p); } int attaque(int t) { return t % 2 == 1 ? 25 : 0; } }
+        class Archer extends Personnage { Archer(String n, int p) { super(n, p); } int attaque(int t) { return 7 + t; } }
+
+        public class Main {
+            static Personnage lire(Scanner sc) {
+                String c = sc.next(), n = sc.next();
+                int pv = sc.nextInt();
+                return switch (c) { case "guerrier" -> new Guerrier(n, pv); case "mage" -> new Mage(n, pv); default -> new Archer(n, pv); };
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Personnage[] p = {lire(sc), lire(sc)};
+                int tour = 1;
+                while (p[0].estVivant() && p[1].estVivant() && tour <= 100) {
+                    Personnage a = p[(tour - 1) % 2], b = p[tour % 2];
+                    int d = a.attaque(tour);
+                    b.subir(d);
+                    System.out.println("tour " + tour + " : " + a.nom + " inflige " + d + " à " + b.nom + " (" + b.pv + ")");
+                    tour++;
+                }
+                if (p[0].estVivant() && p[1].estVivant()) System.out.println("match nul");
+                else System.out.println("vainqueur : " + (p[0].estVivant() ? p[0].nom : p[1].nom));
+            }
+        }
+      tests:
+        - { input: "mage Kiri 40\nguerrier Bob 45", output: "tour 1 : Kiri inflige 25 à Bob (20)\ntour 2 : Bob inflige 10 à Kiri (30)\ntour 3 : Kiri inflige 25 à Bob (0)\nvainqueur : Kiri" }
+        - { input: "archer Ada 20\nguerrier Zed 30", output: "tour 1 : Ada inflige 8 à Zed (22)\ntour 2 : Zed inflige 10 à Ada (10)\ntour 3 : Ada inflige 10 à Zed (12)\ntour 4 : Zed inflige 10 à Ada (0)\nvainqueur : Zed", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-abs-ex1
+          type: mcq
+          prompt: Une classe abstraite peut-elle avoir un constructeur ?
+          choices: ['Oui (appelé par les sous-classes via super)', 'Non', 'Seulement privé', 'Seulement statique']
+          answer: 0
+        - id: java-abs-ex2
+          type: mcq
+          prompt: Que se passe-t-il si une sous-classe concrète n’implémente pas une méthode abstraite ?
+          choices: ['Erreur de compilation', 'La méthode renvoie null', 'Exception à l’exécution', 'Rien']
+          answer: 0
+        - id: java-abs-ex3
+          type: mcq
+          prompt: Que choisir pour décrire une capacité commune à des classes sans lien (« est sérialisable ») ?
+          choices: ['Une interface', 'Une classe abstraite', 'Une classe final', 'Un record']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-packages
+    title: Packages
+    summary: Organiser le code en packages, imports, visibilité de package, classes imbriquées et modules Java (JPMS).
+    minutes: 20
+    concepts: [modules]
+    sections:
+      - title: Packages et imports
+        body: |
+          Un **package** regroupe des classes liées et définit un espace de noms. Il correspond à une arborescence de dossiers :
+
+          ```java
+          // src/main/java/fr/codemori/banque/Compte.java
+          package fr.codemori.banque;
+
+          import java.util.List;                 // une classe
+          import java.util.*;                    // tout le package (déconseillé dans un gros projet)
+          import static java.lang.Math.max;      // import statique d’un membre
+
+          public class Compte { … }
+          ```
+
+          Convention : nom de domaine inversé, en minuscules (`fr.codemori.jeu.moteur`). `java.lang` (String, Math, System…) est importé automatiquement.
+
+          La visibilité **package-private** (sans modificateur) permet de cacher des classes d’implémentation au reste de l’application.
+      - title: Classes imbriquées et modules
+        body: |
+          ```java
+          public class Panier {
+              public static class Ligne { … }    // imbriquée statique : comme une classe normale, nommée Panier.Ligne
+              private class Iterateur { … }      // interne : accès à l’instance englobante (Panier.this)
+          }
+          Runnable r = new Runnable() {          // classe anonyme
+              public void run() { … }
+          };
+          ```
+
+          Les **modules** (Java 9, `module-info.java`) regroupent des packages et déclarent explicitement ce qu’ils exportent et ce dont ils dépendent :
+
+          ```java
+          module fr.codemori.banque {
+              requires java.sql;
+              exports fr.codemori.banque.api;    // seul ce package est visible de l’extérieur
+          }
+          ```
+    exercises:
+      - id: java-pkg-q1
+        type: mcq
+        prompt: Quel package est importé automatiquement ?
+        choices: ['java.lang', 'java.util', 'java.io', 'Aucun']
+        answer: 0
+      - id: java-pkg-q2
+        type: mcq
+        prompt: Quelle convention pour un nom de package ?
+        choices: ['Nom de domaine inversé en minuscules (fr.codemori.jeu)', 'PascalCase', 'MAJUSCULES', 'Avec des espaces']
+        answer: 0
+      - id: java-pkg-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import static java.lang.Math.max;
+          public class Main {
+              static class Compteur { static int total = 0; int id = ++total; }
+              class Interne { int valeur() { return base * 2; } }
+              int base = 21;
+              public static void main(String[] args) {
+                  new Compteur(); Compteur c = new Compteur();
+                  Main m = new Main();
+                  Main.Interne i = m.new Interne();
+                  System.out.println(c.id + " " + i.valeur() + " " + max(3, 7));
+              }
+          }
+        output: 2 42 7
+      - id: java-pkg-code
+        type: code
+        title: Organisation par classes imbriquées
+        prompt: |
+          Dans un seul fichier, simule une organisation en « packages » avec des classes imbriquées statiques : `Main.Modele.Produit` (record nom/prix) et `Main.Service.Catalogue` (ajout, recherche par préfixe de nom, total des prix).
+
+          Commandes : `ajouter nom prix`, `chercher prefixe` (noms trouvés triés, séparés par des virgules, ou `aucun`), `total`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static class Modele {
+                  record Produit(String nom, int prix) {}
+              }
+              static class Service {
+                  static class Catalogue {
+                      private final List<Modele.Produit> produits = new ArrayList<>();
+                      void ajouter(String nom, int prix) { produits.add(new Modele.Produit(nom, prix)); }
+                      List<String> chercher(String p) {
+                          List<String> r = new ArrayList<>();
+                          for (Modele.Produit x : produits) if (x.nom().startsWith(p)) r.add(x.nom());
+                          Collections.sort(r);
+                          return r;
+                      }
+                      int total() { int t = 0; for (Modele.Produit x : produits) t += x.prix(); return t; }
+                  }
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Service.Catalogue cat = new Service.Catalogue();
+                  while (sc.hasNext()) {
+                      switch (sc.next()) {
+                          case "ajouter" -> cat.ajouter(sc.next(), sc.nextInt());
+                          case "chercher" -> {
+                              List<String> r = cat.chercher(sc.next());
+                              System.out.println(r.isEmpty() ? "aucun" : String.join(",", r));
+                          }
+                          default -> System.out.println(cat.total());
+                      }
+                  }
+              }
+          }
+        tests:
+          - { input: "ajouter stylo 2\najouter stabilo 3\najouter cahier 5\nchercher st\nchercher z\ntotal", output: "stabilo,stylo\naucun\n10" }
+          - { input: total, output: '0', hidden: true }
+    project:
+      id: java-pkg-projet
+      type: code
+      title: Résolveur d’imports
+      difficulty: 3
+      prompt: |
+        Écris un petit outil qui analyse un fichier Java : lis toutes les lignes, repère la ligne `package …;` et les lignes `import …;` (y compris `import static`), puis affiche :
+
+        - `package : <nom>` (ou `package : (défaut)`) ;
+        - les imports normaux triés, un par ligne, préfixés de `+ ` ;
+        - les imports statiques triés, préfixés de `s ` ;
+        - `doublons : N` (imports identiques répétés).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String pkg = "(défaut)";
+                TreeSet<String> imports = new TreeSet<>(), statiques = new TreeSet<>();
+                int doublons = 0;
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine().strip();
+                    if (l.startsWith("package ")) pkg = l.substring(8, l.length() - 1).strip();
+                    else if (l.startsWith("import static ")) { if (!statiques.add(l.substring(14, l.length() - 1).strip())) doublons++; }
+                    else if (l.startsWith("import ")) { if (!imports.add(l.substring(7, l.length() - 1).strip())) doublons++; }
+                }
+                System.out.println("package : " + pkg);
+                for (String i : imports) System.out.println("+ " + i);
+                for (String s : statiques) System.out.println("s " + s);
+                System.out.println("doublons : " + doublons);
+            }
+        }
+      tests:
+        - { input: "package fr.codemori.jeu;\n\nimport java.util.List;\nimport static java.lang.Math.max;\nimport java.io.File;\nimport java.util.List;\n\npublic class Jeu {}", output: "package : fr.codemori.jeu\n+ java.io.File\n+ java.util.List\ns java.lang.Math.max\ndoublons : 1" }
+        - { input: 'public class A {}', output: "package : (défaut)\ndoublons : 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-pkg-ex1
+          type: mcq
+          prompt: Que déclare `exports` dans module-info.java ?
+          choices: ['Les packages visibles par les autres modules', 'Les dépendances', 'La classe principale', 'Les tests']
+          answer: 0
+        - id: java-pkg-ex2
+          type: mcq
+          prompt: Quelle différence entre une classe imbriquée static et une classe interne ?
+          choices: ['La classe interne a accès à l’instance englobante', 'Aucune', 'La static est privée', 'La classe interne est plus rapide']
+          answer: 0
+        - id: java-pkg-ex3
+          type: mcq
+          prompt: Que fait `import static java.lang.Math.max;` ?
+          choices: ['Permet d’écrire max(…) sans préfixe', 'Importe toute la classe Math', 'Rend max statique', 'Rien']
+          answer: 0
