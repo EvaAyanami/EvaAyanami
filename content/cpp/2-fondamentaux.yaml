@@ -1,0 +1,2631 @@
+language: cpp
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: cpp-pointeurs
+    title: Pointeurs
+    summary: Adresses mémoire, déclaration et déréférencement de pointeurs, nullptr, arithmétique de pointeurs et pointeurs vers des structures.
+    minutes: 35
+    concepts: [pointeurs]
+    sections:
+      - title: Adresses et pointeurs
+        body: |
+          Chaque variable occupe une place en mémoire, repérée par une **adresse**. Un **pointeur** est une variable qui contient une adresse.
+
+          ```cpp
+          int x = 42;
+          int* p = &x;        // & : « adresse de » ; p pointe vers x
+          std::cout << *p;    // * : « valeur pointée » → 42
+          *p = 7;             // modifie x à travers p
+          std::cout << x;     // 7
+
+          int* vide = nullptr;   // pointeur qui ne pointe sur rien
+          if (vide != nullptr) { /* … */ }
+          ```
+
+          ⚠️ Déréférencer `nullptr` ou un pointeur non initialisé est un **comportement indéfini** (souvent un plantage « Segmentation fault »).
+      - title: Arithmétique et tableaux
+        body: |
+          Un nom de tableau se convertit en pointeur vers son premier élément :
+
+          ```cpp
+          int t[4] = {10, 20, 30, 40};
+          int* p = t;            // &t[0]
+          std::cout << *(p + 2); // 30 : avance de 2 ÉLÉMENTS (pas octets)
+          p++;                   // pointe maintenant sur t[1]
+          ```
+
+          Pointeur vers une structure : l’opérateur `->` combine déréférencement et accès au membre :
+
+          ```cpp
+          struct Point { int x, y; };
+          Point pt{3, 4};
+          Point* pp = &pt;
+          pp->x = 10;            // équivalent à (*pp).x = 10
+          ```
+
+          `const` et pointeurs : `const int* p` (valeur pointée non modifiable), `int* const p` (pointeur non réassignable).
+    exercises:
+      - id: cpp-ptr-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int a = 5, b = 9;
+              int* p = &a;
+              *p += 10;
+              p = &b;
+              *p *= 2;
+              std::cout << a << " " << b << " " << *p << "\n";
+          }
+        output: 15 18 18
+        concepts: [pointeurs]
+      - id: cpp-ptr-q1
+        type: mcq
+        prompt: Que contient un pointeur ?
+        choices: [Une adresse mémoire, Une copie de la valeur, Le nom d’une variable, Toujours nullptr]
+        answer: 0
+      - id: cpp-ptr-q2
+        type: mcq
+        prompt: Que signifie `p->x` ?
+        choices: ['(*p).x', '&p.x', 'p.x', '*p.x']
+        answer: 0
+      - id: cpp-ptr-fill
+        type: fill
+        prompt: Complète pour modifier `n` via un pointeur.
+        code: |
+          #include <iostream>
+          int main() {
+              int n = 1;
+              int* p = {{?}}n;
+              {{?}}p = 100;
+              std::cout << n << "\n";
+          }
+        blanks: [['&'], ['*']]
+        tests:
+          - { input: '', output: '100' }
+      - id: cpp-ptr-bug
+        type: bugfix
+        prompt: Ce programme plante (segmentation fault). Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          int main() {
+              int* p = nullptr;
+              int valeur = 3;
+              *p = valeur;
+              std::cout << *p << "\n";
+          }
+        bugLines: [5]
+        choices:
+          - On déréférence un pointeur nul ; il faut d’abord le faire pointer vers une variable valide
+          - Il faut écrire &p
+          - valeur doit être un pointeur
+        answer: 0
+        solution: |
+          #include <iostream>
+          int main() {
+              int cible = 0;
+              int* p = &cible;
+              int valeur = 3;
+              *p = valeur;
+              std::cout << *p << "\n";
+          }
+        tests:
+          - { input: '', output: '3' }
+      - id: cpp-ptr-code
+        type: code
+        title: Minimum et maximum par pointeurs
+        prompt: |
+          Écris `void minMax(const int* debut, int n, int* mini, int* maxi)` qui parcourt le tableau **avec de l’arithmétique de pointeurs** et écrit les résultats via `mini` et `maxi`.
+
+          Le programme lit `n` puis `n` entiers et affiche `min max`.
+        starter: |
+          #include <iostream>
+          #include <vector>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<int> v(n);
+              for (auto& x : v) std::cin >> x;
+              int mi, ma;
+              minMax(v.data(), n, &mi, &ma);
+              std::cout << mi << " " << ma << "\n";
+          }
+        solution: |
+          #include <iostream>
+          #include <vector>
+
+          void minMax(const int* debut, int n, int* mini, int* maxi) {
+              *mini = *debut;
+              *maxi = *debut;
+              for (const int* p = debut; p != debut + n; ++p) {
+                  if (*p < *mini) *mini = *p;
+                  if (*p > *maxi) *maxi = *p;
+              }
+          }
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<int> v(n);
+              for (auto& x : v) std::cin >> x;
+              int mi, ma;
+              minMax(v.data(), n, &mi, &ma);
+              std::cout << mi << " " << ma << "\n";
+          }
+        tests:
+          - { input: "4\n4 -2 9 7", output: -2 9 }
+          - { input: "1\n5", output: 5 5, hidden: true }
+        require:
+          - { pattern: 'int\s*\*\s*mini', message: 'minMax doit recevoir des pointeurs' }
+        concepts: [pointeurs]
+    project:
+      id: cpp-ptr-projet
+      type: code
+      title: Inversion en place
+      difficulty: 2
+      prompt: |
+        Écris `void inverser(int* debut, int* fin)` qui inverse le tableau `[debut, fin)` en échangeant les éléments depuis les deux extrémités avec deux pointeurs qui se rapprochent.
+
+        Lis `n` puis `n` entiers et affiche le tableau inversé (séparé par des espaces).
+      starter: |
+        #include <iostream>
+        #include <vector>
+
+        int main() {
+            int n;
+            std::cin >> n;
+            std::vector<int> v(n);
+            for (auto& x : v) std::cin >> x;
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+
+        void inverser(int* debut, int* fin) {
+            while (debut < fin) {
+                --fin;
+                if (debut >= fin) break;
+                int t = *debut;
+                *debut = *fin;
+                *fin = t;
+                ++debut;
+            }
+        }
+
+        int main() {
+            int n;
+            std::cin >> n;
+            std::vector<int> v(n);
+            for (auto& x : v) std::cin >> x;
+            inverser(v.data(), v.data() + n);
+            for (int i = 0; i < n; ++i) std::cout << (i ? " " : "") << v[i];
+            std::cout << "\n";
+        }
+      tests:
+        - { input: "5\n1 2 3 4 5", output: 5 4 3 2 1 }
+        - { input: "4\n7 8 9 10", output: 10 9 8 7, hidden: true }
+        - { input: "1\n42", output: '42', hidden: true }
+      require:
+        - { pattern: 'void\s+inverser\s*\(\s*int\s*\*', message: 'inverser doit recevoir des pointeurs' }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-ptr-ex1
+          type: mcq
+          prompt: Que vaut `*(t + 3)` pour un tableau t ?
+          choices: ['t[3]', 'L’adresse de t[3]', 't[0] + 3', 'Erreur']
+          answer: 0
+        - id: cpp-ptr-ex2
+          type: mcq
+          prompt: Quelle valeur utiliser pour un pointeur qui ne pointe sur rien ?
+          choices: ['nullptr', '0 uniquement', 'void', 'NULLPTR']
+          answer: 0
+        - id: cpp-ptr-ex3
+          type: mcq
+          prompt: Avec `const int* p`, que ne peut-on pas faire ?
+          choices: [Modifier la valeur pointée via p, Faire pointer p ailleurs, Lire *p, Comparer p]
+          answer: 0
+        - id: cpp-ptr-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                int t[] = {3, 6, 9, 12};
+                int* p = t + 1;
+                std::cout << *p << " " << p[2] << " " << *(p - 1) << "\n";
+            }
+          output: 6 12 3
+
+  # ------------------------------------------------------------------
+  - slug: cpp-references
+    title: Références
+    summary: Alias avec les références, passage par référence et par référence constante, différence avec les pointeurs et références pendantes.
+    minutes: 25
+    concepts: [references]
+    sections:
+      - title: Un autre nom pour une variable
+        body: |
+          Une **référence** est un **alias** : un second nom pour une variable existante.
+
+          ```cpp
+          int x = 10;
+          int& r = x;     // r EST x
+          r += 5;
+          std::cout << x; // 15
+          ```
+
+          | | Référence `T&` | Pointeur `T*` |
+          |---|---|---|
+          | Doit être initialisée | ✅ | non |
+          | Peut être nulle | ❌ | ✅ (`nullptr`) |
+          | Peut changer de cible | ❌ | ✅ |
+          | Syntaxe | comme la variable | `*p`, `p->` |
+
+          Les références sont plus simples et plus sûres : préfère-les aux pointeurs quand un objet est forcément présent.
+      - title: Usages et pièges
+        body: |
+          ```cpp
+          void doubler(int& n) { n *= 2; }                        // modifier l’argument
+          int longueur(const std::string& s) { return s.size(); } // lire sans copier
+
+          for (auto& x : v) x += 1;                               // modifier les éléments
+          ```
+
+          **Référence pendante** : ne jamais renvoyer une référence vers une variable locale !
+
+          ```cpp
+          const std::string& mauvais() {
+              std::string s = "temporaire";
+              return s;          // ⚠️ s est détruite : référence invalide (UB)
+          }
+          ```
+
+          Une `const T&` peut se lier à une valeur temporaire (`const int& r = 5;`), une `T&` non.
+    exercises:
+      - id: cpp-ref-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> v{1, 2, 3};
+              for (auto x : v) x *= 10;
+              for (auto& x : v) x += 1;
+              int& premier = v[0];
+              premier = 100;
+              std::cout << v[0] << " " << v[1] << " " << v[2] << "\n";
+          }
+        output: 100 3 4
+        explanation: La première boucle modifie des copies ; la seconde modifie les éléments.
+        concepts: [references]
+      - id: cpp-ref-q1
+        type: mcq
+        prompt: Une référence peut-elle être réassignée pour désigner une autre variable ?
+        choices: [Non, Oui, Seulement si elle est const, Seulement avec &=]
+        answer: 0
+      - id: cpp-ref-q2
+        type: mcq
+        prompt: Pourquoi renvoyer une référence vers une variable locale est-il dangereux ?
+        choices: [La variable est détruite à la fin de la fonction (référence pendante), C’est trop lent, Ça ne compile jamais, Ce n’est pas dangereux]
+        answer: 0
+      - id: cpp-ref-bug
+        type: bugfix
+        prompt: La fonction est censée incrémenter le compteur mais n’a aucun effet. Trouve la ligne à corriger.
+        code: |
+          #include <iostream>
+          void incrementer(int c) {
+              c++;
+          }
+          int main() {
+              int compteur = 0;
+              incrementer(compteur);
+              incrementer(compteur);
+              std::cout << compteur << "\n";
+          }
+        bugLines: [2]
+        choices:
+          - Le paramètre est passé par valeur (copie) ; il faut int&
+          - c++ ne fonctionne pas sur un int
+          - Il faut appeler incrementer(&compteur)
+        answer: 0
+        solution: |
+          #include <iostream>
+          void incrementer(int& c) {
+              c++;
+          }
+          int main() {
+              int compteur = 0;
+              incrementer(compteur);
+              incrementer(compteur);
+              std::cout << compteur << "\n";
+          }
+        tests:
+          - { input: '', output: '2' }
+      - id: cpp-ref-code
+        type: code
+        title: Normaliser des notes
+        prompt: |
+          Écris `void normaliser(std::vector<double>& notes, double bareme)` qui ramène chaque note sur 20 (note × 20 / bareme), **en modifiant le vecteur en place**, et `double moyenne(const std::vector<double>& notes)`.
+
+          Entrée : le barème, puis `n`, puis `n` notes. Affiche les notes normalisées (1 décimale, séparées par des espaces) puis la moyenne (2 décimales).
+        starter: |
+          #include <iostream>
+          #include <vector>
+          #include <iomanip>
+
+          int main() {
+              double bareme;
+              int n;
+              std::cin >> bareme >> n;
+              std::vector<double> notes(n);
+              for (auto& x : notes) std::cin >> x;
+          }
+        solution: |
+          #include <iostream>
+          #include <vector>
+          #include <iomanip>
+
+          void normaliser(std::vector<double>& notes, double bareme) {
+              for (auto& x : notes) x = x * 20 / bareme;
+          }
+
+          double moyenne(const std::vector<double>& notes) {
+              double s = 0;
+              for (double x : notes) s += x;
+              return s / notes.size();
+          }
+
+          int main() {
+              double bareme;
+              int n;
+              std::cin >> bareme >> n;
+              std::vector<double> notes(n);
+              for (auto& x : notes) std::cin >> x;
+              normaliser(notes, bareme);
+              std::cout << std::fixed << std::setprecision(1);
+              for (int i = 0; i < n; ++i) std::cout << (i ? " " : "") << notes[i];
+              std::cout << "\n" << std::setprecision(2) << moyenne(notes) << "\n";
+          }
+        tests:
+          - { input: "40\n3\n20 30 35", output: "10.0 15.0 17.5\n14.17" }
+          - { input: "10\n2\n10 0", output: "20.0 0.0\n10.00", hidden: true }
+        require:
+          - { pattern: 'std::vector<double>\s*&\s*notes', message: 'normaliser doit recevoir le vecteur par référence' }
+          - { pattern: 'const\s+std::vector<double>\s*&', message: 'moyenne doit recevoir une référence constante' }
+        concepts: [references]
+    project:
+      id: cpp-ref-projet
+      type: code
+      title: Compte bancaire par références
+      difficulty: 2
+      prompt: |
+        Écris `bool appliquer(long long& solde, const std::string& op, long long montant)` : `depot` ajoute, `retrait` retire si le solde suffit (sinon renvoie false sans modifier).
+
+        Première ligne : solde initial. Lignes suivantes : `op montant`. Affiche `Refusé : retrait N` pour chaque refus, puis `Solde final : X`.
+      starter: |
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            long long solde;
+            std::cin >> solde;
+            std::string op;
+            long long m;
+            while (std::cin >> op >> m) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+
+        bool appliquer(long long& solde, const std::string& op, long long montant) {
+            if (op == "depot") {
+                solde += montant;
+                return true;
+            }
+            if (solde >= montant) {
+                solde -= montant;
+                return true;
+            }
+            return false;
+        }
+
+        int main() {
+            long long solde;
+            std::cin >> solde;
+            std::string op;
+            long long m;
+            while (std::cin >> op >> m) {
+                if (!appliquer(solde, op, m)) std::cout << "Refusé : " << op << " " << m << "\n";
+            }
+            std::cout << "Solde final : " << solde << "\n";
+        }
+      tests:
+        - { input: "100\ndepot 50\nretrait 120\nretrait 40", output: "Refusé : retrait 40\nSolde final : 30" }
+        - { input: "0\nretrait 1\ndepot 1\nretrait 1", output: "Refusé : retrait 1\nSolde final : 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-ref-ex1
+          type: mcq
+          prompt: Une référence doit-elle être initialisée lors de sa déclaration ?
+          choices: [Oui, Non, Seulement si const, Seulement en C++20]
+          answer: 0
+        - id: cpp-ref-ex2
+          type: mcq
+          prompt: Quel paramètre choisir pour lire un gros objet sans le copier ni le modifier ?
+          choices: ['const T&', 'T', 'T&', 'T*']
+          answer: 0
+        - id: cpp-ref-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            void f(int& a, int b) { a += b; b += a; }
+            int main() {
+                int x = 2, y = 3;
+                f(x, y);
+                f(y, x);
+                std::cout << x << " " << y << "\n";
+            }
+          output: 5 8
+        - id: cpp-ref-ex4
+          type: mcq
+          prompt: Peut-on écrire `int& r = 5;` ?
+          choices: ['Non (une const int& le permettrait)', Oui, Seulement en C++23, Oui mais r vaut 0]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-stack-heap
+    title: Stack et Heap
+    summary: Durée de vie des objets, pile et tas, portée automatique, objets statiques et pourquoi le tas est nécessaire.
+    minutes: 25
+    concepts: [memoire]
+    sections:
+      - title: Pile et tas en C++
+        body: |
+          - **Pile (stack)** : variables locales, durée de vie **automatique** — détruites à la fin de leur bloc. Allocation quasi gratuite, taille limitée (souvent 1 à 8 Mo).
+          - **Tas (heap)** : mémoire allouée **dynamiquement** (`new`, conteneurs comme `std::vector`), qui vit jusqu’à sa libération explicite (ou par un propriétaire RAII).
+          - **Mémoire statique** : variables globales et `static`, vivantes pendant tout le programme.
+
+          ```cpp
+          void f() {
+              int local = 5;                 // pile
+              std::vector<int> v(1000);      // l’objet v sur la pile, ses 1000 int sur le tas
+              static int appels = 0;         // statique : conserve sa valeur entre les appels
+              ++appels;
+          } // local et v détruits ici ; le vector libère automatiquement son tas
+          ```
+      - title: Pourquoi le tas ?
+        body: |
+          On utilise le tas quand :
+
+          - la taille n’est connue qu’à l’exécution (un fichier, une saisie) ;
+          - la donnée est très grosse (risque de *stack overflow*) ;
+          - l’objet doit survivre à la fonction qui le crée.
+
+          ⚠️ Une récursion trop profonde ou un énorme tableau local (`int t[10'000'000];`) provoque un **débordement de pile**.
+
+          En C++ moderne, on manipule rarement le tas directement : `std::vector`, `std::string`, `std::unique_ptr` le gèrent pour nous (**RAII**, voir le niveau Intermédiaire).
+    exercises:
+      - id: cpp-mem-q1
+        type: mcq
+        prompt: Quand une variable locale est-elle détruite ?
+        choices: [À la fin du bloc où elle est déclarée, À la fin du programme, Quand on appelle delete, Jamais]
+        answer: 0
+        concepts: [memoire]
+      - id: cpp-mem-q2
+        type: mcq
+        prompt: Où sont stockés les éléments d’un std::vector ?
+        choices: [Sur le tas, Sur la pile, Dans les registres, Dans le binaire]
+        answer: 0
+      - id: cpp-mem-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int compter() {
+              static int n = 0;
+              int local = 0;
+              ++n;
+              ++local;
+              return n * 10 + local;
+          }
+          int main() {
+              compter();
+              compter();
+              std::cout << compter() << "\n";
+          }
+        output: '31'
+      - id: cpp-mem-bug
+        type: bugfix
+        prompt: Cette fonction renvoie un pointeur invalide. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          int* creer() {
+              int valeur = 42;
+              return &valeur;
+          }
+          int main() {
+              int* p = creer();
+              std::cout << *p << "\n";
+          }
+        bugLines: [4]
+        choices:
+          - On renvoie l’adresse d’une variable locale détruite à la fin de la fonction
+          - Il faut renvoyer *valeur
+          - main ne peut pas recevoir de pointeur
+        answer: 0
+        solution: |
+          #include <iostream>
+          int creer() {
+              int valeur = 42;
+              return valeur;
+          }
+          int main() {
+              int v = creer();
+              std::cout << v << "\n";
+          }
+        tests:
+          - { input: '', output: '42' }
+      - id: cpp-mem-code
+        type: code
+        title: Compteur d’appels
+        prompt: |
+          Écris `int prochainIdentifiant()` qui renvoie 1, puis 2, puis 3… à chaque appel, grâce à une variable locale `static` (pas de variable globale).
+
+          Pour chaque nom lu, affiche `#id nom`.
+        starter: |
+          #include <iostream>
+          #include <string>
+
+          int main() {
+              std::string nom;
+              while (std::cin >> nom) {
+                  std::cout << "#" << prochainIdentifiant() << " " << nom << "\n";
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+
+          int prochainIdentifiant() {
+              static int compteur = 0;
+              return ++compteur;
+          }
+
+          int main() {
+              std::string nom;
+              while (std::cin >> nom) {
+                  std::cout << "#" << prochainIdentifiant() << " " << nom << "\n";
+              }
+          }
+        tests:
+          - { input: Ada Bob Kiri, output: "#1 Ada\n#2 Bob\n#3 Kiri" }
+          - { input: Solo, output: '#1 Solo', hidden: true }
+        require:
+          - { pattern: 'static\s+int', message: Utiliser une variable locale static }
+    project:
+      id: cpp-mem-projet
+      type: code
+      title: Profondeur de récursion
+      difficulty: 2
+      prompt: |
+        Écris une fonction récursive `long long sommeRec(int n)` (somme de 1 à n) et une version itérative `long long sommeIter(int n)`.
+
+        Pour chaque `n` lu : si `n <= 10000`, affiche `récursif : S` ; sinon affiche `itératif : S` (pour éviter un débordement de pile avec une récursion trop profonde).
+      starter: |
+        #include <iostream>
+
+        int main() {
+            int n;
+            while (std::cin >> n) {
+            }
+        }
+      solution: |
+        #include <iostream>
+
+        long long sommeRec(int n) {
+            return n <= 0 ? 0 : n + sommeRec(n - 1);
+        }
+
+        long long sommeIter(int n) {
+            long long s = 0;
+            for (int i = 1; i <= n; ++i) s += i;
+            return s;
+        }
+
+        int main() {
+            int n;
+            while (std::cin >> n) {
+                if (n <= 10000) std::cout << "récursif : " << sommeRec(n) << "\n";
+                else std::cout << "itératif : " << sommeIter(n) << "\n";
+            }
+        }
+      tests:
+        - { input: "10\n100000", output: "récursif : 55\nitératif : 5000050000" }
+        - { input: "0\n10000\n50000000", output: "récursif : 0\nrécursif : 50005000\nitératif : 1250000025000000", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-mem-ex1
+          type: mcq
+          prompt: Que provoque une récursion infinie ?
+          choices: [Un débordement de pile (stack overflow), Une fuite de tas, Une erreur de compilation, Rien]
+          answer: 0
+        - id: cpp-mem-ex2
+          type: mcq
+          prompt: Combien de temps vit une variable locale static ?
+          choices: [Pendant tout le programme, Jusqu’à la fin de la fonction, Jusqu’au prochain appel, Une seconde]
+          answer: 0
+        - id: cpp-mem-ex3
+          type: mcq
+          prompt: Pourquoi ne pas déclarer `int t[10000000];` en variable locale ?
+          choices: [Risque de débordement de pile, C’est interdit, C’est trop lent à compiler, Les tableaux sont limités à 100 éléments]
+          answer: 0
+        - id: cpp-mem-ex4
+          type: mcq
+          prompt: En C++ moderne, qui libère la mémoire du tas d’un std::vector ?
+          choices: [Son destructeur automatiquement (RAII), Le programmeur avec delete, Le garbage collector, Le système à la fin seulement]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-allocation
+    title: Allocation mémoire
+    summary: new et delete, tableaux dynamiques new[]/delete[], fuites mémoire, double libération et premiers pas vers unique_ptr.
+    minutes: 30
+    concepts: [memoire, pointeurs]
+    sections:
+      - title: new et delete
+        body: |
+          ```cpp
+          int* p = new int(42);        // alloue un int sur le tas
+          std::cout << *p;
+          delete p;                    // libère
+          p = nullptr;                 // évite un pointeur pendant
+
+          int n = 5;
+          int* t = new int[n]{};       // tableau dynamique initialisé à 0
+          t[2] = 7;
+          delete[] t;                  // ⚠️ delete[] pour un tableau
+          ```
+
+          Chaque `new` doit correspondre à **exactement un** `delete` (et `new[]` à `delete[]`).
+      - title: Les erreurs classiques
+        body: |
+          | Erreur | Conséquence |
+          |---|---|
+          | Oublier `delete` | **fuite mémoire** |
+          | `delete` deux fois | **double free** → plantage / faille |
+          | Utiliser après `delete` | **use-after-free** → UB |
+          | `delete` au lieu de `delete[]` | UB |
+          | Exception entre `new` et `delete` | fuite |
+
+          C’est pourquoi le C++ moderne **évite `new`/`delete` explicites** au profit de :
+
+          ```cpp
+          #include <memory>
+          auto p = std::make_unique<int>(42);         // libéré automatiquement
+          auto t = std::make_unique<int[]>(5);
+          std::vector<int> v(5);                      // encore plus simple
+          ```
+
+          Outils : `-fsanitize=address` (AddressSanitizer), **Valgrind**.
+    exercises:
+      - id: cpp-alloc-q1
+        type: mcq
+        prompt: Comment libérer un tableau alloué avec `new int[10]` ?
+        choices: ['delete[] t;', 'delete t;', 'free(t);', 'Rien, c’est automatique']
+        answer: 0
+      - id: cpp-alloc-q2
+        type: mcq
+        prompt: Qu’est-ce qu’une fuite mémoire ?
+        choices: [De la mémoire allouée jamais libérée, Une lecture hors limites, Un pointeur nul, Une variable non initialisée]
+        answer: 0
+      - id: cpp-alloc-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int n = 4;
+              int* t = new int[n];
+              for (int i = 0; i < n; ++i) t[i] = i * i;
+              int s = 0;
+              for (int i = 0; i < n; ++i) s += t[i];
+              delete[] t;
+              std::cout << s << "\n";
+          }
+        output: '14'
+      - id: cpp-alloc-bug
+        type: bugfix
+        prompt: Ce programme libère deux fois le même objet (le destructeur trace chaque libération). Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          struct Ressource {
+              ~Ressource() { std::cout << "libéré\n"; }
+          };
+          int main() {
+              Ressource* a = new Ressource;
+              Ressource* b = a;
+              delete a;
+              delete b;
+              std::cout << "fin\n";
+          }
+        bugLines: [9]
+        choices:
+          - a et b pointent vers le même objet ; le libérer deux fois est un double free
+          - Il faut delete[] a
+          - b n’a pas été initialisé
+        answer: 0
+        solution: |
+          #include <iostream>
+          struct Ressource {
+              ~Ressource() { std::cout << "libéré\n"; }
+          };
+          int main() {
+              Ressource* a = new Ressource;
+              Ressource* b = a;
+              delete a;
+              a = b = nullptr;
+              std::cout << "fin\n";
+          }
+        tests:
+          - { input: '', output: "libéré\nfin" }
+      - id: cpp-alloc-code
+        type: code
+        title: Tableau dynamique
+        prompt: |
+          Lis `n` puis `n` entiers dans un tableau alloué avec `new int[n]`. Affiche les valeurs à l’envers puis libère correctement la mémoire avec `delete[]`.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              int n;
+              std::cin >> n;
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              int* t = new int[n];
+              for (int i = 0; i < n; ++i) std::cin >> t[i];
+              for (int i = n - 1; i >= 0; --i) std::cout << t[i] << (i ? " " : "\n");
+              delete[] t;
+          }
+        tests:
+          - { input: "4\n1 2 3 4", output: 4 3 2 1 }
+          - { input: "1\n9", output: '9', hidden: true }
+        require:
+          - { pattern: 'new\s+int\s*\[', message: 'Allouer avec new int[n]' }
+          - { pattern: 'delete\s*\[\s*\]', message: 'Libérer avec delete[]' }
+    project:
+      id: cpp-alloc-projet
+      type: code
+      title: Vecteur dynamique maison
+      difficulty: 3
+      prompt: |
+        Implémente une petite structure `struct Tableau { int* donnees; int taille; int capacite; };` avec :
+
+        - `void ajouter(Tableau& t, int x)` : si plein, alloue une zone **deux fois plus grande** (`new int[]`), copie, libère l’ancienne (`delete[]`) ;
+        - `void liberer(Tableau& t)`.
+
+        Capacité initiale : 1. Pour chaque entier lu, ajoute-le et affiche `taille/capacité`. Termine par la somme des éléments.
+      starter: |
+        #include <iostream>
+
+        struct Tableau {
+            int* donnees;
+            int taille;
+            int capacite;
+        };
+
+        int main() {
+            Tableau t{new int[1], 0, 1};
+            int x;
+            while (std::cin >> x) {
+            }
+        }
+      solution: |
+        #include <iostream>
+
+        struct Tableau {
+            int* donnees;
+            int taille;
+            int capacite;
+        };
+
+        void ajouter(Tableau& t, int x) {
+            if (t.taille == t.capacite) {
+                int* nouveau = new int[t.capacite * 2];
+                for (int i = 0; i < t.taille; ++i) nouveau[i] = t.donnees[i];
+                delete[] t.donnees;
+                t.donnees = nouveau;
+                t.capacite *= 2;
+            }
+            t.donnees[t.taille++] = x;
+        }
+
+        void liberer(Tableau& t) {
+            delete[] t.donnees;
+            t.donnees = nullptr;
+            t.taille = t.capacite = 0;
+        }
+
+        int main() {
+            Tableau t{new int[1], 0, 1};
+            int x;
+            while (std::cin >> x) {
+                ajouter(t, x);
+                std::cout << t.taille << "/" << t.capacite << "\n";
+            }
+            long long s = 0;
+            for (int i = 0; i < t.taille; ++i) s += t.donnees[i];
+            std::cout << s << "\n";
+            liberer(t);
+        }
+      tests:
+        - { input: 5 6 7 8 9, output: "1/1\n2/2\n3/4\n4/4\n5/8\n35" }
+        - { input: '42', output: "1/1\n42", hidden: true }
+      require:
+        - { pattern: 'delete\s*\[\s*\]', message: 'Libérer l’ancienne zone avec delete[]' }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-alloc-ex1
+          type: mcq
+          prompt: Que se passe-t-il si on utilise un pointeur après delete ?
+          choices: [Comportement indéfini (use-after-free), Il vaut automatiquement nullptr, Exception, Rien de grave]
+          answer: 0
+        - id: cpp-alloc-ex2
+          type: mcq
+          prompt: Quelle alternative moderne remplace `new int(5)` ?
+          choices: ['std::make_unique<int>(5)', 'malloc', 'alloc<int>', 'new_safe']
+          answer: 0
+        - id: cpp-alloc-ex3
+          type: mcq
+          prompt: Quel outil détecte les fuites et accès invalides à l’exécution ?
+          choices: [AddressSanitizer / Valgrind, Le préprocesseur, cmake, git]
+          answer: 0
+        - id: cpp-alloc-ex4
+          type: mcq
+          prompt: Pourquoi mettre un pointeur à nullptr après delete ?
+          choices: [Pour éviter un pointeur pendant réutilisé par erreur, C’est obligatoire, Pour libérer plus vite, Pour le recycler]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-classes
+    title: Classes
+    summary: Définir une classe avec attributs et méthodes, sections public/private, méthodes const et séparation déclaration/définition.
+    minutes: 35
+    concepts: [classes, structs]
+    sections:
+      - title: Une première classe
+        body: |
+          ```cpp
+          class Rectangle {
+          public:                                  // accessible de l’extérieur
+              double aire() const { return largeur * hauteur; }
+              void redimensionner(double l, double h) {
+                  if (l > 0 && h > 0) { largeur = l; hauteur = h; }
+              }
+          private:                                 // réservé à la classe
+              double largeur = 1.0;
+              double hauteur = 1.0;
+          };                                       // ⚠️ point-virgule final
+
+          Rectangle r;
+          r.redimensionner(3, 4);
+          std::cout << r.aire();   // 12
+          ```
+
+          - `class` : membres **privés** par défaut ; `struct` : **publics** par défaut. C’est la seule différence.
+          - Une méthode `const` promet de ne pas modifier l’objet : elle peut être appelée sur un objet `const`.
+      - title: Organisation en fichiers
+        body: |
+          ```cpp
+          // rectangle.hpp
+          #pragma once
+          class Rectangle {
+          public:
+              double aire() const;
+          private:
+              double largeur = 1, hauteur = 1;
+          };
+
+          // rectangle.cpp
+          #include "rectangle.hpp"
+          double Rectangle::aire() const { return largeur * hauteur; }
+          ```
+
+          `Rectangle::aire` (opérateur de portée `::`) définit la méthode en dehors de la classe. `#pragma once` évite les inclusions multiples.
+
+          `this` est un pointeur vers l’objet courant : `this->largeur`.
+    exercises:
+      - id: cpp-class-q1
+        type: mcq
+        prompt: Quelle est la seule différence entre class et struct ?
+        choices: [La visibilité par défaut des membres (private / public), struct n’a pas de méthodes, class est plus rapide, struct est réservé au C]
+        answer: 0
+        concepts: [classes]
+      - id: cpp-class-q2
+        type: mcq
+        prompt: Que garantit une méthode déclarée `const` ?
+        choices: [Elle ne modifie pas l’objet, Elle renvoie une constante, Elle est appelée une seule fois, Elle est inline]
+        answer: 0
+      - id: cpp-class-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          class Compteur {
+          public:
+              void incrementer(int pas = 1) { valeur += pas; }
+              int lire() const { return valeur; }
+          private:
+              int valeur = 0;
+          };
+          int main() {
+              Compteur a, b;
+              a.incrementer();
+              a.incrementer(5);
+              b.incrementer(a.lire());
+              std::cout << a.lire() << " " << b.lire() << "\n";
+          }
+        output: 6 6
+        concepts: [classes]
+      - id: cpp-class-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          class Compte {
+              double solde = 0;
+          public:
+              void deposer(double m) { solde += m; }
+          };
+          int main() {
+              Compte c;
+              c.deposer(50);
+              std::cout << c.solde << "\n";
+          }
+        bugLines: [10]
+        choices:
+          - solde est privé (déclaré avant public:) ; il faut un accesseur
+          - deposer devrait être private
+          - On ne peut pas créer d’objet Compte
+        answer: 0
+        solution: |
+          #include <iostream>
+          class Compte {
+              double solde = 0;
+          public:
+              void deposer(double m) { solde += m; }
+              double getSolde() const { return solde; }
+          };
+          int main() {
+              Compte c;
+              c.deposer(50);
+              std::cout << c.getSolde() << "\n";
+          }
+        tests:
+          - { input: '', output: '50' }
+        concepts: [classes]
+      - id: cpp-class-code
+        type: code
+        title: Classe Fraction
+        prompt: |
+          Écris une classe `Fraction` (attributs privés `num`, `den`) avec une méthode `void fixer(long long n, long long d)` qui simplifie la fraction (utilise `std::gcd` de `<numeric>`, dénominateur positif), `Fraction plus(const Fraction& o) const` et `void afficher() const` (format `num/den`).
+
+          Lis deux fractions `a b` et `c d` et affiche leur somme.
+        starter: |
+          #include <iostream>
+          #include <numeric>
+
+          int main() {
+              long long a, b, c, d;
+              std::cin >> a >> b >> c >> d;
+              Fraction f, g;
+              f.fixer(a, b);
+              g.fixer(c, d);
+              f.plus(g).afficher();
+          }
+        solution: |
+          #include <iostream>
+          #include <numeric>
+
+          class Fraction {
+          public:
+              void fixer(long long n, long long d) {
+                  if (d < 0) { n = -n; d = -d; }
+                  long long g = std::gcd(n, d);
+                  if (g == 0) g = 1;
+                  num = n / g;
+                  den = d / g;
+              }
+              Fraction plus(const Fraction& o) const {
+                  Fraction r;
+                  r.fixer(num * o.den + o.num * den, den * o.den);
+                  return r;
+              }
+              void afficher() const { std::cout << num << "/" << den << "\n"; }
+          private:
+              long long num = 0, den = 1;
+          };
+
+          int main() {
+              long long a, b, c, d;
+              std::cin >> a >> b >> c >> d;
+              Fraction f, g;
+              f.fixer(a, b);
+              g.fixer(c, d);
+              f.plus(g).afficher();
+          }
+        tests:
+          - { input: 1 2 1 3, output: 5/6 }
+          - { input: 1 4 1 4, output: 1/2, hidden: true }
+          - { input: -1 2 1 2, output: 0/1, hidden: true }
+        concepts: [classes]
+    project:
+      id: cpp-class-projet
+      type: code
+      title: Inventaire
+      difficulty: 3
+      prompt: |
+        Écris une classe `Inventaire` (vecteur privé d’objets `{nom, quantite, prix}`) avec `void ajouter(const std::string& nom, int q, double prix)` (cumule la quantité si l’objet existe), `double valeurTotale() const` et `void afficher() const` (`nom x quantite` dans l’ordre d’ajout).
+
+        Chaque ligne : `nom quantite prix`. Affiche l’inventaire puis `Total : X.XX`.
+      starter: |
+        #include <iostream>
+        #include <string>
+        #include <vector>
+        #include <iomanip>
+
+        int main() {
+            std::string nom;
+            int q;
+            double prix;
+            while (std::cin >> nom >> q >> prix) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+        #include <vector>
+        #include <iomanip>
+
+        class Inventaire {
+        public:
+            void ajouter(const std::string& nom, int q, double prix) {
+                for (auto& o : objets) {
+                    if (o.nom == nom) { o.quantite += q; return; }
+                }
+                objets.push_back({nom, q, prix});
+            }
+            double valeurTotale() const {
+                double t = 0;
+                for (const auto& o : objets) t += o.quantite * o.prix;
+                return t;
+            }
+            void afficher() const {
+                for (const auto& o : objets) std::cout << o.nom << " x " << o.quantite << "\n";
+            }
+        private:
+            struct Objet { std::string nom; int quantite; double prix; };
+            std::vector<Objet> objets;
+        };
+
+        int main() {
+            Inventaire inv;
+            std::string nom;
+            int q;
+            double prix;
+            while (std::cin >> nom >> q >> prix) inv.ajouter(nom, q, prix);
+            inv.afficher();
+            std::cout << "Total : " << std::fixed << std::setprecision(2) << inv.valeurTotale() << "\n";
+        }
+      tests:
+        - { input: "potion 3 2.5\nepee 1 40\npotion 2 2.5", output: "potion x 5\nepee x 1\nTotal : 52.50" }
+        - { input: "pomme 10 0.3", output: "pomme x 10\nTotal : 3.00", hidden: true }
+      concepts: [classes]
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-class-ex1
+          type: mcq
+          prompt: Que désigne `this` dans une méthode ?
+          choices: [Un pointeur vers l’objet courant, La classe, La méthode, Le module]
+          answer: 0
+        - id: cpp-class-ex2
+          type: mcq
+          prompt: Comment définir la méthode `aire` de `Rectangle` hors de la classe ?
+          choices: ['double Rectangle::aire() const { … }', 'double aire::Rectangle() { … }', 'Rectangle.aire() { … }', 'def aire()']
+          answer: 0
+        - id: cpp-class-ex3
+          type: mcq
+          prompt: Quel est le rôle de `#pragma once` ?
+          choices: [Empêcher l’inclusion multiple d’un en-tête, Optimiser une boucle, Rendre une classe unique, Exécuter une seule fois]
+          answer: 0
+        - id: cpp-class-ex4
+          type: mcq
+          prompt: Peut-on appeler une méthode non const sur un objet const ?
+          choices: [Non, Oui, Seulement si elle est publique, Seulement en C++20]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-objets
+    title: Objets
+    summary: Instancier, copier et comparer des objets, objets sur la pile et dans des conteneurs, membres statiques et objets temporaires.
+    minutes: 25
+    concepts: [classes]
+    sections:
+      - title: Des objets comme des valeurs
+        body: |
+          En C++, les objets se comportent comme des **valeurs** : l’affectation **copie** l’objet (contrairement à Java où l’on copie une référence).
+
+          ```cpp
+          struct Point { int x, y; };
+          Point a{1, 2};
+          Point b = a;      // COPIE indépendante
+          b.x = 100;
+          std::cout << a.x; // 1
+          ```
+
+          Pour partager un même objet : références (`Point& r = a;`) ou pointeurs.
+
+          Les objets se rangent dans des conteneurs : `std::vector<Point> pts{{1, 2}, {3, 4}};`, `pts.emplace_back(5, 6)` (construit directement dans le vecteur, si un constructeur existe).
+      - title: Membres statiques et comparaison
+        body: |
+          Un membre **`static`** est partagé par toutes les instances :
+
+          ```cpp
+          class Joueur {
+          public:
+              Joueur() { ++nombre; }
+              static int total() { return nombre; }
+          private:
+              static inline int nombre = 0;   // C++17 : définition dans la classe
+          };
+          Joueur j1, j2;
+          std::cout << Joueur::total();     // 2
+          ```
+
+          Comparer des objets : il faut définir `operator==` — ou demander au compilateur de le générer (C++20) :
+
+          ```cpp
+          struct Point {
+              int x, y;
+              bool operator==(const Point&) const = default;
+              auto operator<=>(const Point&) const = default;  // <, <=, >, >= générés
+          };
+          ```
+    exercises:
+      - id: cpp-obj-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <vector>
+          struct P { int v; };
+          int main() {
+              P a{1};
+              P b = a;
+              P& r = a;
+              b.v = 5;
+              r.v = 9;
+              std::vector<P> liste{a, b};
+              liste[0].v = 0;
+              std::cout << a.v << " " << b.v << " " << liste[0].v << " " << liste[1].v << "\n";
+          }
+        output: 9 5 0 5
+        concepts: [classes]
+      - id: cpp-obj-q1
+        type: mcq
+        prompt: Que fait `Point b = a;` pour une struct Point ?
+        choices: [Copie l’objet (b est indépendant), b devient une référence à a, Déplace a, Erreur]
+        answer: 0
+      - id: cpp-obj-q2
+        type: mcq
+        prompt: Un membre static est…
+        choices: [Partagé par toutes les instances, Propre à chaque instance, Constant, Privé obligatoirement]
+        answer: 0
+      - id: cpp-obj-fill
+        type: fill
+        prompt: Complète pour que le compilateur génère l’opérateur ==.
+        code: |
+          #include <iostream>
+          struct Couleur {
+              int r, g, b;
+              bool operator==(const Couleur&) const = {{?}};
+          };
+          int main() {
+              Couleur a{1, 2, 3}, b{1, 2, 3};
+              std::cout << (a == b) << "\n";
+          }
+        blanks: [[default]]
+        tests:
+          - { input: '', output: '1' }
+      - id: cpp-obj-code
+        type: code
+        title: Compteur d’instances
+        prompt: |
+          Écris une classe `Ticket` dont chaque instance reçoit un numéro unique croissant (1, 2, 3…) grâce à un compteur `static`. Méthodes : `int numero() const` et `static int emis()`.
+
+          Pour chaque nom lu, crée un `Ticket` dans un `std::vector<Ticket>` et affiche `nom : ticket N`. Termine par `émis : X`.
+        starter: |
+          #include <iostream>
+          #include <string>
+          #include <vector>
+
+          int main() {
+              std::vector<Ticket> tickets;
+              std::string nom;
+              while (std::cin >> nom) {
+                  tickets.emplace_back();
+                  std::cout << nom << " : ticket " << tickets.back().numero() << "\n";
+              }
+              std::cout << "émis : " << Ticket::emis() << "\n";
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <vector>
+
+          class Ticket {
+          public:
+              Ticket() : num(++compteur) {}
+              int numero() const { return num; }
+              static int emis() { return compteur; }
+          private:
+              int num;
+              static inline int compteur = 0;
+          };
+
+          int main() {
+              std::vector<Ticket> tickets;
+              std::string nom;
+              while (std::cin >> nom) {
+                  tickets.emplace_back();
+                  std::cout << nom << " : ticket " << tickets.back().numero() << "\n";
+              }
+              std::cout << "émis : " << Ticket::emis() << "\n";
+          }
+        tests:
+          - { input: Ada Bob, output: "Ada : ticket 1\nBob : ticket 2\némis : 2" }
+          - { input: '', output: 'émis : 0', hidden: true }
+        require:
+          - { pattern: '\bstatic\b', message: Utiliser un membre static }
+    project:
+      id: cpp-obj-projet
+      type: code
+      title: Points et distances
+      difficulty: 2
+      prompt: |
+        Définis `struct Point { double x, y; }` avec `operator==` par défaut et une fonction `double distance(const Point& a, const Point& b)`.
+
+        Entrée : `n` puis `n` points. Affiche la distance totale du chemin qui relie les points dans l’ordre (2 décimales), puis le nombre de points en double (points égaux à un point précédent).
+      starter: |
+        #include <iostream>
+        #include <vector>
+        #include <cmath>
+        #include <iomanip>
+
+        int main() {
+            int n;
+            std::cin >> n;
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+        #include <cmath>
+        #include <iomanip>
+
+        struct Point {
+            double x, y;
+            bool operator==(const Point&) const = default;
+        };
+
+        double distance(const Point& a, const Point& b) {
+            return std::hypot(a.x - b.x, a.y - b.y);
+        }
+
+        int main() {
+            int n;
+            std::cin >> n;
+            std::vector<Point> pts(n);
+            for (auto& p : pts) std::cin >> p.x >> p.y;
+            double total = 0;
+            int doublons = 0;
+            for (int i = 0; i < n; ++i) {
+                if (i > 0) total += distance(pts[i - 1], pts[i]);
+                for (int j = 0; j < i; ++j) {
+                    if (pts[j] == pts[i]) { ++doublons; break; }
+                }
+            }
+            std::cout << std::fixed << std::setprecision(2) << total << "\n" << doublons << "\n";
+        }
+      tests:
+        - { input: "4\n0 0\n3 4\n3 0\n0 0", output: "12.00\n1" }
+        - { input: "1\n5 5", output: "0.00\n0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-obj-ex1
+          type: mcq
+          prompt: Comment appeler une méthode static total() de la classe Joueur ?
+          choices: ['Joueur::total()', 'Joueur.total()', 'static total()', 'this->total()']
+          answer: 0
+        - id: cpp-obj-ex2
+          type: mcq
+          prompt: Que génère `auto operator<=>(const T&) const = default;` ?
+          choices: ['Les comparaisons <, <=, > et >=', 'Le constructeur de copie', 'L’affichage', 'Rien']
+          answer: 0
+        - id: cpp-obj-ex3
+          type: mcq
+          prompt: Quel avantage a emplace_back sur push_back ?
+          choices: [Il construit l’objet directement dans le conteneur, Il trie le vecteur, Il est thread-safe, Aucun]
+          answer: 0
+        - id: cpp-obj-ex4
+          type: mcq
+          prompt: En C++, l’affectation d’objets…
+          choices: [copie l’objet par défaut, partage l’objet comme en Java, déplace toujours, est interdite]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-constructeurs
+    title: Constructeurs
+    summary: Constructeurs par défaut et paramétrés, liste d’initialisation, délégation, explicit, constructeur de copie et règle de zéro.
+    minutes: 30
+    concepts: [classes, constructeurs]
+    sections:
+      - title: Construire un objet valide
+        body: |
+          ```cpp
+          class Temperature {
+          public:
+              Temperature() : Temperature(20.0) {}                 // délégation
+              explicit Temperature(double c) : celsius(c) {        // liste d’initialisation
+                  if (c < -273.15) celsius = -273.15;
+              }
+              double valeur() const { return celsius; }
+          private:
+              double celsius;
+          };
+
+          Temperature t1;          // 20
+          Temperature t2{36.6};
+          // Temperature t3 = 5.0; // ❌ interdit grâce à explicit
+          ```
+
+          - La **liste d’initialisation** (`: celsius(c)`) initialise les membres **avant** le corps : obligatoire pour les membres `const` et les références, plus efficace pour les objets.
+          - Les membres sont initialisés dans **l’ordre de leur déclaration** dans la classe.
+          - `explicit` empêche les conversions implicites surprenantes.
+      - title: Copie et règle de zéro
+        body: |
+          Le compilateur génère automatiquement le **constructeur de copie** et l’**affectation par copie** (copie membre à membre) :
+
+          ```cpp
+          Temperature a{10};
+          Temperature b = a;     // constructeur de copie
+          b = Temperature{30};   // affectation
+          ```
+
+          **Règle de zéro** : si tes membres gèrent eux-mêmes leurs ressources (`std::string`, `std::vector`, `std::unique_ptr`), n’écris **aucune** de ces fonctions spéciales : les versions générées sont correctes.
+
+          On peut aussi les contrôler explicitement : `= default` ou `= delete` (interdire la copie d’un objet non copiable).
+    exercises:
+      - id: cpp-ctor-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          class A {
+          public:
+              A() : A(1) { std::cout << "défaut "; }
+              A(int v) : x(v) { std::cout << "param(" << v << ") "; }
+              int x;
+          };
+          int main() {
+              A a;
+              A b{5};
+              A c = b;
+              std::cout << a.x + b.x + c.x << "\n";
+          }
+        output: param(1) défaut param(5) 11
+      - id: cpp-ctor-q1
+        type: mcq
+        prompt: Pourquoi la liste d’initialisation est-elle obligatoire pour un membre const ?
+        choices: [Un const doit être initialisé, il ne peut pas être affecté dans le corps, Pour la performance seulement, Elle ne l’est pas, Pour l’héritage]
+        answer: 0
+      - id: cpp-ctor-q2
+        type: mcq
+        prompt: Que permet `explicit` devant un constructeur à un paramètre ?
+        choices: [Empêcher les conversions implicites, Le rendre public, Le rendre plus rapide, L’hériter]
+        answer: 0
+      - id: cpp-ctor-fill
+        type: fill
+        prompt: Complète la liste d’initialisation.
+        code: |
+          #include <iostream>
+          #include <string>
+          class Joueur {
+          public:
+              Joueur(std::string n, int v) {{?}} nom(n), vies(v) {}
+              void afficher() const { std::cout << nom << " " << vies << "\n"; }
+          private:
+              std::string nom;
+              int vies;
+          };
+          int main() { Joueur j{"Kiri", 3}; j.afficher(); }
+        blanks: [[':']]
+        tests:
+          - { input: '', output: Kiri 3 }
+      - id: cpp-ctor-code
+        type: code
+        title: Horloge
+        prompt: |
+          Écris une classe `Horloge` avec un constructeur `Horloge(int h, int m)` qui **normalise** l’heure (par ex. `(25, 70)` → `02:10`), une méthode `void avancer(int minutes)` et `void afficher() const` au format `HH:MM`.
+
+          Entrée : `h m` puis plusieurs durées en minutes. Affiche l’heure initiale puis l’heure après chaque avance.
+        starter: |
+          #include <iostream>
+          #include <iomanip>
+
+          int main() {
+              int h, m;
+              std::cin >> h >> m;
+          }
+        solution: |
+          #include <iostream>
+          #include <iomanip>
+
+          class Horloge {
+          public:
+              Horloge(int h, int m) : minutes(0) { avancer(h * 60 + m); }
+              void avancer(int m) {
+                  minutes = ((minutes + m) % 1440 + 1440) % 1440;
+              }
+              void afficher() const {
+                  std::cout << std::setw(2) << std::setfill('0') << minutes / 60 << ":" << std::setw(2) << std::setfill('0') << minutes % 60 << "\n";
+              }
+          private:
+              int minutes;
+          };
+
+          int main() {
+              int h, m;
+              std::cin >> h >> m;
+              Horloge c(h, m);
+              c.afficher();
+              int d;
+              while (std::cin >> d) {
+                  c.avancer(d);
+                  c.afficher();
+              }
+          }
+        tests:
+          - { input: "25 70\n50\n-130", output: "02:10\n03:00\n00:50" }
+          - { input: "23 59\n1", output: "23:59\n00:00", hidden: true }
+    project:
+      id: cpp-ctor-projet
+      type: code
+      title: Date valide
+      difficulty: 3
+      prompt: |
+        Écris une classe `Date` dont le constructeur `Date(int j, int m, int a)` **lève** `std::invalid_argument("date invalide")` si la date n’existe pas (années bissextiles comprises), et une méthode `Date lendemain() const`. Affichage `JJ/MM/AAAA`.
+
+        Pour chaque ligne `j m a`, affiche `JJ/MM/AAAA -> lendemain` ou `date invalide` (attrape l’exception).
+      starter: |
+        #include <iostream>
+        #include <iomanip>
+        #include <stdexcept>
+
+        int main() {
+            int j, m, a;
+            while (std::cin >> j >> m >> a) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <iomanip>
+        #include <stdexcept>
+
+        class Date {
+        public:
+            Date(int j, int m, int a) : jour(j), mois(m), annee(a) {
+                if (m < 1 || m > 12 || j < 1 || j > joursDansMois(m, a)) throw std::invalid_argument("date invalide");
+            }
+            Date lendemain() const {
+                if (jour < joursDansMois(mois, annee)) return Date(jour + 1, mois, annee);
+                if (mois < 12) return Date(1, mois + 1, annee);
+                return Date(1, 1, annee + 1);
+            }
+            void afficher(std::ostream& o) const {
+                o << std::setfill('0') << std::setw(2) << jour << "/" << std::setw(2) << mois << "/" << annee;
+            }
+        private:
+            static bool bissextile(int a) { return (a % 4 == 0 && a % 100 != 0) || a % 400 == 0; }
+            static int joursDansMois(int m, int a) {
+                static const int j[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+                return m == 2 && bissextile(a) ? 29 : j[m - 1];
+            }
+            int jour, mois, annee;
+        };
+
+        int main() {
+            int j, m, a;
+            while (std::cin >> j >> m >> a) {
+                try {
+                    Date d(j, m, a);
+                    d.afficher(std::cout);
+                    std::cout << " -> ";
+                    d.lendemain().afficher(std::cout);
+                    std::cout << "\n";
+                } catch (const std::invalid_argument& e) {
+                    std::cout << e.what() << "\n";
+                }
+            }
+        }
+      tests:
+        - { input: "28 2 2024\n31 12 2025\n30 2 2023", output: "28/02/2024 -> 29/02/2024\n31/12/2025 -> 01/01/2026\ndate invalide" }
+        - { input: "29 2 1900\n29 2 2000\n31 4 2026", output: "date invalide\n29/02/2000 -> 01/03/2000\ndate invalide", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-ctor-ex1
+          type: mcq
+          prompt: Dans quel ordre les membres sont-ils initialisés ?
+          choices: [Dans l’ordre de leur déclaration dans la classe, Dans l’ordre de la liste d’initialisation, Aléatoirement, Par ordre alphabétique]
+          answer: 0
+        - id: cpp-ctor-ex2
+          type: mcq
+          prompt: Que dit la règle de zéro ?
+          choices: [Si les membres gèrent leurs ressources, ne pas écrire de fonctions spéciales, Initialiser tout à zéro, Ne jamais utiliser de constructeur, Toujours écrire un destructeur]
+          answer: 0
+        - id: cpp-ctor-ex3
+          type: mcq
+          prompt: Comment interdire la copie d’une classe ?
+          choices: ['Déclarer le constructeur de copie = delete', 'Le déclarer = default', 'Le rendre static', 'Impossible']
+          answer: 0
+        - id: cpp-ctor-ex4
+          type: mcq
+          prompt: Qu’est-ce qu’un constructeur délégué ?
+          choices: [Un constructeur qui en appelle un autre de la même classe, Un constructeur hérité, Un constructeur virtuel, Un constructeur statique]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-destructeurs
+    title: Destructeurs
+    summary: Le destructeur, ordre de destruction, libération de ressources et naissance du principe RAII.
+    minutes: 25
+    concepts: [classes, memoire]
+    sections:
+      - title: Le destructeur
+        body: |
+          Le **destructeur** `~NomClasse()` est appelé automatiquement quand l’objet est détruit (fin de portée, `delete`, destruction du conteneur). Il libère les ressources :
+
+          ```cpp
+          class Fichier {
+          public:
+              explicit Fichier(const char* nom) : f(std::fopen(nom, "w")) {}
+              ~Fichier() { if (f) std::fclose(f); }      // fermeture garantie
+              Fichier(const Fichier&) = delete;          // non copiable
+              Fichier& operator=(const Fichier&) = delete;
+          private:
+              std::FILE* f;
+          };
+          ```
+
+          Ordre : les objets locaux sont détruits dans l’**ordre inverse** de leur construction ; les membres d’un objet après le corps de son destructeur, en ordre inverse de déclaration.
+      - title: RAII
+        body: |
+          **RAII** (*Resource Acquisition Is Initialization*) : une ressource (mémoire, fichier, verrou, socket) est **acquise par un constructeur** et **libérée par le destructeur**. Comme les destructeurs sont appelés même en cas d’exception, aucune fuite n’est possible.
+
+          C’est **le** principe central du C++ : `std::vector`, `std::string`, `std::unique_ptr`, `std::lock_guard`, `std::fstream` l’appliquent tous.
+
+          **Règle de trois** : si une classe a besoin d’un destructeur personnalisé, elle a probablement aussi besoin d’un constructeur de copie et d’un opérateur d’affectation personnalisés (ou de les supprimer).
+    exercises:
+      - id: cpp-dtor-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          struct Trace {
+              char c;
+              Trace(char x) : c(x) { std::cout << "+" << c << " "; }
+              ~Trace() { std::cout << "-" << c << " "; }
+          };
+          int main() {
+              Trace a('a');
+              {
+                  Trace b('b');
+                  Trace c('c');
+              }
+              Trace d('d');
+              std::cout << "| ";
+          }
+        output: +a +b +c -c -b +d | -d -a
+      - id: cpp-dtor-q1
+        type: mcq
+        prompt: Que signifie RAII ?
+        choices: [L’acquisition d’une ressource se fait à l’initialisation et sa libération à la destruction, Random Access Integer Index, Une norme réseau, Un type de pointeur]
+        answer: 0
+      - id: cpp-dtor-q2
+        type: mcq
+        prompt: Le destructeur est-il appelé si une exception est levée dans la portée ?
+        choices: [Oui, lors du déroulement de la pile, Non, Seulement en mode debug, Seulement pour les objets du tas]
+        answer: 0
+      - id: cpp-dtor-fill
+        type: fill
+        prompt: Complète la déclaration du destructeur.
+        code: |
+          #include <iostream>
+          class Session {
+          public:
+              Session() { std::cout << "ouverte\n"; }
+              {{?}}Session() { std::cout << "fermée\n"; }
+          };
+          int main() { Session s; }
+        blanks: [['~']]
+        tests:
+          - { input: '', output: "ouverte\nfermée" }
+      - id: cpp-dtor-code
+        type: code
+        title: Journal de portée
+        prompt: |
+          Écris une classe `Chrono` qui affiche `début <nom>` à sa construction et `fin <nom>` à sa destruction.
+
+          Chaque mot lu crée un `Chrono` dans un **bloc imbriqué** dans le précédent (fonction récursive `imbriquer(mots, i)`). Les affichages montrent l’imbrication.
+        starter: |
+          #include <iostream>
+          #include <string>
+          #include <vector>
+
+          int main() {
+              std::vector<std::string> mots;
+              std::string m;
+              while (std::cin >> m) mots.push_back(m);
+              imbriquer(mots, 0);
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <vector>
+
+          class Chrono {
+          public:
+              explicit Chrono(std::string n) : nom(std::move(n)) { std::cout << "début " << nom << "\n"; }
+              ~Chrono() { std::cout << "fin " << nom << "\n"; }
+          private:
+              std::string nom;
+          };
+
+          void imbriquer(const std::vector<std::string>& mots, std::size_t i) {
+              if (i >= mots.size()) return;
+              Chrono c(mots[i]);
+              imbriquer(mots, i + 1);
+          }
+
+          int main() {
+              std::vector<std::string> mots;
+              std::string m;
+              while (std::cin >> m) mots.push_back(m);
+              imbriquer(mots, 0);
+          }
+        tests:
+          - { input: main calcul, output: "début main\ndébut calcul\nfin calcul\nfin main" }
+          - { input: a b c, output: "début a\ndébut b\ndébut c\nfin c\nfin b\nfin a", hidden: true }
+    project:
+      id: cpp-dtor-projet
+      type: code
+      title: Gestionnaire de ressources
+      difficulty: 3
+      prompt: |
+        Simule un pool de connexions. Une classe `Connexion` reçoit un identifiant et une référence vers un compteur global de connexions actives : le constructeur incrémente et affiche `ouverture #id (actives : N)`, le destructeur décrémente et affiche `fermeture #id (actives : N)`. La classe est **non copiable**.
+
+        Chaque ligne d’entrée est un entier `k` : ouvre `k` connexions dans un `std::vector<std::unique_ptr<Connexion>>`, puis les détruit en vidant le vecteur (`clear()`), qui les détruit dans l’ordre des éléments. Les ids sont globaux et croissants. Termine par `actives finales : 0`.
+      starter: |
+        #include <iostream>
+        #include <memory>
+        #include <vector>
+
+        int main() {
+            int actives = 0;
+            int k;
+            while (std::cin >> k) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <memory>
+        #include <vector>
+
+        class Connexion {
+        public:
+            Connexion(int i, int& compteur) : id(i), actives(compteur) {
+                ++actives;
+                std::cout << "ouverture #" << id << " (actives : " << actives << ")\n";
+            }
+            ~Connexion() {
+                --actives;
+                std::cout << "fermeture #" << id << " (actives : " << actives << ")\n";
+            }
+            Connexion(const Connexion&) = delete;
+            Connexion& operator=(const Connexion&) = delete;
+        private:
+            int id;
+            int& actives;
+        };
+
+        int main() {
+            int actives = 0;
+            int prochain = 1;
+            int k;
+            while (std::cin >> k) {
+                std::vector<std::unique_ptr<Connexion>> pool;
+                for (int i = 0; i < k; ++i) pool.push_back(std::make_unique<Connexion>(prochain++, actives));
+                pool.clear();
+            }
+            std::cout << "actives finales : " << actives << "\n";
+        }
+      tests:
+        - { input: "2\n1", output: "ouverture #1 (actives : 1)\nouverture #2 (actives : 2)\nfermeture #1 (actives : 1)\nfermeture #2 (actives : 0)\nouverture #3 (actives : 1)\nfermeture #3 (actives : 0)\nactives finales : 0" }
+        - { input: '0', output: 'actives finales : 0', hidden: true }
+      require:
+        - { pattern: '~Connexion', message: Écrire le destructeur }
+        - { pattern: '=\s*delete', message: Rendre la classe non copiable }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-dtor-ex1
+          type: mcq
+          prompt: Dans quel ordre sont détruits deux objets locaux a puis b ?
+          choices: [b puis a, a puis b, En même temps, Ordre non défini]
+          answer: 0
+        - id: cpp-dtor-ex2
+          type: mcq
+          prompt: Que dit la règle de trois ?
+          choices: [Destructeur, constructeur de copie et affectation personnalisés vont généralement ensemble, Toujours trois constructeurs, Trois niveaux d’héritage maximum, Trois membres par classe]
+          answer: 0
+        - id: cpp-dtor-ex3
+          type: mcq
+          prompt: Un destructeur peut-il prendre des paramètres ?
+          choices: [Non, Oui, Un seul, Seulement s’il est virtuel]
+          answer: 0
+        - id: cpp-dtor-ex4
+          type: mcq
+          prompt: Quel objet standard applique RAII à un mutex ?
+          choices: ['std::lock_guard', 'std::thread', 'std::vector', 'std::cout']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-encapsulation
+    title: Encapsulation
+    summary: Protéger les invariants d’une classe — membres privés, accesseurs, validation, const-correctness et interfaces minimales.
+    minutes: 25
+    concepts: [classes, encapsulation]
+    sections:
+      - title: Protéger les invariants
+        body: |
+          Un **invariant** est une règle toujours vraie pour un objet valide (un solde jamais négatif, une date existante, un âge positif). L’encapsulation le garantit : les données sont **privées**, et seules des méthodes contrôlées peuvent les modifier.
+
+          ```cpp
+          class CompteBancaire {
+          public:
+              explicit CompteBancaire(std::string titulaire) : titulaire_(std::move(titulaire)) {}
+              void deposer(long long montant) {
+                  if (montant <= 0) throw std::invalid_argument("montant invalide");
+                  solde_ += montant;
+              }
+              bool retirer(long long montant) {
+                  if (montant <= 0 || montant > solde_) return false;
+                  solde_ -= montant;
+                  return true;
+              }
+              long long solde() const { return solde_; }            // lecture seule
+              const std::string& titulaire() const { return titulaire_; }
+          private:
+              std::string titulaire_;
+              long long solde_ = 0;
+          };
+          ```
+      - title: Bonnes pratiques
+        body: |
+          - Exposer des **actions** (`deposer`, `retirer`) plutôt que des setters bruts (`setSolde`).
+          - Une interface **minimale** : chaque méthode publique est une promesse à maintenir.
+          - **const-correctness** : toutes les méthodes qui ne modifient rien sont `const`.
+          - Renvoyer des `const T&` (ou des copies) plutôt que des références modifiables vers l’état interne.
+          - `friend` donne accès aux membres privés à une fonction ou classe précise : à utiliser avec parcimonie (par ex. `operator<<`).
+    exercises:
+      - id: cpp-enc-q1
+        type: mcq
+        prompt: Qu’est-ce qu’un invariant de classe ?
+        choices: [Une règle toujours vraie pour tout objet valide, Une constante globale, Un membre static, Une méthode virtuelle]
+        answer: 0
+        concepts: [encapsulation]
+      - id: cpp-enc-q2
+        type: mcq
+        prompt: Pourquoi préférer `retirer(montant)` à `setSolde(valeur)` ?
+        choices: [La méthode peut vérifier les règles métier, C’est plus court, setSolde est interdit, Pour la vitesse]
+        answer: 0
+      - id: cpp-enc-bug
+        type: bugfix
+        prompt: L’invariant « toutes les notes sont entre 0 et 20 » n’est pas respecté. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          #include <vector>
+          class Notes {
+          public:
+              void ajouter(int n) { if (n >= 0 || n <= 20) notes.push_back(n); }
+              const std::vector<int>& toutes() const { return notes; }
+          private:
+              std::vector<int> notes;
+          };
+          int main() {
+              Notes n;
+              n.ajouter(15);
+              n.ajouter(25);
+              n.ajouter(-3);
+              std::cout << n.toutes().size() << "\n";
+          }
+        bugLines: [5]
+        choices:
+          - La condition utilise || au lieu de && et laisse passer des notes invalides
+          - Le vecteur devrait être public
+          - toutes() devrait renvoyer une copie
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <vector>
+          class Notes {
+          public:
+              void ajouter(int n) { if (n >= 0 && n <= 20) notes.push_back(n); }
+              const std::vector<int>& toutes() const { return notes; }
+          private:
+              std::vector<int> notes;
+          };
+          int main() {
+              Notes n;
+              n.ajouter(15);
+              n.ajouter(25);
+              n.ajouter(-3);
+              std::cout << n.toutes().size() << "\n";
+          }
+        tests:
+          - { input: '', output: '1' }
+        explanation: La seule méthode qui modifie l’état doit garantir l’invariant ; une erreur de logique dans la validation suffit à le casser.
+      - id: cpp-enc-code
+        type: code
+        title: Thermostat
+        prompt: |
+          Écris une classe `Thermostat` dont la consigne reste **toujours entre 5 et 30 °C** (invariant). Méthodes : `void regler(double c)` (ignore une valeur hors limites et renvoie false), `void augmenter()` / `void diminuer()` (pas de 0.5, bornés), `double consigne() const`. Consigne initiale : 19.
+
+          Commandes : `regler X`, `+`, `-`. Affiche la consigne (1 décimale) après chaque commande.
+        starter: |
+          #include <iostream>
+          #include <string>
+          #include <iomanip>
+
+          int main() {
+              std::string cmd;
+              while (std::cin >> cmd) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <iomanip>
+          #include <algorithm>
+
+          class Thermostat {
+          public:
+              bool regler(double c) {
+                  if (c < 5 || c > 30) return false;
+                  consigne_ = c;
+                  return true;
+              }
+              void augmenter() { consigne_ = std::min(30.0, consigne_ + 0.5); }
+              void diminuer() { consigne_ = std::max(5.0, consigne_ - 0.5); }
+              double consigne() const { return consigne_; }
+          private:
+              double consigne_ = 19;
+          };
+
+          int main() {
+              Thermostat t;
+              std::string cmd;
+              std::cout << std::fixed << std::setprecision(1);
+              while (std::cin >> cmd) {
+                  if (cmd == "regler") { double c; std::cin >> c; t.regler(c); }
+                  else if (cmd == "+") t.augmenter();
+                  else t.diminuer();
+                  std::cout << t.consigne() << "\n";
+              }
+          }
+        tests:
+          - { input: "+\nregler 40\nregler 29.8\n+\n+", output: "19.5\n19.5\n29.8\n30.0\n30.0" }
+          - { input: "regler 5\n-\n-", output: "5.0\n5.0\n5.0", hidden: true }
+        concepts: [encapsulation, classes]
+    project:
+      id: cpp-enc-projet
+      type: code
+      title: Pile bornée
+      difficulty: 3
+      prompt: |
+        Écris une classe `PileBornee` (capacité fixée au constructeur) avec `bool empiler(int x)` (false si pleine), `std::optional<int> depiler()` (vide si la pile est vide), `int taille() const`, `bool pleine() const`. Les données sont privées.
+
+        Première ligne : capacité. Commandes : `push X` (affiche `ok` ou `pleine`), `pop` (affiche la valeur ou `vide`), `taille`.
+      starter: |
+        #include <iostream>
+        #include <optional>
+        #include <string>
+        #include <vector>
+
+        int main() {
+            int cap;
+            std::cin >> cap;
+        }
+      solution: |
+        #include <iostream>
+        #include <optional>
+        #include <string>
+        #include <vector>
+
+        class PileBornee {
+        public:
+            explicit PileBornee(int capacite) : capacite_(capacite) {}
+            bool empiler(int x) {
+                if (pleine()) return false;
+                donnees_.push_back(x);
+                return true;
+            }
+            std::optional<int> depiler() {
+                if (donnees_.empty()) return std::nullopt;
+                int v = donnees_.back();
+                donnees_.pop_back();
+                return v;
+            }
+            int taille() const { return static_cast<int>(donnees_.size()); }
+            bool pleine() const { return taille() >= capacite_; }
+        private:
+            int capacite_;
+            std::vector<int> donnees_;
+        };
+
+        int main() {
+            int cap;
+            std::cin >> cap;
+            PileBornee p(cap);
+            std::string cmd;
+            while (std::cin >> cmd) {
+                if (cmd == "push") {
+                    int x;
+                    std::cin >> x;
+                    std::cout << (p.empiler(x) ? "ok" : "pleine") << "\n";
+                } else if (cmd == "pop") {
+                    auto v = p.depiler();
+                    if (v) std::cout << *v << "\n"; else std::cout << "vide\n";
+                } else {
+                    std::cout << p.taille() << "\n";
+                }
+            }
+        }
+      tests:
+        - { input: "2\npush 1\npush 2\npush 3\npop\ntaille\npop\npop", output: "ok\nok\npleine\n2\n1\n1\nvide" }
+        - { input: "0\npush 5\ntaille", output: "pleine\n0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-enc-ex1
+          type: mcq
+          prompt: Que permet le mot-clé friend ?
+          choices: [Donner à une fonction ou classe l’accès aux membres privés, Rendre une classe publique, Hériter, Copier un objet]
+          answer: 0
+        - id: cpp-enc-ex2
+          type: mcq
+          prompt: Quelle méthode doit être marquée const ?
+          choices: [Toute méthode qui ne modifie pas l’objet, Le constructeur, Le destructeur, Les setters]
+          answer: 0
+        - id: cpp-enc-ex3
+          type: mcq
+          prompt: Quel est l’intérêt principal de l’encapsulation ?
+          choices: [Garantir les invariants et pouvoir changer l’implémentation sans casser les utilisateurs, Accélérer le programme, Réduire la mémoire, Éviter les pointeurs]
+          answer: 0
+        - id: cpp-enc-ex4
+          type: mcq
+          prompt: Que renvoyer de préférence pour exposer un conteneur interne en lecture ?
+          choices: ['const std::vector<T>&', 'std::vector<T>&', 'T*', 'Un membre public']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-heritage
+    title: Héritage
+    summary: Classes dérivées, héritage public, appel du constructeur parent, membres protected, redéfinition et ordre de construction.
+    minutes: 30
+    concepts: [heritage, classes]
+    sections:
+      - title: Dériver une classe
+        body: |
+          ```cpp
+          class Animal {
+          public:
+              explicit Animal(std::string nom) : nom_(std::move(nom)) {}
+              void presenter() const { std::cout << "Je suis " << nom_ << "\n"; }
+          protected:                       // accessible aux classes dérivées
+              std::string nom_;
+          };
+
+          class Chien : public Animal {      // héritage public
+          public:
+              Chien(std::string nom, std::string race) : Animal(std::move(nom)), race_(std::move(race)) {}
+              void aboyer() const { std::cout << nom_ << " (" << race_ << ") : Wouf !\n"; }
+          private:
+              std::string race_;
+          };
+
+          Chien rex("Rex", "berger");
+          rex.presenter();   // hérité
+          rex.aboyer();
+          ```
+
+          Un `Chien` **est un** `Animal` (relation « est-un »). Si la relation est « a-un » (une voiture **a un** moteur), préfère la **composition** (un membre).
+      - title: Construction et visibilité
+        body: |
+          - Construction : **la base d’abord**, puis les membres de la dérivée, puis le corps du constructeur dérivé. Destruction : dans l’ordre inverse.
+          - Le constructeur parent s’appelle dans la liste d’initialisation : `Chien(...) : Animal(nom)`.
+          - `protected` : visible par les dérivées, pas de l’extérieur.
+          - `using Animal::Animal;` hérite des constructeurs de la base.
+          - Une méthode de même nom dans la dérivée **masque** celle de la base ; pour un vrai polymorphisme, elle doit être `virtual` (chapitre suivant).
+          - `final` interdit de dériver une classe (ou de redéfinir une méthode).
+    exercises:
+      - id: cpp-her-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          struct Base {
+              Base() { std::cout << "B "; }
+              ~Base() { std::cout << "~B "; }
+          };
+          struct Membre {
+              Membre() { std::cout << "M "; }
+              ~Membre() { std::cout << "~M "; }
+          };
+          struct Derivee : Base {
+              Membre m;
+              Derivee() { std::cout << "D "; }
+              ~Derivee() { std::cout << "~D "; }
+          };
+          int main() {
+              { Derivee d; }
+              std::cout << "\n";
+          }
+        output: B M D ~D ~M ~B
+        concepts: [heritage]
+      - id: cpp-her-q1
+        type: mcq
+        prompt: Quelle relation l’héritage public modélise-t-il ?
+        choices: ['« est-un »', '« a-un »', '« utilise-un »', 'Aucune']
+        answer: 0
+      - id: cpp-her-q2
+        type: mcq
+        prompt: Un membre protected est accessible…
+        choices: [Dans la classe et ses dérivées, Partout, Seulement dans la classe, Seulement dans main]
+        answer: 0
+      - id: cpp-her-fill
+        type: fill
+        prompt: Complète l’héritage et l’appel au constructeur parent.
+        code: |
+          #include <iostream>
+          #include <string>
+          class Vehicule {
+          public:
+              Vehicule(int r) : roues(r) {}
+              int roues;
+          };
+          class Moto : {{?}} Vehicule {
+          public:
+              Moto() : {{?}}(2) {}
+          };
+          int main() { Moto m; std::cout << m.roues << "\n"; }
+        blanks: [[public], [Vehicule]]
+        tests:
+          - { input: '', output: '2' }
+      - id: cpp-her-code
+        type: code
+        title: Employés et managers
+        prompt: |
+          Écris une classe `Employe` (nom, salaire de base, méthode `double salaire() const` et `std::string nom() const`) et une classe dérivée `Manager` qui ajoute une prime par membre d’équipe (`200` par membre) via une méthode `double salaireTotal() const`.
+
+          Lignes : `E nom base` ou `M nom base taille_equipe`. Affiche `nom : salaire` (salaire total pour les managers, 0 décimale).
+        starter: |
+          #include <iostream>
+          #include <string>
+
+          int main() {
+              char type;
+              std::string nom;
+              double base;
+              while (std::cin >> type >> nom >> base) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <iomanip>
+
+          class Employe {
+          public:
+              Employe(std::string nom, double base) : nom_(std::move(nom)), base_(base) {}
+              double salaire() const { return base_; }
+              std::string nom() const { return nom_; }
+          protected:
+              std::string nom_;
+              double base_;
+          };
+
+          class Manager : public Employe {
+          public:
+              Manager(std::string nom, double base, int equipe) : Employe(std::move(nom), base), equipe_(equipe) {}
+              double salaireTotal() const { return salaire() + 200.0 * equipe_; }
+          private:
+              int equipe_;
+          };
+
+          int main() {
+              char type;
+              std::string nom;
+              double base;
+              std::cout << std::fixed << std::setprecision(0);
+              while (std::cin >> type >> nom >> base) {
+                  if (type == 'M') {
+                      int eq;
+                      std::cin >> eq;
+                      Manager m(nom, base, eq);
+                      std::cout << m.nom() << " : " << m.salaireTotal() << "\n";
+                  } else {
+                      Employe e(nom, base);
+                      std::cout << e.nom() << " : " << e.salaire() << "\n";
+                  }
+              }
+          }
+        tests:
+          - { input: "E Ada 3000\nM Linus 4000 5", output: "Ada : 3000\nLinus : 5000" }
+          - { input: "M Solo 2500 0", output: 'Solo : 2500', hidden: true }
+        require:
+          - { pattern: 'class\s+Manager\s*:\s*public\s+Employe', message: Manager doit hériter publiquement d’Employe }
+        concepts: [heritage, classes]
+    project:
+      id: cpp-her-projet
+      type: code
+      title: Comptes bancaires spécialisés
+      difficulty: 3
+      prompt: |
+        Classe de base `Compte` (titulaire, solde protégé, `deposer`, `bool retirer(double)` qui refuse un solde négatif). Classe dérivée `CompteEpargne` qui ajoute un taux et une méthode `void appliquerInterets()` (solde × (1 + taux)). Classe dérivée `CompteCourant` avec un **découvert autorisé** : elle fournit sa propre méthode `bool retirerAvecDecouvert(double)`.
+
+        Commandes : `epargne taux`, `courant decouvert` (crée le compte — un seul compte par exécution, solde initial 0), puis `depot X`, `retrait X`, `interets`. Affiche le solde (2 décimales) après chaque opération, ou `refusé` pour un retrait impossible.
+      starter: |
+        #include <iostream>
+        #include <iomanip>
+        #include <string>
+
+        int main() {
+            std::string type;
+            double param;
+            std::cin >> type >> param;
+        }
+      solution: |
+        #include <iostream>
+        #include <iomanip>
+        #include <string>
+
+        class Compte {
+        public:
+            void deposer(double m) { solde_ += m; }
+            bool retirer(double m) {
+                if (m > solde_) return false;
+                solde_ -= m;
+                return true;
+            }
+            double solde() const { return solde_; }
+        protected:
+            double solde_ = 0;
+        };
+
+        class CompteEpargne : public Compte {
+        public:
+            explicit CompteEpargne(double taux) : taux_(taux) {}
+            void appliquerInterets() { solde_ *= 1 + taux_; }
+        private:
+            double taux_;
+        };
+
+        class CompteCourant : public Compte {
+        public:
+            explicit CompteCourant(double decouvert) : decouvert_(decouvert) {}
+            bool retirerAvecDecouvert(double m) {
+                if (solde_ - m < -decouvert_) return false;
+                solde_ -= m;
+                return true;
+            }
+        private:
+            double decouvert_;
+        };
+
+        int main() {
+            std::string type;
+            double param;
+            std::cin >> type >> param;
+            CompteEpargne ep(param);
+            CompteCourant cc(param);
+            bool epargne = type == "epargne";
+            std::string cmd;
+            std::cout << std::fixed << std::setprecision(2);
+            while (std::cin >> cmd) {
+                bool ok = true;
+                if (cmd == "depot") {
+                    double x; std::cin >> x;
+                    if (epargne) ep.deposer(x); else cc.deposer(x);
+                } else if (cmd == "retrait") {
+                    double x; std::cin >> x;
+                    ok = epargne ? ep.retirer(x) : cc.retirerAvecDecouvert(x);
+                } else if (epargne) {
+                    ep.appliquerInterets();
+                }
+                if (!ok) std::cout << "refusé\n";
+                else std::cout << (epargne ? ep.solde() : cc.solde()) << "\n";
+            }
+        }
+      tests:
+        - { input: "epargne 0.1\ndepot 100\ninterets\nretrait 200\nretrait 10", output: "100.00\n110.00\nrefusé\n100.00" }
+        - { input: "courant 50\nretrait 30\nretrait 30\ndepot 100", output: "-30.00\nrefusé\n70.00", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-her-ex1
+          type: mcq
+          prompt: Dans quel ordre sont construits base et dérivée ?
+          choices: [La base d’abord, La dérivée d’abord, En parallèle, Ordre indéfini]
+          answer: 0
+        - id: cpp-her-ex2
+          type: mcq
+          prompt: Que fait le mot-clé final sur une classe ?
+          choices: [Interdit d’en dériver, La rend constante, La rend abstraite, Rien]
+          answer: 0
+        - id: cpp-her-ex3
+          type: mcq
+          prompt: Une voiture a un moteur. Quelle relation choisir ?
+          choices: [Composition (membre Moteur), Héritage de Moteur, friend, static]
+          answer: 0
+        - id: cpp-her-ex4
+          type: mcq
+          prompt: Le C++ permet-il l’héritage multiple ?
+          choices: [Oui, Non, Seulement d’interfaces, Seulement en C++23]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-polymorphisme
+    title: Polymorphisme
+    summary: Méthodes virtuelles, override, classes abstraites, destructeur virtuel, liaison dynamique et collections polymorphes.
+    minutes: 35
+    concepts: [polymorphisme, heritage]
+    sections:
+      - title: virtual et override
+        body: |
+          ```cpp
+          class Forme {
+          public:
+              virtual ~Forme() = default;               // ⚠️ destructeur virtuel indispensable
+              virtual double aire() const = 0;          // virtuelle PURE → classe abstraite
+              virtual std::string nom() const { return "forme"; }
+          };
+
+          class Cercle : public Forme {
+          public:
+              explicit Cercle(double r) : r_(r) {}
+              double aire() const override { return 3.14159 * r_ * r_; }
+              std::string nom() const override { return "cercle"; }
+          private:
+              double r_;
+          };
+          ```
+
+          - `virtual` : l’appel est résolu **à l’exécution** selon le type réel de l’objet (via une table virtuelle, *vtable*).
+          - `override` : demande au compilateur de vérifier qu’on redéfinit bien une méthode virtuelle (attrape les fautes de frappe).
+          - `= 0` : méthode virtuelle pure ; la classe devient **abstraite** (non instanciable).
+      - title: Collections polymorphes
+        body: |
+          Le polymorphisme passe par des **pointeurs ou références** vers la base :
+
+          ```cpp
+          std::vector<std::unique_ptr<Forme>> formes;
+          formes.push_back(std::make_unique<Cercle>(1.0));
+          formes.push_back(std::make_unique<Carre>(2.0));
+          for (const auto& f : formes) std::cout << f->nom() << " : " << f->aire() << "\n";
+          ```
+
+          ⚠️ **Découpage (slicing)** : copier une dérivée dans une variable de type base (`Forme f = cercle;`) perd la partie dérivée. Toujours manipuler par pointeur ou référence.
+
+          ⚠️ Sans destructeur virtuel, détruire une dérivée via un pointeur de base est un comportement indéfini (le destructeur dérivé n’est pas appelé).
+    exercises:
+      - id: cpp-poly-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <memory>
+          #include <vector>
+          struct Animal {
+              virtual ~Animal() = default;
+              virtual const char* cri() const { return "..."; }
+              const char* type() const { return "animal"; }
+          };
+          struct Chat : Animal {
+              const char* cri() const override { return "miaou"; }
+              const char* type() const { return "chat"; }
+          };
+          int main() {
+              std::unique_ptr<Animal> a = std::make_unique<Chat>();
+              Chat c;
+              std::cout << a->cri() << " " << a->type() << " " << c.type() << "\n";
+          }
+        output: miaou animal chat
+        explanation: '`cri` est virtuelle (type réel), `type` ne l’est pas (type statique du pointeur).'
+        concepts: [polymorphisme]
+      - id: cpp-poly-q1
+        type: mcq
+        prompt: Qu’est-ce qu’une classe abstraite ?
+        choices: [Une classe avec au moins une méthode virtuelle pure (non instanciable), Une classe sans attribut, Une classe privée, Une classe template]
+        answer: 0
+      - id: cpp-poly-q2
+        type: mcq
+        prompt: Pourquoi déclarer un destructeur virtuel dans une classe de base polymorphe ?
+        choices: [Pour que le destructeur de la dérivée soit appelé via un pointeur de base, Pour accélérer la destruction, C’est interdit, Pour la copie]
+        answer: 0
+      - id: cpp-poly-bug
+        type: bugfix
+        prompt: Le compilateur signale une erreur grâce à override. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          struct Base {
+              virtual ~Base() = default;
+              virtual int valeur() const { return 1; }
+          };
+          struct Fille : Base {
+              int valeur() override { return 2; }
+          };
+          int main() {
+              Fille f;
+              const Base& b = f;
+              std::cout << b.valeur() << "\n";
+          }
+        bugLines: [7]
+        choices:
+          - La signature diffère (il manque const) ; la méthode ne redéfinit rien
+          - override est interdit dans une struct
+          - Base devrait être abstraite
+        answer: 0
+        solution: |
+          #include <iostream>
+          struct Base {
+              virtual ~Base() = default;
+              virtual int valeur() const { return 1; }
+          };
+          struct Fille : Base {
+              int valeur() const override { return 2; }
+          };
+          int main() {
+              Fille f;
+              const Base& b = f;
+              std::cout << b.valeur() << "\n";
+          }
+        tests:
+          - { input: '', output: '2' }
+      - id: cpp-poly-code
+        type: code
+        title: Formes polymorphes
+        prompt: |
+          Écris une classe abstraite `Forme` (`aire()`, `perimetre()`, `nom()` virtuelles pures, destructeur virtuel) et trois classes `Cercle`, `Rectangle`, `Triangle` (côtés, formule de Héron). Utilise π = 3.141592653589793.
+
+          Chaque ligne : `cercle r`, `rectangle l h` ou `triangle a b c`. Stocke les formes dans un `std::vector<std::unique_ptr<Forme>>`, affiche `nom : aire A, périmètre P` (2 décimales), puis `Plus grande aire : nom`.
+        starter: |
+          #include <iostream>
+          #include <memory>
+          #include <vector>
+          #include <string>
+          #include <cmath>
+          #include <iomanip>
+
+          int main() {
+              std::string type;
+              while (std::cin >> type) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <memory>
+          #include <vector>
+          #include <string>
+          #include <cmath>
+          #include <iomanip>
+
+          constexpr double PI = 3.141592653589793;
+
+          class Forme {
+          public:
+              virtual ~Forme() = default;
+              virtual double aire() const = 0;
+              virtual double perimetre() const = 0;
+              virtual std::string nom() const = 0;
+          };
+
+          class Cercle : public Forme {
+          public:
+              explicit Cercle(double r) : r_(r) {}
+              double aire() const override { return PI * r_ * r_; }
+              double perimetre() const override { return 2 * PI * r_; }
+              std::string nom() const override { return "cercle"; }
+          private:
+              double r_;
+          };
+
+          class Rectangle : public Forme {
+          public:
+              Rectangle(double l, double h) : l_(l), h_(h) {}
+              double aire() const override { return l_ * h_; }
+              double perimetre() const override { return 2 * (l_ + h_); }
+              std::string nom() const override { return "rectangle"; }
+          private:
+              double l_, h_;
+          };
+
+          class Triangle : public Forme {
+          public:
+              Triangle(double a, double b, double c) : a_(a), b_(b), c_(c) {}
+              double perimetre() const override { return a_ + b_ + c_; }
+              double aire() const override {
+                  double s = perimetre() / 2;
+                  return std::sqrt(s * (s - a_) * (s - b_) * (s - c_));
+              }
+              std::string nom() const override { return "triangle"; }
+          private:
+              double a_, b_, c_;
+          };
+
+          int main() {
+              std::vector<std::unique_ptr<Forme>> formes;
+              std::string type;
+              while (std::cin >> type) {
+                  if (type == "cercle") { double r; std::cin >> r; formes.push_back(std::make_unique<Cercle>(r)); }
+                  else if (type == "rectangle") { double l, h; std::cin >> l >> h; formes.push_back(std::make_unique<Rectangle>(l, h)); }
+                  else { double a, b, c; std::cin >> a >> b >> c; formes.push_back(std::make_unique<Triangle>(a, b, c)); }
+              }
+              std::cout << std::fixed << std::setprecision(2);
+              const Forme* meilleure = nullptr;
+              for (const auto& f : formes) {
+                  std::cout << f->nom() << " : aire " << f->aire() << ", périmètre " << f->perimetre() << "\n";
+                  if (!meilleure || f->aire() > meilleure->aire()) meilleure = f.get();
+              }
+              if (meilleure) std::cout << "Plus grande aire : " << meilleure->nom() << "\n";
+          }
+        tests:
+          - { input: "cercle 1\nrectangle 2 3\ntriangle 3 4 5", output: "cercle : aire 3.14, périmètre 6.28\nrectangle : aire 6.00, périmètre 10.00\ntriangle : aire 6.00, périmètre 12.00\nPlus grande aire : rectangle" }
+          - { input: "triangle 2 2 2\ncercle 2", output: "triangle : aire 1.73, périmètre 6.00\ncercle : aire 12.57, périmètre 12.57\nPlus grande aire : cercle", hidden: true }
+        require:
+          - { pattern: 'virtual\s+double\s+aire\s*\(\s*\)\s*const\s*=\s*0', message: 'aire doit être virtuelle pure' }
+          - { pattern: 'override', message: Utiliser override }
+        concepts: [polymorphisme]
+    project:
+      id: cpp-poly-projet
+      type: code
+      title: Zoo virtuel
+      difficulty: 3
+      prompt: |
+        Classe abstraite `Animal` (nom, `virtual std::string cri() const = 0`, `virtual int nourriture() const = 0` en grammes/jour, méthode non virtuelle `std::string presentation() const` qui renvoie `"<nom> le <espece> fait <cri>"` en appelant une méthode virtuelle `espece()`).
+
+        Dérivées : `Lion` (roar, 7000 g), `Perroquet` (coco, 50 g), `Tortue` (…, 200 g).
+
+        Chaque ligne : `espece nom`. Affiche la présentation de chaque animal puis `Nourriture totale : N g`.
+      starter: |
+        #include <iostream>
+        #include <memory>
+        #include <string>
+        #include <vector>
+
+        int main() {
+            std::string espece, nom;
+            while (std::cin >> espece >> nom) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <memory>
+        #include <string>
+        #include <vector>
+
+        class Animal {
+        public:
+            explicit Animal(std::string nom) : nom_(std::move(nom)) {}
+            virtual ~Animal() = default;
+            virtual std::string cri() const = 0;
+            virtual int nourriture() const = 0;
+            virtual std::string espece() const = 0;
+            std::string presentation() const { return nom_ + " le " + espece() + " fait " + cri(); }
+        private:
+            std::string nom_;
+        };
+
+        class Lion : public Animal {
+        public:
+            using Animal::Animal;
+            std::string cri() const override { return "roar"; }
+            int nourriture() const override { return 7000; }
+            std::string espece() const override { return "lion"; }
+        };
+
+        class Perroquet : public Animal {
+        public:
+            using Animal::Animal;
+            std::string cri() const override { return "coco"; }
+            int nourriture() const override { return 50; }
+            std::string espece() const override { return "perroquet"; }
+        };
+
+        class Tortue : public Animal {
+        public:
+            using Animal::Animal;
+            std::string cri() const override { return "…"; }
+            int nourriture() const override { return 200; }
+            std::string espece() const override { return "tortue"; }
+        };
+
+        int main() {
+            std::vector<std::unique_ptr<Animal>> zoo;
+            std::string espece, nom;
+            while (std::cin >> espece >> nom) {
+                if (espece == "lion") zoo.push_back(std::make_unique<Lion>(nom));
+                else if (espece == "perroquet") zoo.push_back(std::make_unique<Perroquet>(nom));
+                else zoo.push_back(std::make_unique<Tortue>(nom));
+            }
+            int total = 0;
+            for (const auto& a : zoo) {
+                std::cout << a->presentation() << "\n";
+                total += a->nourriture();
+            }
+            std::cout << "Nourriture totale : " << total << " g\n";
+        }
+      tests:
+        - { input: "lion Simba\nperroquet Coco\ntortue Franklin", output: "Simba le lion fait roar\nCoco le perroquet fait coco\nFranklin le tortue fait …\nNourriture totale : 7250 g" }
+        - { input: '', output: 'Nourriture totale : 0 g', hidden: true }
+      require:
+        - { pattern: 'virtual\s+~Animal', message: Destructeur virtuel dans Animal }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-poly-ex1
+          type: mcq
+          prompt: Qu’est-ce que le « slicing » ?
+          choices: [La perte de la partie dérivée quand on copie un objet dans une variable de type base, Un découpage de chaîne, Une optimisation, Une méthode virtuelle]
+          answer: 0
+        - id: cpp-poly-ex2
+          type: mcq
+          prompt: Comment est implémentée la liaison dynamique en pratique ?
+          choices: [Par une table virtuelle (vtable), Par réflexion, Par des macros, Par le préprocesseur]
+          answer: 0
+        - id: cpp-poly-ex3
+          type: mcq
+          prompt: Peut-on instancier une classe abstraite ?
+          choices: [Non, Oui, Seulement avec new, Seulement si elle a un constructeur]
+          answer: 0
+        - id: cpp-poly-ex4
+          type: mcq
+          prompt: Quel est l’intérêt du mot-clé override ?
+          choices: [Le compilateur vérifie qu’une méthode virtuelle est bien redéfinie, Il rend la méthode virtuelle, Il accélère l’appel, Il interdit la redéfinition]
+          answer: 0
