@@ -1,0 +1,1910 @@
+language: rust
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-architecture
+    title: Architecture logicielle
+    summary: Structurer une application Rust — couches, architecture hexagonale, traits comme ports, typestate et newtypes pour rendre les états invalides impossibles.
+    minutes: 40
+    concepts: [architecture, traits]
+    sections:
+      - title: Séparer le domaine de l’infrastructure
+        body: |
+          Une application maintenable sépare :
+
+          - le **domaine** (règles métier pures, sans E/S) ;
+          - les **ports** : des traits qui décrivent ce dont le domaine a besoin (`trait DepotUtilisateurs`) ;
+          - les **adaptateurs** : implémentations concrètes (PostgreSQL, mémoire pour les tests, API HTTP).
+
+          ```rust
+          pub trait DepotComptes {
+              fn charger(&self, id: u32) -> Option<Compte>;
+              fn sauver(&mut self, c: Compte);
+          }
+
+          pub struct ServiceVirement<D: DepotComptes> { depot: D }
+
+          impl<D: DepotComptes> ServiceVirement<D> {
+              pub fn virer(&mut self, de: u32, vers: u32, montant: u64) -> Result<(), ErreurVirement> {
+                  // logique métier testable avec un dépôt en mémoire
+                  # todo!()
+              }
+          }
+          ```
+
+          C’est l’**architecture hexagonale** (ports et adaptateurs) : le domaine ne dépend de rien, tout dépend du domaine.
+      - title: Rendre les états invalides irreprésentables
+        body: |
+          Le système de types de Rust permet d’encoder des règles métier :
+
+          **Newtype** — un type distinct pour chaque notion :
+
+          ```rust
+          pub struct Email(String);
+          impl Email {
+              pub fn parse(s: &str) -> Result<Email, String> {
+                  if s.contains('@') { Ok(Email(s.to_string())) } else { Err(format!("email invalide : {s}")) }
+              }
+          }
+          // Impossible de passer une chaîne non validée là où un Email est attendu.
+          ```
+
+          **Typestate** — l’état fait partie du type :
+
+          ```rust
+          struct Brouillon; struct Publie;
+          struct Article<Etat> { texte: String, _e: std::marker::PhantomData<Etat> }
+          impl Article<Brouillon> {
+              fn publier(self) -> Article<Publie> { Article { texte: self.texte, _e: std::marker::PhantomData } }
+          }
+          impl Article<Publie> { fn url(&self) -> String { /* … */ String::new() } }
+          // article_brouillon.url() ne compile pas !
+          ```
+      - title: Organisation d’un projet
+        body: |
+          ```text
+          mon-app/
+          ├── Cargo.toml          ← workspace
+          ├── domaine/            ← crate bibliothèque : entités, règles, ports (traits)
+          ├── infra/              ← adaptateurs : base de données, HTTP, fichiers
+          ├── api/                ← binaire : serveur web (axum/actix)
+          └── cli/                ← binaire : outil en ligne de commande
+          ```
+
+          Principes : dépendances orientées vers le domaine, erreurs typées par couche (`thiserror`) et converties aux frontières (`From`), configuration chargée une fois au démarrage, injection des dépendances par les génériques ou `Box<dyn Trait>`.
+    exercises:
+      - id: rust-arch-q1
+        type: mcq
+        prompt: Dans une architecture hexagonale, que représente un « port » en Rust ?
+        choices: [Un trait décrivant un besoin du domaine, Un numéro de port TCP, Un module privé, Une macro]
+        answer: 0
+        concepts: [architecture]
+      - id: rust-arch-q2
+        type: mcq
+        prompt: Quel est l’intérêt du motif newtype `struct Email(String)` ?
+        choices: [Garantir par le type qu’une valeur a été validée, Accélérer les String, Économiser de la mémoire, Rendre la String mutable]
+        answer: 0
+      - id: rust-arch-q3
+        type: mcq
+        prompt: Avec le motif typestate, appeler une méthode non disponible dans l’état courant provoque…
+        choices: [Une erreur de compilation, Une panique, Un avertissement, Rien]
+        answer: 0
+      - id: rust-arch-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          trait Horloge { fn maintenant(&self) -> u32; }
+          struct HorlogeFixe(u32);
+          impl Horloge for HorlogeFixe { fn maintenant(&self) -> u32 { self.0 } }
+
+          struct Salutation<H: Horloge> { h: H }
+          impl<H: Horloge> Salutation<H> {
+              fn message(&self) -> &str {
+                  match self.h.maintenant() { 5..=11 => "Bonjour", 12..=17 => "Bon après-midi", _ => "Bonsoir" }
+              }
+          }
+
+          fn main() {
+              for h in [8, 14, 22] {
+                  print!("{} / ", Salutation { h: HorlogeFixe(h) }.message());
+              }
+              println!();
+          }
+        output: Bonjour / Bon après-midi / Bonsoir /
+        explanation: Injecter l’horloge via un trait rend la logique testable de façon déterministe.
+      - id: rust-arch-code
+        type: code
+        title: Service de virement testable
+        prompt: |
+          Implémente le domaine bancaire :
+
+          - `trait Depot { fn solde(&self, id: &str) -> Option<i64>; fn definir(&mut self, id: &str, solde: i64); }`
+          - un adaptateur `DepotMemoire` basé sur un `HashMap` ;
+          - `enum ErreurVirement { CompteInconnu(String), SoldeInsuffisant, MontantInvalide }` ;
+          - `fn virer<D: Depot>(d: &mut D, de: &str, vers: &str, montant: i64) -> Result<(), ErreurVirement>` (montant > 0, comptes existants, solde suffisant ; opération atomique).
+
+          Entrée : lignes `ouvrir id solde` ou `virer de vers montant`. Pour chaque virement, affiche `ok`, `compte inconnu : id`, `solde insuffisant` ou `montant invalide`. Termine par les soldes triés par id (`id=solde` séparés par des espaces).
+        starter: |
+          use std::collections::HashMap;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::collections::HashMap;
+          use std::io::{self, Read};
+
+          trait Depot {
+              fn solde(&self, id: &str) -> Option<i64>;
+              fn definir(&mut self, id: &str, solde: i64);
+          }
+
+          struct DepotMemoire(HashMap<String, i64>);
+
+          impl Depot for DepotMemoire {
+              fn solde(&self, id: &str) -> Option<i64> { self.0.get(id).copied() }
+              fn definir(&mut self, id: &str, solde: i64) { self.0.insert(id.to_string(), solde); }
+          }
+
+          enum ErreurVirement { CompteInconnu(String), SoldeInsuffisant, MontantInvalide }
+
+          fn virer<D: Depot>(d: &mut D, de: &str, vers: &str, montant: i64) -> Result<(), ErreurVirement> {
+              if montant <= 0 { return Err(ErreurVirement::MontantInvalide); }
+              let s1 = d.solde(de).ok_or_else(|| ErreurVirement::CompteInconnu(de.to_string()))?;
+              let s2 = d.solde(vers).ok_or_else(|| ErreurVirement::CompteInconnu(vers.to_string()))?;
+              if s1 < montant { return Err(ErreurVirement::SoldeInsuffisant); }
+              if de == vers { return Ok(()); }
+              d.definir(de, s1 - montant);
+              d.definir(vers, s2 + montant);
+              Ok(())
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut depot = DepotMemoire(HashMap::new());
+              for l in e.lines() {
+                  let p: Vec<&str> = l.split_whitespace().collect();
+                  if p[0] == "ouvrir" {
+                      depot.definir(p[1], p[2].parse().unwrap());
+                  } else {
+                      match virer(&mut depot, p[1], p[2], p[3].parse().unwrap()) {
+                          Ok(()) => println!("ok"),
+                          Err(ErreurVirement::CompteInconnu(id)) => println!("compte inconnu : {}", id),
+                          Err(ErreurVirement::SoldeInsuffisant) => println!("solde insuffisant"),
+                          Err(ErreurVirement::MontantInvalide) => println!("montant invalide"),
+                      }
+                  }
+              }
+              let mut v: Vec<(&String, &i64)> = depot.0.iter().collect();
+              v.sort();
+              let s: Vec<String> = v.iter().map(|(k, s)| format!("{}={}", k, s)).collect();
+              println!("{}", s.join(" "));
+          }
+        tests:
+          - { input: "ouvrir a 100\nouvrir b 0\nvirer a b 30\nvirer b a 50\nvirer a z 1\nvirer a b -5", output: "ok\nsolde insuffisant\ncompte inconnu : z\nmontant invalide\na=70 b=30" }
+          - { input: "ouvrir x 5\nvirer x x 5", output: "ok\nx=5", hidden: true }
+        require:
+          - { pattern: 'trait\s+Depot', message: Définir le trait Depot (port) }
+          - { pattern: 'fn\s+virer\s*<', message: virer doit être générique sur le dépôt }
+        concepts: [architecture, traits]
+    project:
+      id: rust-arch-projet
+      type: code
+      title: Machine à états de commande (typestate)
+      difficulty: 3
+      prompt: |
+        Modélise une commande e-commerce avec le motif **typestate** : `Commande<Panier>`, `Commande<Payee>`, `Commande<Expediee>` (états = structs vides, `PhantomData`).
+
+        - `Commande<Panier>` : `ajouter(&mut self, prix: u32)`, `payer(self) -> Result<Commande<Payee>, Commande<Panier>>` (échoue si le panier est vide) ;
+        - `Commande<Payee>` : `expedier(self, suivi: &str) -> Commande<Expediee>` ;
+        - `Commande<Expediee>` : `suivi(&self) -> &str`, `total(&self) -> u32`.
+
+        L’entrée est une suite de commandes : `ajouter N`, `payer`, `expedier CODE`. Affiche `payée` / `paiement refusé : panier vide` / `expédiée : CODE (total T)`. Les commandes invalides pour l’état courant affichent `action impossible`. (Indice : stocke l’état courant dans une `enum` qui enveloppe les trois types.)
+      starter: |
+        use std::io::{self, Read};
+        use std::marker::PhantomData;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+        use std::marker::PhantomData;
+
+        struct Panier;
+        struct Payee;
+        struct Expediee;
+
+        struct Commande<E> {
+            articles: Vec<u32>,
+            suivi: String,
+            _e: PhantomData<E>,
+        }
+
+        impl Commande<Panier> {
+            fn new() -> Self { Commande { articles: vec![], suivi: String::new(), _e: PhantomData } }
+            fn ajouter(&mut self, prix: u32) { self.articles.push(prix); }
+            fn payer(self) -> Result<Commande<Payee>, Commande<Panier>> {
+                if self.articles.is_empty() { Err(self) } else { Ok(Commande { articles: self.articles, suivi: self.suivi, _e: PhantomData }) }
+            }
+        }
+        impl Commande<Payee> {
+            fn expedier(self, suivi: &str) -> Commande<Expediee> {
+                Commande { articles: self.articles, suivi: suivi.to_string(), _e: PhantomData }
+            }
+        }
+        impl Commande<Expediee> {
+            fn suivi(&self) -> &str { &self.suivi }
+            fn total(&self) -> u32 { self.articles.iter().sum() }
+        }
+
+        enum Etat {
+            Panier(Commande<Panier>),
+            Payee(Commande<Payee>),
+            Expediee(Commande<Expediee>),
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut etat = Etat::Panier(Commande::new());
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                etat = match (p[0], etat) {
+                    ("ajouter", Etat::Panier(mut c)) => { c.ajouter(p[1].parse().unwrap()); Etat::Panier(c) }
+                    ("payer", Etat::Panier(c)) => match c.payer() {
+                        Ok(c) => { println!("payée"); Etat::Payee(c) }
+                        Err(c) => { println!("paiement refusé : panier vide"); Etat::Panier(c) }
+                    },
+                    ("expedier", Etat::Payee(c)) => {
+                        let c = c.expedier(p[1]);
+                        println!("expédiée : {} (total {})", c.suivi(), c.total());
+                        Etat::Expediee(c)
+                    }
+                    (_, autre) => { println!("action impossible"); autre }
+                };
+            }
+        }
+      tests:
+        - { input: "payer\najouter 10\najouter 25\nexpedier X1\npayer\najouter 5\nexpedier FR42", output: "paiement refusé : panier vide\naction impossible\npayée\naction impossible\nexpédiée : FR42 (total 35)" }
+        - { input: "ajouter 1\npayer\nexpedier A\nexpedier B\npayer", output: "payée\nexpédiée : A (total 1)\naction impossible\naction impossible", hidden: true }
+      require:
+        - { pattern: 'PhantomData', message: 'Utiliser PhantomData pour le typestate' }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-arch-ex1
+          type: mcq
+          prompt: Dans quelle direction doivent pointer les dépendances en architecture hexagonale ?
+          choices: [Vers le domaine, Vers la base de données, Vers l’interface web, Peu importe]
+          answer: 0
+        - id: rust-arch-ex2
+          type: mcq
+          prompt: Pourquoi injecter une dépendance via un trait générique plutôt que de l’instancier dans le service ?
+          choices: [Pour pouvoir la remplacer (tests, autres implémentations), Pour réduire la taille du binaire, Pour éviter le borrow checker, Aucune raison]
+          answer: 0
+        - id: rust-arch-ex3
+          type: mcq
+          prompt: 'À quoi sert `PhantomData<E>` dans le motif typestate ?'
+          choices: [À utiliser le paramètre de type E sans stocker de donnée, À allouer E sur le tas, À rendre la struct thread-safe, À rien]
+          answer: 0
+        - id: rust-arch-ex4
+          type: mcq
+          prompt: Quelle crate facilite la définition d’erreurs typées par couche ?
+          choices: [thiserror, rayon, regex, rand]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-bibliotheques
+    title: Développement de bibliothèques
+    summary: Concevoir une API publique idiomatique — visibilité, builders, traits d’extension, compatibilité SemVer, documentation et features.
+    minutes: 35
+    concepts: [modules, traits, build]
+    sections:
+      - title: Une API idiomatique
+        body: |
+          Les *Rust API Guidelines* recommandent notamment :
+
+          - noms explicites (`as_`/`to_`/`into_` selon le coût de la conversion) ;
+          - implémenter les traits communs (`Debug`, `Clone`, `Default`, `PartialEq`, `Display`, `From`, `Error`) ;
+          - accepter des paramètres génériques flexibles (`impl AsRef<str>`, `impl Into<String>`, `impl IntoIterator`) ;
+          - renvoyer des types concrets ou `impl Trait`, et des `Result` avec des erreurs typées ;
+          - champs privés + constructeurs/builders pour pouvoir évoluer sans casser les utilisateurs.
+
+          ```rust
+          pub fn saluer(nom: impl AsRef<str>) -> String {
+              format!("Bonjour, {} !", nom.as_ref())
+          }
+          saluer("Kiri"); saluer(String::from("Ada"));   // les deux fonctionnent
+          ```
+      - title: Le motif Builder
+        body: |
+          ```rust
+          #[derive(Debug, Default)]
+          pub struct Requete { url: String, delai_ms: u64, essais: u32 }
+
+          pub struct RequeteBuilder { r: Requete }
+
+          impl Requete {
+              pub fn builder(url: impl Into<String>) -> RequeteBuilder {
+                  RequeteBuilder { r: Requete { url: url.into(), delai_ms: 5000, essais: 1 } }
+              }
+          }
+          impl RequeteBuilder {
+              pub fn delai(mut self, ms: u64) -> Self { self.r.delai_ms = ms; self }
+              pub fn essais(mut self, n: u32) -> Self { self.r.essais = n; self }
+              pub fn construire(self) -> Requete { self.r }
+          }
+
+          let r = Requete::builder("https://exemple.fr").delai(200).essais(3).construire();
+          ```
+      - title: Stabilité et documentation
+        body: |
+          - **SemVer** : retirer une fonction publique, ajouter un champ public à une struct, ajouter une variante à une enum publique… sont des changements **majeurs**. `#[non_exhaustive]` sur une enum/struct permet d’ajouter des variantes/champs plus tard.
+          - **Traits scellés** (*sealed*) : empêcher les utilisateurs d’implémenter un trait public.
+          - **Documentation** : `//!` pour la crate, `///` avec des exemples testés (`cargo test --doc`), sections `# Errors`, `# Panics`, `# Safety`.
+          - `#![deny(missing_docs)]`, `cargo semver-checks` pour détecter les ruptures, `features` pour les dépendances optionnelles.
+    exercises:
+      - id: rust-lib-q1
+        type: mcq
+        prompt: Quel type de paramètre accepte à la fois `&str` et `String` sans conversion explicite ?
+        choices: ['impl AsRef<str>', '&String', 'String', 'Box<str>']
+        answer: 0
+      - id: rust-lib-q2
+        type: mcq
+        prompt: Ajouter une variante à une enum publique est…
+        choices: ['Un changement potentiellement cassant (sauf avec #[non_exhaustive])', 'Toujours compatible', 'Interdit par le compilateur', 'Sans effet']
+        answer: 0
+      - id: rust-lib-fill
+        type: fill
+        prompt: Complète le builder pour qu’il soit chaînable.
+        code: |
+          #[derive(Debug)]
+          struct Config { verbeux: bool, niveau: u8 }
+          struct Builder { c: Config }
+          impl Builder {
+              fn new() -> Self { Builder { c: Config { verbeux: false, niveau: 1 } } }
+              fn verbeux(mut self) -> {{?}} { self.c.verbeux = true; self }
+              fn niveau(mut self, n: u8) -> Self { self.c.niveau = n; self }
+              fn construire(self) -> Config { self.c }
+          }
+          fn main() {
+              println!("{:?}", Builder::new().niveau(3).verbeux().construire());
+          }
+        blanks: [[Self, Builder]]
+        tests:
+          - { input: '', output: 'Config { verbeux: true, niveau: 3 }' }
+      - id: rust-lib-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          trait ExtTexte {
+              fn initiales(&self) -> String;
+          }
+          impl ExtTexte for str {
+              fn initiales(&self) -> String {
+                  self.split_whitespace().filter_map(|m| m.chars().next()).flat_map(|c| c.to_uppercase()).collect()
+              }
+          }
+          fn main() {
+              println!("{}", "programmation orientée objet".initiales());
+          }
+        output: POO
+        explanation: Un trait d’extension ajoute des méthodes à un type existant (ici `str`).
+      - id: rust-lib-code
+        type: code
+        title: Builder de requête validé
+        prompt: |
+          Implémente `Requete::builder(url)` avec les méthodes chaînables `methode(&str)`, `entete(cle, valeur)` (cumulables), `delai(ms)` et `construire(self) -> Result<Requete, String>` qui valide :
+
+          - l’URL commence par `http://` ou `https://` → sinon `Err("url invalide")` ;
+          - la méthode est `GET`, `POST`, `PUT` ou `DELETE` (par défaut `GET`) → sinon `Err("méthode invalide")` ;
+          - le délai est entre 1 et 60000 (défaut 5000) → sinon `Err("délai invalide")`.
+
+          Implémente `Display` pour `Requete` : `METHODE url (délai ms, N en-têtes)`.
+
+          Chaque ligne d’entrée est une suite d’instructions séparées par ` | ` : `url …`, `methode …`, `entete cle valeur`, `delai n`. Affiche la requête ou `erreur : …`.
+        starter: |
+          use std::fmt;
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::fmt;
+          use std::io::{self, Read};
+
+          struct Requete {
+              url: String,
+              methode: String,
+              entetes: Vec<(String, String)>,
+              delai: u64,
+          }
+
+          struct RequeteBuilder {
+              r: Requete,
+          }
+
+          impl Requete {
+              fn builder(url: impl Into<String>) -> RequeteBuilder {
+                  RequeteBuilder { r: Requete { url: url.into(), methode: "GET".into(), entetes: vec![], delai: 5000 } }
+              }
+          }
+
+          impl RequeteBuilder {
+              fn methode(mut self, m: &str) -> Self { self.r.methode = m.to_string(); self }
+              fn entete(mut self, k: &str, v: &str) -> Self { self.r.entetes.push((k.into(), v.into())); self }
+              fn delai(mut self, ms: u64) -> Self { self.r.delai = ms; self }
+              fn construire(self) -> Result<Requete, String> {
+                  let r = self.r;
+                  if !(r.url.starts_with("http://") || r.url.starts_with("https://")) { return Err("url invalide".into()); }
+                  if !["GET", "POST", "PUT", "DELETE"].contains(&r.methode.as_str()) { return Err("méthode invalide".into()); }
+                  if !(1..=60000).contains(&r.delai) { return Err("délai invalide".into()); }
+                  Ok(r)
+              }
+          }
+
+          impl fmt::Display for Requete {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  write!(f, "{} {} ({} ms, {} en-têtes)", self.methode, self.url, self.delai, self.entetes.len())
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let mut b: Option<RequeteBuilder> = None;
+                  for instr in l.split(" | ") {
+                      let p: Vec<&str> = instr.split_whitespace().collect();
+                      b = Some(match (p[0], b) {
+                          ("url", _) => Requete::builder(p[1]),
+                          ("methode", Some(b)) => b.methode(p[1]),
+                          ("entete", Some(b)) => b.entete(p[1], p[2]),
+                          ("delai", Some(b)) => b.delai(p[1].parse().unwrap()),
+                          (_, b) => b.unwrap(),
+                      });
+                  }
+                  match b.unwrap().construire() {
+                      Ok(r) => println!("{}", r),
+                      Err(m) => println!("erreur : {}", m),
+                  }
+              }
+          }
+        tests:
+          - { input: "url https://api.fr/v1 | methode POST | entete Auth jeton | entete Accept json | delai 200\nurl ftp://x.fr", output: "POST https://api.fr/v1 (200 ms, 2 en-têtes)\nerreur : url invalide" }
+          - { input: "url http://a.b\nurl http://a.b | methode PATCH\nurl http://a.b | delai 0", output: "GET http://a.b (5000 ms, 0 en-têtes)\nerreur : méthode invalide\nerreur : délai invalide", hidden: true }
+    project:
+      id: rust-lib-projet
+      type: code
+      title: Bibliothèque de statistiques
+      difficulty: 3
+      prompt: |
+        Conçois une mini bibliothèque `stats` (dans un module `pub mod stats`) avec une API soignée :
+
+        - `pub trait Statistiques { fn moyenne(&self) -> Option<f64>; fn variance(&self) -> Option<f64>; fn ecart_type(&self) -> Option<f64> { … par défaut … } }` implémenté pour `[f64]` ;
+        - `pub fn resumer<I: IntoIterator<Item = f64>>(donnees: I) -> Resume` où `Resume` (champs privés + accesseurs) implémente `Display` au format `n=… moyenne=… écart-type=…` (2 décimales, `-` si vide).
+
+        La variance est la variance de population (division par n). Pour chaque ligne de nombres, affiche le résumé.
+      starter: |
+        use std::fmt;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        pub mod stats {
+            use std::fmt;
+
+            pub trait Statistiques {
+                fn moyenne(&self) -> Option<f64>;
+                fn variance(&self) -> Option<f64>;
+                fn ecart_type(&self) -> Option<f64> {
+                    self.variance().map(f64::sqrt)
+                }
+            }
+
+            impl Statistiques for [f64] {
+                fn moyenne(&self) -> Option<f64> {
+                    if self.is_empty() { None } else { Some(self.iter().sum::<f64>() / self.len() as f64) }
+                }
+                fn variance(&self) -> Option<f64> {
+                    let m = self.moyenne()?;
+                    Some(self.iter().map(|x| (x - m).powi(2)).sum::<f64>() / self.len() as f64)
+                }
+            }
+
+            pub struct Resume {
+                n: usize,
+                moyenne: Option<f64>,
+                ecart_type: Option<f64>,
+            }
+
+            impl Resume {
+                pub fn n(&self) -> usize { self.n }
+            }
+
+            pub fn resumer<I: IntoIterator<Item = f64>>(donnees: I) -> Resume {
+                let v: Vec<f64> = donnees.into_iter().collect();
+                Resume { n: v.len(), moyenne: v.moyenne(), ecart_type: v.ecart_type() }
+            }
+
+            fn fmt_opt(x: Option<f64>) -> String {
+                x.map(|v| format!("{:.2}", v)).unwrap_or_else(|| "-".into())
+            }
+
+            impl fmt::Display for Resume {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    write!(f, "n={} moyenne={} écart-type={}", self.n, fmt_opt(self.moyenne), fmt_opt(self.ecart_type))
+                }
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let r = stats::resumer(l.split_whitespace().map(|x| x.parse::<f64>().unwrap()));
+                println!("{}", r);
+            }
+        }
+      tests:
+        - { input: "2 4 4 4 5 5 7 9\n10", output: "n=8 moyenne=5.00 écart-type=2.00\nn=1 moyenne=10.00 écart-type=0.00" }
+        - { input: "\n1 2", output: "n=0 moyenne=- écart-type=-\nn=2 moyenne=1.50 écart-type=0.50", hidden: true }
+      require:
+        - { pattern: 'pub\s+mod\s+stats', message: Créer le module public stats }
+        - { pattern: 'IntoIterator', message: 'resumer doit accepter un IntoIterator' }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-lib-ex1
+          type: mcq
+          prompt: Que permet l’attribut `#[non_exhaustive]` ?
+          choices: [D’ajouter des variantes ou champs plus tard sans casser les utilisateurs, D’accélérer les match, De masquer une enum, De rendre une struct copiable]
+          answer: 0
+        - id: rust-lib-ex2
+          type: mcq
+          prompt: Quelle convention de nommage indique une conversion coûteuse qui consomme self ?
+          choices: ['into_', 'as_', 'get_', 'is_']
+          answer: 0
+        - id: rust-lib-ex3
+          type: mcq
+          prompt: Quelle section de documentation décrit les cas où une fonction peut paniquer ?
+          choices: ['# Panics', '# Errors', '# Examples', '# Safety']
+          answer: 0
+        - id: rust-lib-ex4
+          type: mcq
+          prompt: Quel outil détecte les ruptures de compatibilité SemVer d’une crate ?
+          choices: [cargo semver-checks, cargo fmt, cargo bench, rustup]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-systeme
+    title: Programmation système
+    summary: Fichiers, processus, variables d’environnement, codes de sortie, signaux et entrées/sorties tamponnées — dialoguer avec le système d’exploitation.
+    minutes: 35
+    concepts: [systeme]
+    sections:
+      - title: Fichiers et répertoires
+        body: |
+          ```rust
+          use std::fs::{self, File, OpenOptions};
+          use std::io::{BufRead, BufReader, Write};
+
+          fs::write("note.txt", "ligne 1\nligne 2\n")?;
+          let contenu = fs::read_to_string("note.txt")?;
+
+          let f = File::open("note.txt")?;
+          for ligne in BufReader::new(f).lines() {   // lecture ligne par ligne
+              println!("{}", ligne?);
+          }
+
+          let mut journal = OpenOptions::new().create(true).append(true).open("app.log")?;
+          writeln!(journal, "démarrage")?;
+
+          fs::create_dir_all("donnees/cache")?;
+          for entree in fs::read_dir(".")? {
+              let e = entree?;
+              println!("{:?} {}", e.file_name(), e.metadata()?.len());
+          }
+          ```
+
+          `std::path::{Path, PathBuf}` manipule les chemins de façon portable (`join`, `extension`, `parent`).
+      - title: Processus et environnement
+        body: |
+          ```rust
+          use std::process::{Command, exit};
+          use std::env;
+
+          let args: Vec<String> = env::args().collect();
+          let home = env::var("HOME").unwrap_or_default();
+
+          let sortie = Command::new("ls").arg("-l").output()?;
+          println!("{}", String::from_utf8_lossy(&sortie.stdout));
+
+          if args.len() < 2 {
+              eprintln!("usage : {} <fichier>", args[0]);
+              exit(2);           // code de sortie non nul = erreur
+          }
+          ```
+
+          Les signaux (Ctrl+C) se gèrent avec des crates comme `ctrlc` ou `signal-hook` ; `nix` et `libc` exposent les appels système POSIX.
+      - title: Robustesse
+        body: |
+          - Toujours propager les erreurs d’E/S (`?`) avec un **contexte** utile (« impossible d’ouvrir config.toml »).
+          - Écrire de façon **atomique** : écrire dans un fichier temporaire puis `fs::rename` (évite un fichier à moitié écrit en cas de crash).
+          - Lire de gros fichiers en flux (`BufReader`) plutôt qu’en entier.
+          - Distinguer `stdout` (résultats) et `stderr` (diagnostics) : les outils Unix se composent par tubes (`|`).
+    exercises:
+      - id: rust-sys-q1
+        type: mcq
+        prompt: Quelle approche évite un fichier de configuration à moitié écrit en cas de crash ?
+        choices: [Écrire dans un fichier temporaire puis le renommer, Écrire plus vite, Utiliser println!, Ouvrir le fichier deux fois]
+        answer: 0
+      - id: rust-sys-q2
+        type: mcq
+        prompt: Que signifie un code de sortie non nul par convention ?
+        choices: [Le programme a rencontré une erreur, Le programme a réussi, Le programme est en pause, Rien]
+        answer: 0
+      - id: rust-sys-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::path::Path;
+          fn main() {
+              let p = Path::new("/home/kiri/projets/rapport.final.pdf");
+              println!("{:?}", p.extension().unwrap());
+              println!("{:?}", p.file_stem().unwrap());
+              println!("{}", p.parent().unwrap().join("images").display());
+          }
+        output: "\"pdf\"\n\"rapport.final\"\n/home/kiri/projets/images"
+      - id: rust-sys-code
+        type: code
+        title: Journal sur disque
+        prompt: |
+          Écris les lignes lues dans un fichier `/tmp/journal-<pid>.log` (utilise `std::process::id()`), une par ligne, préfixées par leur numéro (`001 texte`). Relis ensuite le fichier avec un `BufReader`, affiche uniquement les lignes contenant `ERREUR`, puis `total : N lignes` et supprime le fichier.
+        starter: |
+          use std::fs::{self, File};
+          use std::io::{self, BufRead, BufReader, Read, Write};
+
+          fn main() -> io::Result<()> {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e)?;
+              Ok(())
+          }
+        solution: |
+          use std::fs::{self, File};
+          use std::io::{self, BufRead, BufReader, Read, Write};
+
+          fn main() -> io::Result<()> {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e)?;
+              let chemin = format!("/tmp/journal-{}.log", std::process::id());
+              {
+                  let mut f = File::create(&chemin)?;
+                  for (i, l) in e.lines().enumerate() {
+                      writeln!(f, "{:03} {}", i + 1, l)?;
+                  }
+              }
+              let mut total = 0;
+              for ligne in BufReader::new(File::open(&chemin)?).lines() {
+                  let ligne = ligne?;
+                  total += 1;
+                  if ligne.contains("ERREUR") {
+                      println!("{}", ligne);
+                  }
+              }
+              println!("total : {} lignes", total);
+              fs::remove_file(&chemin)?;
+              Ok(())
+          }
+        tests:
+          - { input: "démarrage\nERREUR disque plein\nretry\nERREUR réseau", output: "002 ERREUR disque plein\n004 ERREUR réseau\ntotal : 4 lignes" }
+          - { input: tout va bien, output: 'total : 1 lignes', hidden: true }
+        concepts: [systeme]
+    project:
+      id: rust-sys-projet
+      type: code
+      title: Mini wc
+      difficulty: 3
+      prompt: |
+        Réimplémente l’outil Unix `wc`. Chaque ligne d’entrée est une **option** suivie d’un texte, séparés par `::` : `-l::texte`, `-w::texte`, `-c::texte` ou `::texte` (sans option).
+
+        Le texte peut contenir la séquence littérale `\n` qui représente un saut de ligne. Affiche :
+
+        - `-l` : le nombre de sauts de ligne ;
+        - `-w` : le nombre de mots ;
+        - `-c` : le nombre d’**octets** ;
+        - sans option : `lignes mots octets` séparés par des espaces.
+
+        Une option inconnue affiche sur la sortie standard `wc: option invalide -- X`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let (opt, texte) = l.split_once("::").unwrap();
+                let t = texte.replace("\\n", "\n");
+                let lignes = t.matches('\n').count();
+                let mots = t.split_whitespace().count();
+                let octets = t.len();
+                match opt {
+                    "-l" => println!("{}", lignes),
+                    "-w" => println!("{}", mots),
+                    "-c" => println!("{}", octets),
+                    "" => println!("{} {} {}", lignes, mots, octets),
+                    autre => println!("wc: option invalide -- {}", autre.trim_start_matches('-')),
+                }
+            }
+        }
+      tests:
+        - { input: "-l::un\\ndeux\\n\n-w::la vie est belle\n::été\\n", output: "2\n4\n1 1 6" }
+        - { input: "-c::abc\n-x::zzz", output: "3\nwc: option invalide -- x", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-sys-ex1
+          type: mcq
+          prompt: Quel type manipule les chemins de façon portable ?
+          choices: ['std::path::PathBuf', 'String', 'std::fs::File', 'OsStr seulement']
+          answer: 0
+        - id: rust-sys-ex2
+          type: mcq
+          prompt: Où écrire les messages de diagnostic d’un outil en ligne de commande ?
+          choices: [Sur stderr (eprintln!), Sur stdout, Dans un fichier obligatoirement, Nulle part]
+          answer: 0
+        - id: rust-sys-ex3
+          type: mcq
+          prompt: Comment lire un très gros fichier sans tout charger en mémoire ?
+          choices: [BufReader et lines(), fs::read_to_string, include_str!, Charger dans un Vec]
+          answer: 0
+        - id: rust-sys-ex4
+          type: mcq
+          prompt: Quelle API lance un programme externe et récupère sa sortie ?
+          choices: ['std::process::Command', 'std::env::args', 'std::thread::spawn', 'std::fs::read']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-reseau
+    title: Réseau
+    summary: Sockets TCP et UDP avec std::net, protocole ligne par ligne, serveur multi-clients et versions asynchrones avec tokio.
+    minutes: 40
+    concepts: [reseau, concurrence]
+    sections:
+      - title: TCP avec std::net
+        body: |
+          ```rust
+          use std::io::{BufRead, BufReader, Write};
+          use std::net::{TcpListener, TcpStream};
+          use std::thread;
+
+          // Serveur d’écho
+          let ecoute = TcpListener::bind("127.0.0.1:0")?;   // port 0 = choisi par l’OS
+          let adresse = ecoute.local_addr()?;
+          thread::spawn(move || {
+              for flux in ecoute.incoming() {
+                  let mut flux = flux.unwrap();
+                  thread::spawn(move || {
+                      let mut lecteur = BufReader::new(flux.try_clone().unwrap());
+                      let mut ligne = String::new();
+                      while lecteur.read_line(&mut ligne).unwrap() > 0 {
+                          flux.write_all(ligne.to_uppercase().as_bytes()).unwrap();
+                          ligne.clear();
+                      }
+                  });
+              }
+          });
+
+          // Client
+          let mut c = TcpStream::connect(adresse)?;
+          c.write_all(b"bonjour\n")?;
+          ```
+
+          TCP est un **flux d’octets** : il faut définir un **protocole de délimitation** (une ligne, un préfixe de longueur…), car un `read` peut renvoyer un message partiel ou plusieurs messages collés.
+      - title: UDP et tokio
+        body: |
+          **UDP** : datagrammes indépendants, sans connexion ni garantie de livraison (DNS, jeux, streaming).
+
+          ```rust
+          let s = std::net::UdpSocket::bind("127.0.0.1:0")?;
+          s.send_to(b"ping", "127.0.0.1:9000")?;
+          ```
+
+          Avec **tokio**, un serveur gère des milliers de clients avec quelques threads :
+
+          ```rust
+          let ecoute = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+          loop {
+              let (mut socket, _) = ecoute.accept().await?;
+              tokio::spawn(async move {
+                  let (lecture, mut ecriture) = socket.split();
+                  // tokio::io::copy, BufReader::lines()…
+              });
+          }
+          ```
+
+          Pour HTTP, on utilise des crates comme **hyper**, **axum** ou **reqwest** plutôt que de réimplémenter le protocole.
+    exercises:
+      - id: rust-net-q1
+        type: mcq
+        prompt: Pourquoi faut-il un protocole de délimitation des messages sur TCP ?
+        choices: [TCP transmet un flux d’octets sans frontières de messages, TCP perd des messages, TCP est chiffré, Ce n’est pas nécessaire]
+        answer: 0
+        concepts: [reseau]
+      - id: rust-net-q2
+        type: mcq
+        prompt: Que fait `TcpListener::bind("127.0.0.1:0")` ?
+        choices: [Écoute sur un port libre choisi par le système, Écoute sur le port 0 uniquement, Se connecte à un serveur, Échoue toujours]
+        answer: 0
+      - id: rust-net-q3
+        type: mcq
+        prompt: Quel protocole convient à un jeu en temps réel tolérant quelques pertes ?
+        choices: [UDP, TCP, FTP, SMTP]
+        answer: 0
+      - id: rust-net-code
+        type: code
+        title: Serveur d’écho en majuscules
+        prompt: |
+          Lance un serveur TCP sur `127.0.0.1:0` dans un thread : pour chaque ligne reçue, il renvoie la ligne en majuscules.
+
+          Dans le thread principal, connecte un client, envoie chaque ligne de l’entrée standard et affiche la réponse reçue pour chacune (lecture ligne par ligne avec un `BufReader`).
+        starter: |
+          use std::io::{self, BufRead, BufReader, Read, Write};
+          use std::net::{TcpListener, TcpStream};
+          use std::thread;
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, BufRead, BufReader, Read, Write};
+          use std::net::{TcpListener, TcpStream};
+          use std::thread;
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let ecoute = TcpListener::bind("127.0.0.1:0").unwrap();
+              let adresse = ecoute.local_addr().unwrap();
+              thread::spawn(move || {
+                  let (flux, _) = ecoute.accept().unwrap();
+                  let mut ecriture = flux.try_clone().unwrap();
+                  for ligne in BufReader::new(flux).lines() {
+                      let ligne = ligne.unwrap();
+                      writeln!(ecriture, "{}", ligne.to_uppercase()).unwrap();
+                  }
+              });
+              let mut client = TcpStream::connect(adresse).unwrap();
+              let mut lecteur = BufReader::new(client.try_clone().unwrap());
+              for l in e.lines() {
+                  writeln!(client, "{}", l).unwrap();
+                  let mut rep = String::new();
+                  lecteur.read_line(&mut rep).unwrap();
+                  print!("{}", rep);
+              }
+          }
+        tests:
+          - { input: "bonjour serveur\nrust réseau", output: "BONJOUR SERVEUR\nRUST RÉSEAU" }
+          - { input: a, output: A, hidden: true }
+        require:
+          - { pattern: 'TcpListener', message: Créer un serveur avec TcpListener }
+        concepts: [reseau]
+      - id: rust-net-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::net::UdpSocket;
+          fn main() {
+              let a = UdpSocket::bind("127.0.0.1:0").unwrap();
+              let b = UdpSocket::bind("127.0.0.1:0").unwrap();
+              a.send_to(b"ping", b.local_addr().unwrap()).unwrap();
+              let mut buf = [0u8; 16];
+              let (n, _) = b.recv_from(&mut buf).unwrap();
+              println!("{} {}", n, String::from_utf8_lossy(&buf[..n]));
+          }
+        output: 4 ping
+    project:
+      id: rust-net-projet
+      type: code
+      title: Serveur clé-valeur
+      difficulty: 3
+      prompt: |
+        Implémente un petit serveur clé-valeur TCP (style Redis) qui accepte **plusieurs clients** (un thread par client) et partage un `Arc<Mutex<HashMap<String, String>>>`.
+
+        Protocole (une commande par ligne) : `SET cle valeur` → `OK` ; `GET cle` → la valeur ou `(nil)` ; `DEL cle` → `1` ou `0` ; autre → `ERR commande inconnue`.
+
+        Entrée : chaque ligne est `client:commande` (client = 1 ou 2). Le programme ouvre deux connexions clientes et envoie chaque commande par la connexion indiquée, **en attendant la réponse** avant la commande suivante. Affiche `client > réponse`.
+      starter: |
+        use std::collections::HashMap;
+        use std::io::{self, BufRead, BufReader, Read, Write};
+        use std::net::{TcpListener, TcpStream};
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::collections::HashMap;
+        use std::io::{self, BufRead, BufReader, Read, Write};
+        use std::net::{TcpListener, TcpStream};
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        fn traiter(cmd: &str, db: &Mutex<HashMap<String, String>>) -> String {
+            let p: Vec<&str> = cmd.splitn(3, ' ').collect();
+            let mut m = db.lock().unwrap();
+            match (p[0], p.len()) {
+                ("SET", 3) => { m.insert(p[1].into(), p[2].into()); "OK".into() }
+                ("GET", 2) => m.get(p[1]).cloned().unwrap_or_else(|| "(nil)".into()),
+                ("DEL", 2) => if m.remove(p[1]).is_some() { "1".into() } else { "0".into() },
+                _ => "ERR commande inconnue".into(),
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let ecoute = TcpListener::bind("127.0.0.1:0").unwrap();
+            let adresse = ecoute.local_addr().unwrap();
+            let db = Arc::new(Mutex::new(HashMap::new()));
+            thread::spawn(move || {
+                for flux in ecoute.incoming() {
+                    let flux = flux.unwrap();
+                    let db = Arc::clone(&db);
+                    thread::spawn(move || {
+                        let mut w = flux.try_clone().unwrap();
+                        for l in BufReader::new(flux).lines() {
+                            let rep = traiter(&l.unwrap(), &db);
+                            writeln!(w, "{}", rep).unwrap();
+                        }
+                    });
+                }
+            });
+            let mut clients: Vec<(TcpStream, BufReader<TcpStream>)> = (0..2)
+                .map(|_| {
+                    let c = TcpStream::connect(adresse).unwrap();
+                    let r = BufReader::new(c.try_clone().unwrap());
+                    (c, r)
+                })
+                .collect();
+            for l in e.lines() {
+                let (id, cmd) = l.split_once(':').unwrap();
+                let (c, r) = &mut clients[id.parse::<usize>().unwrap() - 1];
+                writeln!(c, "{}", cmd).unwrap();
+                let mut rep = String::new();
+                r.read_line(&mut rep).unwrap();
+                println!("{} > {}", id, rep.trim_end());
+            }
+        }
+      tests:
+        - { input: "1:SET langage Rust\n2:GET langage\n2:DEL langage\n1:GET langage\n1:PING", output: "1 > OK\n2 > Rust\n2 > 1\n1 > (nil)\n1 > ERR commande inconnue" }
+        - { input: "2:SET a deux mots\n1:GET a\n1:DEL z", output: "2 > OK\n1 > deux mots\n1 > 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-net-ex1
+          type: mcq
+          prompt: Quelle crate est un framework web populaire basé sur tokio ?
+          choices: [axum, serde, rand, regex]
+          answer: 0
+        - id: rust-net-ex2
+          type: mcq
+          prompt: Pourquoi cloner un TcpStream avec try_clone ?
+          choices: [Pour lire et écrire depuis deux objets distincts sur la même connexion, Pour ouvrir une seconde connexion, Pour copier les données, Pour fermer la connexion]
+          answer: 0
+        - id: rust-net-ex3
+          type: mcq
+          prompt: Avec un thread par client, quel est le principal risque à très grande échelle ?
+          choices: [Épuiser la mémoire et le temps CPU en changements de contexte, Des data races, Des fuites de sockets automatiques, Aucun]
+          answer: 0
+        - id: rust-net-ex4
+          type: mcq
+          prompt: UDP garantit-il l’ordre et la livraison des messages ?
+          choices: [Non, Oui, Seulement en local, Seulement avec tokio]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-cli
+    title: Applications CLI
+    summary: Construire des outils en ligne de commande professionnels — arguments, sous-commandes, codes de sortie, couleurs, tests et distribution.
+    minutes: 35
+    concepts: [cli, systeme]
+    sections:
+      - title: Analyse des arguments avec clap
+        body: |
+          ```rust
+          use clap::{Parser, Subcommand};
+
+          /// Gestionnaire de tâches en ligne de commande
+          #[derive(Parser)]
+          #[command(version, about)]
+          struct Cli {
+              /// Affiche plus de détails
+              #[arg(short, long)]
+              verbeux: bool,
+              #[command(subcommand)]
+              commande: Commande,
+          }
+
+          #[derive(Subcommand)]
+          enum Commande {
+              Ajouter { titre: String, #[arg(long, default_value_t = 1)] priorite: u8 },
+              Lister,
+              Terminer { id: u32 },
+          }
+
+          fn main() {
+              let cli = Cli::parse();      // gère --help, --version et les erreurs
+              match cli.commande { /* … */ _ => {} }
+          }
+          ```
+
+          `clap` génère l’aide, valide les types et propose des corrections (« did you mean ‘lister’ ? »).
+      - title: Les bonnes pratiques d’un outil Unix
+        body: |
+          - Résultats sur **stdout**, messages et erreurs sur **stderr**.
+          - **Code de sortie** : 0 succès, 1 erreur générale, 2 mauvaise utilisation.
+          - Lire depuis **stdin** si aucun fichier n’est donné (composable avec `|`).
+          - Respecter `NO_COLOR` et ne colorer que si la sortie est un terminal (`std::io::IsTerminal`).
+          - Fournir `--help`, `--version`, une option `--json` pour une sortie lisible par les machines.
+          - Tester avec **assert_cmd** + **predicates** (exécuter le binaire et vérifier sa sortie).
+          - Distribuer : `cargo install`, binaires précompilés (cargo-dist), paquets.
+
+          Crates utiles : `anyhow` (erreurs), `indicatif` (barres de progression), `dialoguer` (questions interactives), `owo-colors` (couleurs).
+    exercises:
+      - id: rust-cli-q1
+        type: mcq
+        prompt: Quel code de sortie signale par convention une mauvaise utilisation (arguments invalides) ?
+        choices: ['0', '1', '2', '127']
+        answer: 2
+      - id: rust-cli-q2
+        type: mcq
+        prompt: Quand un outil CLI devrait-il désactiver les couleurs ?
+        choices: [Si la sortie n’est pas un terminal ou si NO_COLOR est défini, Jamais, Toujours, Le vendredi]
+        answer: 0
+      - id: rust-cli-q3
+        type: mcq
+        prompt: Quelle crate est la référence pour analyser les arguments ?
+        choices: [clap, tokio, serde_json, rayon]
+        answer: 0
+      - id: rust-cli-code
+        type: code
+        title: Analyseur d’arguments maison
+        prompt: |
+          Écris un analyseur d’arguments pour l’outil `todo`. Chaque ligne d’entrée est une ligne de commande. Grammaire :
+
+          - options globales avant la sous-commande : `-v`/`--verbose` ;
+          - `ajouter <titre…> [--priorite N]` (N entre 1 et 5, défaut 1) ;
+          - `lister [--toutes]` ; `terminer <id>`.
+
+          Affiche la structure analysée : `Ajouter { titre: "…", priorite: N } verbose=bool`, `Lister { toutes: bool } verbose=…`, `Terminer { id: N } verbose=…`, ou `erreur : <message>` avec les messages `sous-commande manquante`, `sous-commande inconnue : X`, `titre manquant`, `priorité invalide`, `id invalide`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          #[derive(Debug)]
+          enum Commande {
+              Ajouter { titre: String, priorite: u8 },
+              Lister { toutes: bool },
+              Terminer { id: u32 },
+          }
+
+          fn analyser(args: &[&str]) -> Result<(Commande, bool), String> {
+              let mut i = 0;
+              let mut verbose = false;
+              while i < args.len() && (args[i] == "-v" || args[i] == "--verbose") {
+                  verbose = true;
+                  i += 1;
+              }
+              let sous = *args.get(i).ok_or("sous-commande manquante")?;
+              let reste = &args[i + 1..];
+              let cmd = match sous {
+                  "ajouter" => {
+                      let mut titre = vec![];
+                      let mut priorite = 1u8;
+                      let mut j = 0;
+                      while j < reste.len() {
+                          if reste[j] == "--priorite" {
+                              priorite = reste.get(j + 1).and_then(|p| p.parse().ok()).filter(|p| (1..=5).contains(p)).ok_or("priorité invalide")?;
+                              j += 2;
+                          } else {
+                              titre.push(reste[j]);
+                              j += 1;
+                          }
+                      }
+                      if titre.is_empty() { return Err("titre manquant".into()); }
+                      Commande::Ajouter { titre: titre.join(" "), priorite }
+                  }
+                  "lister" => Commande::Lister { toutes: reste.contains(&"--toutes") },
+                  "terminer" => Commande::Terminer { id: reste.first().and_then(|x| x.parse().ok()).ok_or("id invalide")? },
+                  autre => return Err(format!("sous-commande inconnue : {}", autre)),
+              };
+              Ok((cmd, verbose))
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let args: Vec<&str> = l.split_whitespace().collect();
+                  match analyser(&args) {
+                      Ok((c, v)) => println!("{:?} verbose={}", c, v),
+                      Err(m) => println!("erreur : {}", m),
+                  }
+              }
+          }
+        tests:
+          - { input: "-v ajouter Lire le livre --priorite 3\nlister --toutes\nterminer 7", output: "Ajouter { titre: \"Lire le livre\", priorite: 3 } verbose=true\nLister { toutes: true } verbose=false\nTerminer { id: 7 } verbose=false" }
+          - { input: "--verbose\nsupprimer 3\najouter --priorite 9 x\najouter\nterminer abc", output: "erreur : sous-commande manquante\nerreur : sous-commande inconnue : supprimer\nerreur : priorité invalide\nerreur : titre manquant\nerreur : id invalide", hidden: true }
+        concepts: [cli]
+    project:
+      id: rust-cli-projet
+      type: code
+      title: Gestionnaire de tâches en ligne de commande
+      difficulty: 3
+      prompt: |
+        Réalise le moteur d’un gestionnaire de tâches. Chaque ligne d’entrée est une commande :
+
+        - `ajouter <titre> [--priorite N]` → `Tâche #id ajoutée` (ids à partir de 1) ;
+        - `terminer <id>` → `Tâche #id terminée` ou `erreur : tâche #id introuvable` ;
+        - `lister` → les tâches **non terminées** triées par priorité décroissante puis id, au format `#id [P] titre`, ou `(aucune tâche)` ;
+        - `stats` → `X terminée(s), Y en cours`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        struct Tache {
+            id: u32,
+            titre: String,
+            priorite: u8,
+            terminee: bool,
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut taches: Vec<Tache> = Vec::new();
+            for l in e.lines() {
+                let args: Vec<&str> = l.split_whitespace().collect();
+                match args.first().copied() {
+                    Some("ajouter") => {
+                        let mut titre = vec![];
+                        let mut priorite = 1;
+                        let mut i = 1;
+                        while i < args.len() {
+                            if args[i] == "--priorite" {
+                                priorite = args[i + 1].parse().unwrap();
+                                i += 2;
+                            } else {
+                                titre.push(args[i]);
+                                i += 1;
+                            }
+                        }
+                        let id = taches.len() as u32 + 1;
+                        taches.push(Tache { id, titre: titre.join(" "), priorite, terminee: false });
+                        println!("Tâche #{} ajoutée", id);
+                    }
+                    Some("terminer") => {
+                        let id: u32 = args[1].parse().unwrap();
+                        match taches.iter_mut().find(|t| t.id == id) {
+                            Some(t) => { t.terminee = true; println!("Tâche #{} terminée", id); }
+                            None => println!("erreur : tâche #{} introuvable", id),
+                        }
+                    }
+                    Some("lister") => {
+                        let mut en_cours: Vec<&Tache> = taches.iter().filter(|t| !t.terminee).collect();
+                        en_cours.sort_by(|a, b| b.priorite.cmp(&a.priorite).then(a.id.cmp(&b.id)));
+                        if en_cours.is_empty() { println!("(aucune tâche)"); }
+                        for t in en_cours { println!("#{} [{}] {}", t.id, t.priorite, t.titre); }
+                    }
+                    _ => {
+                        let fini = taches.iter().filter(|t| t.terminee).count();
+                        println!("{} terminée(s), {} en cours", fini, taches.len() - fini);
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "ajouter Écrire le rapport --priorite 2\najouter Faire les courses\najouter Réparer le serveur --priorite 5\nterminer 2\nterminer 9\nlister\nstats", output: "Tâche #1 ajoutée\nTâche #2 ajoutée\nTâche #3 ajoutée\nTâche #2 terminée\nerreur : tâche #9 introuvable\n#3 [5] Réparer le serveur\n#1 [2] Écrire le rapport\n1 terminée(s), 2 en cours" }
+        - { input: "lister\nstats", output: "(aucune tâche)\n0 terminée(s), 0 en cours", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-cli-ex1
+          type: mcq
+          prompt: Quelle crate permet de tester un binaire CLI en vérifiant sa sortie ?
+          choices: [assert_cmd, tokio, clap, rand]
+          answer: 0
+        - id: rust-cli-ex2
+          type: mcq
+          prompt: Pourquoi proposer une option --json ?
+          choices: [Pour que d’autres programmes puissent exploiter la sortie, Pour la coloration, Pour accélérer l’outil, Par obligation légale]
+          answer: 0
+        - id: rust-cli-ex3
+          type: mcq
+          prompt: Où doivent aller les résultats d’une commande Unix ?
+          choices: [stdout, stderr, un fichier temporaire, /dev/null]
+          answer: 0
+        - id: rust-cli-ex4
+          type: mcq
+          prompt: Quelle crate affiche des barres de progression ?
+          choices: [indicatif, regex, serde, rayon]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-backend
+    title: Services backend
+    summary: Concevoir un service web en Rust — routage HTTP, JSON avec serde, état partagé, middlewares, base de données et observabilité.
+    minutes: 40
+    concepts: [backend, async, reseau]
+    sections:
+      - title: Un service avec axum
+        body: |
+          ```rust
+          use axum::{routing::{get, post}, Router, Json, extract::{Path, State}};
+          use serde::{Deserialize, Serialize};
+          use std::sync::{Arc, Mutex};
+
+          #[derive(Serialize, Deserialize, Clone)]
+          struct Tache { id: u32, titre: String, faite: bool }
+
+          type Etat = Arc<Mutex<Vec<Tache>>>;
+
+          async fn lister(State(e): State<Etat>) -> Json<Vec<Tache>> {
+              Json(e.lock().unwrap().clone())
+          }
+
+          async fn creer(State(e): State<Etat>, Json(t): Json<Tache>) -> Json<Tache> {
+              e.lock().unwrap().push(t.clone());
+              Json(t)
+          }
+
+          #[tokio::main]
+          async fn main() {
+              let etat: Etat = Arc::new(Mutex::new(vec![]));
+              let app = Router::new()
+                  .route("/taches", get(lister).post(creer))
+                  .with_state(etat);
+              let l = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+              axum::serve(l, app).await.unwrap();
+          }
+          ```
+      - title: Les briques d’un backend de production
+        body: |
+          | Besoin | Outils |
+          |---|---|
+          | Sérialisation | `serde`, `serde_json` |
+          | Base de données | `sqlx` (requêtes vérifiées à la compilation), `diesel`, `sea-orm` |
+          | Middlewares | `tower` / `tower-http` (CORS, compression, délais, traces) |
+          | Configuration | variables d’environnement, `figment`, `config` |
+          | Observabilité | `tracing` + `tracing-subscriber`, métriques Prometheus |
+          | Auth | `argon2` (mots de passe), JWT ou sessions |
+          | Tests | tests d’intégration en appelant le `Router` directement (`tower::ServiceExt::oneshot`) |
+
+          Principes REST : ressources nommées au pluriel (`/taches`), verbes HTTP (`GET` lire, `POST` créer, `PUT`/`PATCH` modifier, `DELETE` supprimer), codes de statut corrects (200, 201, 400, 404, 409, 500).
+    exercises:
+      - id: rust-back-q1
+        type: mcq
+        prompt: Quel code HTTP renvoyer après la création réussie d’une ressource ?
+        choices: ['201 Created', '200 OK', '204 No Content', '302 Found']
+        answer: 0
+        concepts: [backend]
+      - id: rust-back-q2
+        type: mcq
+        prompt: Quelle crate vérifie les requêtes SQL à la compilation ?
+        choices: [sqlx, serde, tower, clap]
+        answer: 0
+      - id: rust-back-q3
+        type: mcq
+        prompt: Quel verbe HTTP utiliser pour supprimer une ressource ?
+        choices: [DELETE, GET, POST, PATCH]
+        answer: 0
+      - id: rust-back-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use serde::{Deserialize, Serialize};
+
+          #[derive(Serialize, Deserialize, Debug)]
+          struct Utilisateur { nom: String, age: u32, #[serde(default)] admin: bool }
+
+          fn main() {
+              let u: Utilisateur = serde_json::from_str(r#"{"nom":"Kiri","age":16}"#).unwrap();
+              println!("{:?}", u);
+              println!("{}", serde_json::to_string(&u).unwrap());
+          }
+        output: "Utilisateur { nom: \"Kiri\", age: 16, admin: false }\n{\"nom\":\"Kiri\",\"age\":16,\"admin\":false}"
+      - id: rust-back-code
+        type: code
+        title: Routeur HTTP minimal
+        prompt: |
+          Écris le cœur d’une API REST de tâches **sans framework** : une fonction `fn traiter(methode: &str, chemin: &str, corps: &str, db: &mut Vec<Tache>) -> (u16, String)`.
+
+          Routes :
+
+          - `GET /taches` → `200` et le JSON de toutes les tâches ;
+          - `POST /taches` avec un corps JSON `{"titre": "..."}` → `201` et la tâche créée (`id` auto-incrémenté à partir de 1, `faite: false`), ou `400` + `{"erreur":"corps invalide"}` ;
+          - `PATCH /taches/<id>` → marque la tâche faite : `200` + tâche, ou `404` + `{"erreur":"introuvable"}` ;
+          - `DELETE /taches/<id>` → `204` et un corps vide, ou `404` ;
+          - autre → `404` + `{"erreur":"route inconnue"}`.
+
+          Chaque ligne d’entrée : `METHODE chemin [corps JSON]`. Affiche `code corps`. Utilise `serde_json`.
+        starter: |
+          use serde::{Deserialize, Serialize};
+          use std::io::{self, Read};
+
+          #[derive(Serialize, Clone)]
+          struct Tache { id: u32, titre: String, faite: bool }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut db: Vec<Tache> = Vec::new();
+              for l in e.lines() {
+                  let mut p = l.splitn(3, ' ');
+                  let m = p.next().unwrap();
+                  let c = p.next().unwrap();
+                  let corps = p.next().unwrap_or("");
+                  let (code, rep) = traiter(m, c, corps, &mut db);
+                  println!("{} {}", code, rep);
+              }
+          }
+        solution: |
+          use serde::{Deserialize, Serialize};
+          use std::io::{self, Read};
+
+          #[derive(Serialize, Clone)]
+          struct Tache { id: u32, titre: String, faite: bool }
+
+          #[derive(Deserialize)]
+          struct Creation { titre: String }
+
+          fn erreur(code: u16, msg: &str) -> (u16, String) {
+              (code, serde_json::json!({ "erreur": msg }).to_string())
+          }
+
+          fn traiter(methode: &str, chemin: &str, corps: &str, db: &mut Vec<Tache>) -> (u16, String) {
+              let morceaux: Vec<&str> = chemin.trim_matches('/').split('/').collect();
+              match (methode, morceaux.as_slice()) {
+                  ("GET", ["taches"]) => (200, serde_json::to_string(db).unwrap()),
+                  ("POST", ["taches"]) => match serde_json::from_str::<Creation>(corps) {
+                      Ok(c) => {
+                          let id = db.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+                          let t = Tache { id, titre: c.titre, faite: false };
+                          db.push(t.clone());
+                          (201, serde_json::to_string(&t).unwrap())
+                      }
+                      Err(_) => erreur(400, "corps invalide"),
+                  },
+                  ("PATCH", ["taches", id]) => match id.parse::<u32>().ok().and_then(|id| db.iter_mut().find(|t| t.id == id)) {
+                      Some(t) => { t.faite = true; (200, serde_json::to_string(t).unwrap()) }
+                      None => erreur(404, "introuvable"),
+                  },
+                  ("DELETE", ["taches", id]) => {
+                      let avant = db.len();
+                      if let Ok(id) = id.parse::<u32>() { db.retain(|t| t.id != id); }
+                      if db.len() < avant { (204, String::new()) } else { erreur(404, "introuvable") }
+                  }
+                  _ => erreur(404, "route inconnue"),
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut db: Vec<Tache> = Vec::new();
+              for l in e.lines() {
+                  let mut p = l.splitn(3, ' ');
+                  let m = p.next().unwrap();
+                  let c = p.next().unwrap();
+                  let corps = p.next().unwrap_or("");
+                  let (code, rep) = traiter(m, c, corps, &mut db);
+                  println!("{} {}", code, rep);
+              }
+          }
+        tests:
+          - { input: "POST /taches {\"titre\":\"Coder\"}\nPOST /taches {\"oups\":1}\nPATCH /taches/1\nGET /taches\nDELETE /taches/1\nDELETE /taches/1\nGET /utilisateurs", output: "201 {\"id\":1,\"titre\":\"Coder\",\"faite\":false}\n400 {\"erreur\":\"corps invalide\"}\n200 {\"id\":1,\"titre\":\"Coder\",\"faite\":true}\n200 [{\"id\":1,\"titre\":\"Coder\",\"faite\":true}]\n204\n404 {\"erreur\":\"introuvable\"}\n404 {\"erreur\":\"route inconnue\"}" }
+          - { input: "GET /taches\nPATCH /taches/abc", output: "200 []\n404 {\"erreur\":\"introuvable\"}", hidden: true }
+        concepts: [backend]
+    project:
+      id: rust-back-projet
+      type: code
+      title: Limiteur de débit (rate limiter)
+      difficulty: 3
+      prompt: |
+        Implémente un **limiteur de débit à seau à jetons** (*token bucket*), brique classique des API : chaque client dispose d’un seau de capacité `C` jetons, rechargé de `R` jetons par seconde (sans dépasser `C`). Une requête consomme 1 jeton ; s’il n’y en a pas, elle est refusée (`429`).
+
+        Première ligne : `C R`. Lignes suivantes : `temps_ms client`. Les seaux démarrent pleins à la première requête du client. Pour chaque requête, affiche `200` ou `429`, puis à la fin, pour chaque client par ordre alphabétique, `client : acceptées/total`.
+
+        Utilise des jetons fractionnaires (`f64`) : recharge = `(t - dernier_t) / 1000 × R`.
+      starter: |
+        use std::collections::BTreeMap;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::collections::BTreeMap;
+        use std::io::{self, Read};
+
+        struct Seau {
+            jetons: f64,
+            dernier: u64,
+            acceptees: u32,
+            total: u32,
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let p: Vec<f64> = l.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let (cap, recharge) = (p[0], p[1]);
+            let mut seaux: BTreeMap<String, Seau> = BTreeMap::new();
+            for ligne in l {
+                let q: Vec<&str> = ligne.split_whitespace().collect();
+                let t: u64 = q[0].parse().unwrap();
+                let s = seaux.entry(q[1].to_string()).or_insert(Seau { jetons: cap, dernier: t, acceptees: 0, total: 0 });
+                s.jetons = (s.jetons + (t - s.dernier) as f64 / 1000.0 * recharge).min(cap);
+                s.dernier = t;
+                s.total += 1;
+                if s.jetons >= 1.0 {
+                    s.jetons -= 1.0;
+                    s.acceptees += 1;
+                    println!("200");
+                } else {
+                    println!("429");
+                }
+            }
+            for (c, s) in &seaux {
+                println!("{} : {}/{}", c, s.acceptees, s.total);
+            }
+        }
+      tests:
+        - { input: "2 1\n0 alice\n100 alice\n200 alice\n1300 alice\n1400 bob", output: "200\n200\n429\n200\n200\nalice : 3/4\nbob : 1/1" }
+        - { input: "1 2\n0 a\n400 a\n500 a\n1000 a", output: "200\n429\n200\n200\na : 3/4", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-back-ex1
+          type: mcq
+          prompt: Quel code HTTP signale qu’un client a dépassé sa limite de débit ?
+          choices: ['429 Too Many Requests', '403 Forbidden', '500', '418']
+          answer: 0
+        - id: rust-back-ex2
+          type: mcq
+          prompt: Quelle crate fournit la journalisation structurée asynchrone standard de l’écosystème ?
+          choices: [tracing, log4rs uniquement, println, slog obligatoire]
+          answer: 0
+        - id: rust-back-ex3
+          type: mcq
+          prompt: Avec axum, comment partager une base de données entre les gestionnaires ?
+          choices: [Via l’état du Router (State) contenant par ex. un pool, Avec une variable static mut, En la recréant à chaque requête, Avec des cookies]
+          answer: 0
+        - id: rust-back-ex4
+          type: mcq
+          prompt: Quel algorithme hacher les mots de passe ?
+          choices: [Argon2, MD5, SHA-1 sans sel, Base64]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-performance
+    title: Performance
+    summary: Performance de haut niveau — cache CPU, disposition des données, SIMD, parallélisme de données, allocations et lecture des benchmarks.
+    minutes: 35
+    concepts: [performance]
+    sections:
+      - title: Le cache avant tout
+        body: |
+          Un accès à la RAM coûte ~100 cycles, au cache L1 ~4 cycles. Les données **contiguës** et parcourues **séquentiellement** sont donc bien plus rapides :
+
+          - `Vec<T>` plutôt que des listes chaînées ;
+          - **Structure de tableaux** (SoA) plutôt que tableau de structures (AoS) quand on ne traite qu’un champ :
+
+          ```rust
+          // AoS : chaque particule = 32 octets, on charge tout pour lire x
+          struct Particule { x: f32, y: f32, vx: f32, vy: f32, masse: f32, id: u64 }
+          // SoA : les x sont contigus → idéal pour un parcours ou la vectorisation
+          struct Particules { x: Vec<f32>, y: Vec<f32>, vx: Vec<f32>, vy: Vec<f32> }
+          ```
+
+          - parcourir une matrice ligne par ligne (ordre mémoire), pas colonne par colonne.
+      - title: Parallélisme et vectorisation
+        body: |
+          - **rayon** : `v.par_iter().map(f).sum()` répartit le travail sur tous les cœurs (*work stealing*).
+          - **SIMD** : le compilateur vectorise automatiquement les boucles simples sur des tranches (aide-le avec `chunks_exact`, des types alignés, `-C target-cpu=native`) ; `std::simd` (nightly) ou les intrinsèques `std::arch` pour le contrôle total.
+          - Éviter le **faux partage** (*false sharing*) : des compteurs écrits par des threads différents ne doivent pas partager la même ligne de cache (64 octets) → `#[repr(align(64))]`.
+
+          Mesurer avec **criterion** (statistiques, détection des régressions), `perf stat` (cache misses, branch misses), **cargo-flamegraph**.
+    exercises:
+      - id: rust-perf-q1
+        type: mcq
+        prompt: Pourquoi un Vec est-il généralement plus rapide qu’une liste chaînée pour un parcours ?
+        choices: [Ses éléments sont contigus en mémoire (meilleure localité de cache), Il utilise moins de CPU par instruction, Il est trié, Il est alloué sur la pile]
+        answer: 0
+        concepts: [performance]
+      - id: rust-perf-q2
+        type: mcq
+        prompt: Qu’est-ce que le faux partage (false sharing) ?
+        choices: [Des threads qui écrivent des données distinctes sur une même ligne de cache, Un Rc partagé, Un bug de Mutex, Une fuite mémoire]
+        answer: 0
+      - id: rust-perf-q3
+        type: mcq
+        prompt: Pour parcourir une matrice stockée ligne par ligne, quel ordre de boucles est le plus rapide ?
+        choices: [Lignes à l’extérieur, colonnes à l’intérieur, Colonnes à l’extérieur, Indifférent, Aléatoire]
+        answer: 0
+      - id: rust-perf-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let n: usize = 4;
+              let m: Vec<u64> = (0..(n * n) as u64).collect();
+              let mut lignes = 0;
+              for i in 0..n { for j in 0..n { lignes += m[i * n + j] * (j as u64); } }
+              let mut colonnes = 0;
+              for j in 0..n { for i in 0..n { colonnes += m[i * n + j] * (j as u64); } }
+              println!("{} {}", lignes, lignes == colonnes);
+          }
+        output: 200 true
+        explanation: Même résultat, mais le parcours ligne par ligne respecte l’ordre mémoire.
+      - id: rust-perf-code
+        type: code
+        title: Plus longue sous-suite croissante
+        prompt: |
+          Lis `n` puis `n` entiers. Affiche la longueur de la **plus longue sous-suite strictement croissante** (non nécessairement contiguë).
+
+          ⚠️ Les tests cachés vont jusqu’à 200 000 éléments : l’algorithme O(n²) est trop lent. Utilise la méthode O(n log n) (« patience sorting » avec `binary_search` / `partition_point`).
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let v: Vec<i64> = e.split_whitespace().skip(1).map(|x| x.parse().unwrap()).collect();
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let v: Vec<i64> = e.split_whitespace().skip(1).map(|x| x.parse().unwrap()).collect();
+              let mut fins: Vec<i64> = Vec::with_capacity(v.len());
+              for x in v {
+                  let pos = fins.partition_point(|&f| f < x);
+                  if pos == fins.len() { fins.push(x); } else { fins[pos] = x; }
+              }
+              println!("{}", fins.len());
+          }
+        tests:
+          - { input: "8\n10 9 2 5 3 7 101 18", output: '4' }
+          - { input: "5\n5 4 3 2 1", output: '1', hidden: true }
+          - { input: "6\n1 2 2 3 3 4", output: '4', hidden: true }
+        concepts: [performance]
+    project:
+      id: rust-perf-projet
+      type: code
+      title: Simulation de particules (SoA)
+      difficulty: 3
+      prompt: |
+        Simule `n` particules en 1D organisées en **structure de tableaux** (`Vec<f64>` séparés pour positions et vitesses).
+
+        Entrée : `n pas dt`, puis `n` lignes `x v`. À chaque pas : `v = v - 9.81 × dt`, puis `x = x + v × dt` ; si `x < 0`, la particule rebondit : `x = -x` et `v = -v × 0.8`.
+
+        Affiche à la fin la position moyenne et la vitesse maximale en valeur absolue (4 décimales, séparées par un espace).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        struct Particules {
+            x: Vec<f64>,
+            v: Vec<f64>,
+        }
+
+        impl Particules {
+            fn pas(&mut self, dt: f64) {
+                for (x, v) in self.x.iter_mut().zip(self.v.iter_mut()) {
+                    *v -= 9.81 * dt;
+                    *x += *v * dt;
+                    if *x < 0.0 {
+                        *x = -*x;
+                        *v = -*v * 0.8;
+                    }
+                }
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut l = e.lines();
+            let t: Vec<f64> = l.next().unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+            let (n, pas, dt) = (t[0] as usize, t[1] as usize, t[2]);
+            let mut p = Particules { x: Vec::with_capacity(n), v: Vec::with_capacity(n) };
+            for ligne in l.take(n) {
+                let q: Vec<f64> = ligne.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                p.x.push(q[0]);
+                p.v.push(q[1]);
+            }
+            for _ in 0..pas {
+                p.pas(dt);
+            }
+            let moy = p.x.iter().sum::<f64>() / n as f64;
+            let vmax = p.v.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+            println!("{:.4} {:.4}", moy, vmax);
+        }
+      tests:
+        - { input: "1 1 0.1\n10 0", output: 9.9019 0.9810 }
+        - { input: "2 3 0.5\n1 0\n0 5", output: 1.9050 4.7088, hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-perf-ex1
+          type: mcq
+          prompt: Que signifie « SoA » ?
+          choices: [Structure of Arrays, Speed of Allocation, Size of Address, Set of Atomics]
+          answer: 0
+        - id: rust-perf-ex2
+          type: mcq
+          prompt: Quelle commande Linux mesure les défauts de cache d’un programme ?
+          choices: [perf stat, ls -l, top, ping]
+          answer: 0
+        - id: rust-perf-ex3
+          type: mcq
+          prompt: Quelle stratégie rayon utilise-t-il pour répartir le travail ?
+          choices: [Le vol de travail (work stealing), Un thread par élément, Le tourniquet strict, Aucune]
+          answer: 0
+        - id: rust-perf-ex4
+          type: mcq
+          prompt: Quelle taille fait typiquement une ligne de cache ?
+          choices: [64 octets, 8 octets, 4 Ko, 1 Mo]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-securite-memoire
+    title: Sécurité mémoire
+    summary: Ce que Rust garantit (et ne garantit pas) — classes de vulnérabilités évitées, entrées non fiables, débordements, dépendances et fuzzing.
+    minutes: 35
+    concepts: [securite, unsafe]
+    sections:
+      - title: Les bugs que Rust élimine
+        body: |
+          ~70 % des vulnérabilités graves de Chrome ou Windows sont des **erreurs mémoire**. En Rust *safe*, elles sont impossibles :
+
+          | Bug | Comment Rust l’empêche |
+          |---|---|
+          | Use-after-free | ownership + borrow checker |
+          | Double free | un seul propriétaire |
+          | Pointeur pendant | durées de vie vérifiées |
+          | Dépassement de tampon | vérification des bornes (`panic` au lieu d’écraser la mémoire) |
+          | Data race | `Send` / `Sync` |
+          | Variable non initialisée | interdit par le compilateur |
+          | Déréférencement de null | pas de null (`Option`) |
+
+          C’est pourquoi l’ANSSI, la NSA et la Maison-Blanche recommandent les langages à mémoire sûre.
+      - title: Ce que Rust ne garantit pas
+        body: |
+          - Les **bugs logiques** (vérifier un mauvais mot de passe reste possible !).
+          - Les **dépassements arithmétiques** en release (*wrapping* silencieux) : utiliser `checked_*`, `saturating_*`, ou `overflow-checks = true`.
+          - Les **paniques** (déni de service si une entrée provoque un `unwrap` sur `None`).
+          - Les **fuites** mémoire et les **interblocages**.
+          - Les failles dans le code `unsafe` et les **dépendances** (chaîne d’approvisionnement).
+
+          Défenses : valider toutes les entrées non fiables (taille max, format), ne jamais `unwrap` une donnée externe, `cargo audit`, `cargo deny`, **fuzzing** (`cargo fuzz`), Miri pour l’`unsafe`, `#![forbid(unsafe_code)]` quand c’est possible.
+    exercises:
+      - id: rust-secu-q1
+        type: mcq
+        prompt: En Rust safe, que se passe-t-il lors d’un accès hors limites `v[100]` ?
+        choices: [Le programme panique au lieu de corrompre la mémoire, La mémoire voisine est lue silencieusement, Erreur de compilation systématique, Rien]
+        answer: 0
+        concepts: [securite]
+      - id: rust-secu-q2
+        type: mcq
+        prompt: Lequel de ces problèmes Rust safe n’empêche-t-il PAS ?
+        choices: [Un bug logique de contrôle d’accès, Un use-after-free, Une data race, Un double free]
+        answer: 0
+      - id: rust-secu-q3
+        type: mcq
+        prompt: Quel attribut interdit tout code unsafe dans une crate ?
+        choices: ['#![forbid(unsafe_code)]', '#[safe]', '#![no_std]', '#[deny(warnings)]']
+        answer: 0
+      - id: rust-secu-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let a: u8 = 250;
+              println!("{:?} {} {}", a.checked_add(10), a.saturating_add(10), a.wrapping_add(10));
+          }
+        output: None 255 4
+      - id: rust-secu-code
+        type: code
+        title: Analyseur de paquets robuste
+        prompt: |
+          Un paquet réseau est une suite d’octets en hexadécimal : `[type:1 octet][longueur:2 octets big-endian][charge utile : longueur octets]`.
+
+          Écris `fn analyser(octets: &[u8]) -> Result<(u8, &[u8]), String>` **sans jamais paniquer** sur une entrée malveillante. Erreurs : `trop court`, `longueur incohérente`, `charge trop grande` (> 1024 octets).
+
+          Chaque ligne d’entrée est un paquet en hexadécimal (ligne invalide → `hex invalide`). Affiche `type T : N octets` (avec la charge en texte si elle est en ASCII imprimable : `type T : N octets "texte"`) ou `rejeté : raison`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn decoder_hex(s: &str) -> Result<Vec<u8>, String> {
+              let s = s.trim();
+              if s.len() % 2 != 0 { return Err("hex invalide".into()); }
+              (0..s.len()).step_by(2).map(|i| s.get(i..i + 2).and_then(|h| u8::from_str_radix(h, 16).ok()).ok_or_else(|| "hex invalide".to_string())).collect()
+          }
+
+          fn analyser(o: &[u8]) -> Result<(u8, &[u8]), String> {
+              if o.len() < 3 { return Err("trop court".into()); }
+              let longueur = u16::from_be_bytes([o[1], o[2]]) as usize;
+              if longueur > 1024 { return Err("charge trop grande".into()); }
+              let charge = o.get(3..3 + longueur).ok_or("longueur incohérente")?;
+              if o.len() != 3 + longueur { return Err("longueur incohérente".into()); }
+              Ok((o[0], charge))
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let r = decoder_hex(l).and_then(|o| analyser(&o).map(|(t, c)| (t, c.to_vec())));
+                  match r {
+                      Ok((t, c)) => {
+                          if !c.is_empty() && c.iter().all(|b| b.is_ascii_graphic() || *b == b' ') {
+                              println!("type {} : {} octets \"{}\"", t, c.len(), String::from_utf8_lossy(&c));
+                          } else {
+                              println!("type {} : {} octets", t, c.len());
+                          }
+                      }
+                      Err(m) => println!("rejeté : {}", m),
+                  }
+              }
+          }
+        tests:
+          - { input: "0100026869\n02000548656c6c6f\n01ff\n01000a00\n0204010000\nzz", output: "type 1 : 2 octets \"hi\"\ntype 2 : 5 octets \"Hello\"\nrejeté : trop court\nrejeté : longueur incohérente\nrejeté : charge trop grande\nrejeté : hex invalide" }
+          - { input: "070000\n0300020102", output: "type 7 : 0 octets\ntype 3 : 2 octets", hidden: true }
+        forbid:
+          - { pattern: '\.unwrap\(\)\s*;?\s*$', message: 'Pas d’unwrap sur les données du paquet' }
+        concepts: [securite]
+    project:
+      id: rust-secu-projet
+      type: code
+      title: Coffre de mots de passe (validation stricte)
+      difficulty: 3
+      prompt: |
+        Implémente le cœur d’un coffre de secrets **robuste face aux entrées malveillantes**. Commandes (une par ligne) :
+
+        - `ajouter <service> <secret>` : service = 1 à 32 caractères `[a-z0-9._-]`, secret = 8 à 64 caractères ASCII imprimables sans espace ; refus si le service existe déjà ;
+        - `lire <service>` : affiche le secret **masqué** (2 premiers caractères puis `*` pour le reste) ;
+        - `supprimer <service>` ;
+        - toute autre entrée (y compris vide ou trop d’arguments) est rejetée.
+
+        Les réponses : `ok`, `masqué : xx******`, ou `erreur : <raison>` avec les raisons `service invalide`, `secret invalide`, `service existant`, `service inconnu`, `commande invalide`. Aucune entrée ne doit faire paniquer le programme.
+      starter: |
+        use std::collections::HashMap;
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::collections::HashMap;
+        use std::io::{self, Read};
+
+        fn service_valide(s: &str) -> bool {
+            (1..=32).contains(&s.len()) && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-".contains(c))
+        }
+
+        fn secret_valide(s: &str) -> bool {
+            (8..=64).contains(&s.len()) && s.chars().all(|c| c.is_ascii_graphic())
+        }
+
+        fn executer(l: &str, coffre: &mut HashMap<String, String>) -> Result<String, &'static str> {
+            let p: Vec<&str> = l.split_whitespace().collect();
+            match p.as_slice() {
+                ["ajouter", s, secret] => {
+                    if !service_valide(s) { return Err("service invalide"); }
+                    if !secret_valide(secret) { return Err("secret invalide"); }
+                    if coffre.contains_key(*s) { return Err("service existant"); }
+                    coffre.insert(s.to_string(), secret.to_string());
+                    Ok("ok".into())
+                }
+                ["lire", s] => {
+                    let secret = coffre.get(*s).ok_or("service inconnu")?;
+                    let debut: String = secret.chars().take(2).collect();
+                    Ok(format!("masqué : {}{}", debut, "*".repeat(secret.len() - 2)))
+                }
+                ["supprimer", s] => coffre.remove(*s).map(|_| "ok".to_string()).ok_or("service inconnu"),
+                _ => Err("commande invalide"),
+            }
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut coffre = HashMap::new();
+            for l in e.lines() {
+                match executer(l, &mut coffre) {
+                    Ok(m) => println!("{}", m),
+                    Err(m) => println!("erreur : {}", m),
+                }
+            }
+        }
+      tests:
+        - { input: "ajouter mail.perso S3cr3t!Kiri\nlire mail.perso\najouter mail.perso autreSecret\najouter Banque abcdefgh\najouter banque court\nsupprimer mail.perso\nlire mail.perso", output: "ok\nmasqué : S3*********\nerreur : service existant\nerreur : service invalide\nerreur : secret invalide\nok\nerreur : service inconnu" }
+        - { input: "\nlire\najouter a b c d\nsupprimer zz\nAJOUTER x 12345678", output: "erreur : commande invalide\nerreur : commande invalide\nerreur : commande invalide\nerreur : service inconnu\nerreur : commande invalide", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-secu-ex1
+          type: mcq
+          prompt: Quel outil génère des entrées aléatoires pour trouver des paniques ou des failles ?
+          choices: [cargo fuzz, cargo fmt, cargo doc, cargo tree]
+          answer: 0
+        - id: rust-secu-ex2
+          type: mcq
+          prompt: Pourquoi éviter unwrap() sur des données venant du réseau ?
+          choices: [Une entrée malveillante peut provoquer une panique (déni de service), unwrap est lent, unwrap est déprécié, Ce n’est pas un problème]
+          answer: 0
+        - id: rust-secu-ex3
+          type: mcq
+          prompt: Quelle proportion approximative des failles graves de grands logiciels C/C++ est due à des erreurs mémoire ?
+          choices: [Environ 70 %, Environ 5 %, 100 %, Aucune]
+          answer: 0
+        - id: rust-secu-ex4
+          type: mcq
+          prompt: Quel outil interdit des licences ou crates non désirées dans les dépendances ?
+          choices: [cargo deny, cargo run, rustfmt, cargo clean]
+          answer: 0
