@@ -1,0 +1,2089 @@
+language: cpp
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: cpp-presentation
+    title: Présentation du C++
+    summary: Histoire, philosophie et domaines d’utilisation du C++, le langage qui allie contrôle du matériel et abstractions puissantes.
+    minutes: 15
+    concepts: [cpp, compilation]
+    sections:
+      - title: Un langage incontournable
+        body: |
+          Le **C++** a été créé par **Bjarne Stroustrup** à partir de 1979 (« C with Classes »), puis standardisé en 1998. Il étend le langage C avec la programmation orientée objet, la programmation générique et de nombreuses abstractions.
+
+          On le retrouve partout où la **performance** compte :
+
+          - moteurs de jeux vidéo (Unreal Engine), logiciels 3D ;
+          - navigateurs (Chrome, Firefox), bases de données (MySQL, MongoDB) ;
+          - finance haute fréquence, systèmes embarqués, automobile, aérospatial ;
+          - bibliothèques scientifiques et d’IA (TensorFlow, PyTorch en interne).
+
+          Philosophie : « **on ne paie pas pour ce qu’on n’utilise pas** » (*zero-overhead*).
+      - title: Le C++ moderne
+        body: |
+          Le langage évolue tous les trois ans :
+
+          | Norme | Apports majeurs |
+          |---|---|
+          | C++98 | STL, templates |
+          | **C++11** | `auto`, lambdas, pointeurs intelligents, move semantics |
+          | C++14 / 17 | `make_unique`, `std::optional`, `string_view`, structured bindings |
+          | **C++20** | concepts, ranges, coroutines, modules |
+          | C++23 | `std::print`, `std::expected`, `std::mdspan` |
+
+          Sur Codemori, tu apprends le **C++ moderne** (C++20/23) compilé avec **GCC** : moins de pièges, plus de sécurité, sans renoncer à la performance.
+
+          > ⚠️ Le C++ donne beaucoup de pouvoir… et de responsabilités : certaines erreurs (accès hors limites, mémoire libérée) ne sont pas détectées et provoquent un **comportement indéfini**. Les bonnes pratiques modernes évitent la plupart de ces pièges.
+    exercises:
+      - id: cpp-pres-q1
+        type: mcq
+        prompt: Qui a créé le C++ ?
+        choices: [Dennis Ritchie, Bjarne Stroustrup, James Gosling, Guido van Rossum]
+        answer: 1
+        explanation: Dennis Ritchie a créé le C, James Gosling Java, Guido van Rossum Python.
+      - id: cpp-pres-q2
+        type: mcq
+        prompt: Quelle version a introduit `auto`, les lambdas et les pointeurs intelligents ?
+        choices: [C++98, C++11, C++20, C++23]
+        answer: 1
+      - id: cpp-pres-q3
+        type: mcq
+        prompt: Que signifie le principe « zero-overhead » ?
+        choices: [On ne paie pas (en performance) pour ce qu’on n’utilise pas, Le C++ est gratuit, Le programme n’utilise aucune mémoire, Les erreurs sont impossibles]
+        answer: 0
+      - id: cpp-pres-code
+        type: code
+        title: Bonjour, C++ !
+        prompt: |
+          Modifie le programme pour qu’il affiche exactement :
+
+          ```
+          Bonjour, C++ !
+          ```
+        starter: |
+          #include <iostream>
+
+          int main() {
+              std::cout << "Hello" << std::endl;
+              return 0;
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              std::cout << "Bonjour, C++ !" << std::endl;
+              return 0;
+          }
+        tests:
+          - { input: '', output: 'Bonjour, C++ !' }
+        require:
+          - { pattern: 'std::cout|cout', message: Utiliser std::cout }
+    project:
+      id: cpp-pres-projet
+      type: code
+      title: Carte de visite
+      difficulty: 1
+      prompt: |
+        Lis un prénom (une ligne) et affiche :
+
+        ```
+        **********
+        Bonjour, <prénom> !
+        **********
+        ```
+      starter: |
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            std::string prenom;
+            std::getline(std::cin, prenom);
+            // À toi !
+            return 0;
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            std::string prenom;
+            std::getline(std::cin, prenom);
+            std::cout << "**********\n";
+            std::cout << "Bonjour, " << prenom << " !\n";
+            std::cout << "**********\n";
+            return 0;
+        }
+      tests:
+        - { input: Kiri, output: "**********\nBonjour, Kiri !\n**********" }
+        - { input: Bjarne, output: "**********\nBonjour, Bjarne !\n**********", hidden: true }
+      hints: ['Enchaîne les éléments avec `<<` : `std::cout << "Bonjour, " << prenom << " !\n";`']
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-pres-ex1
+          type: mcq
+          prompt: Le C++ est un langage…
+          choices: [interprété, compilé en code machine, exécuté uniquement par une machine virtuelle, de balisage]
+          answer: 1
+        - id: cpp-pres-ex2
+          type: mcq
+          prompt: Quelle norme a introduit les concepts et les coroutines ?
+          choices: [C++11, C++14, C++17, C++20]
+          answer: 3
+        - id: cpp-pres-ex3
+          type: mcq
+          prompt: Qu’est-ce qu’un comportement indéfini (undefined behavior) ?
+          choices: [Une situation où la norme ne garantit rien sur ce que fait le programme, Une erreur de compilation, Une exception, Un avertissement]
+          answer: 0
+        - id: cpp-pres-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                std::cout << "C" << "++" << std::endl;
+                std::cout << 2 + 3 << std::endl;
+            }
+          output: "C++\n5"
+
+  # ------------------------------------------------------------------
+  - slug: cpp-compilation
+    title: Compilation
+    summary: Du code source à l’exécutable — préprocesseur, compilation, édition de liens, options de GCC/Clang et messages d’erreur.
+    minutes: 20
+    concepts: [compilation, build]
+    sections:
+      - title: Les étapes de la compilation
+        body: |
+          1. **Préprocesseur** : traite les directives `#include`, `#define`, `#ifdef` (remplacement textuel).
+          2. **Compilation** : chaque fichier `.cpp` devient un fichier objet `.o` (code machine).
+          3. **Édition de liens** (*linker*) : assemble les `.o` et les bibliothèques en un exécutable.
+
+          ```bash
+          g++ -std=c++23 -Wall -Wextra -O2 main.cpp -o programme
+          ./programme
+          ```
+
+          | Option | Rôle |
+          |---|---|
+          | `-std=c++23` | version de la norme |
+          | `-Wall -Wextra` | active de nombreux avertissements (indispensable !) |
+          | `-O2` | optimisations |
+          | `-g` | informations de débogage |
+          | `-fsanitize=address,undefined` | détecte les erreurs mémoire à l’exécution |
+      - title: Erreurs de compilation et de liens
+        body: |
+          ```text
+          main.cpp:5:5: error: 'cout' was not declared in this scope
+          ```
+
+          Format `fichier:ligne:colonne`. Ici, il manque `std::` ou l’`#include <iostream>`.
+
+          Une erreur d’**édition de liens** ressemble à :
+
+          ```text
+          undefined reference to `calculer(int)'
+          ```
+
+          La fonction est **déclarée** mais jamais **définie** (ou le fichier qui la contient n’a pas été compilé avec le reste).
+
+          Compilateurs principaux : **GCC** (`g++`), **Clang** (`clang++`), **MSVC** (Visual Studio). Sur Codemori, ton code est compilé avec `g++ -std=c++23 -Wall -Wextra`.
+    exercises:
+      - id: cpp-comp-order
+        type: order
+        prompt: Remets dans l’ordre les étapes de fabrication d’un exécutable.
+        lines:
+          - 'Préprocesseur (#include, #define)'
+          - Compilation en fichiers objets
+          - Édition de liens
+          - Exécutable prêt
+      - id: cpp-comp-q1
+        type: mcq
+        prompt: Que signifie l’erreur « undefined reference to … » ?
+        choices: [Une fonction déclarée n’a pas été définie (erreur d’édition de liens), Une faute de frappe dans un mot-clé, Un point-virgule manquant, Une division par zéro]
+        answer: 0
+      - id: cpp-comp-q2
+        type: mcq
+        prompt: Quelle option active des avertissements supplémentaires ?
+        choices: ['-O2', '-Wall', '-o', '-std=c++23']
+        answer: 1
+      - id: cpp-comp-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+
+          int main() {
+              cout << "Bonjour" << std::endl;
+              return 0;
+          }
+        bugLines: [4]
+        choices:
+          - cout appartient à l’espace de noms std ; il faut écrire std::cout
+          - 'Il manque un #include <string>'
+          - return 0 est interdit
+        answer: 0
+        solution: |
+          #include <iostream>
+
+          int main() {
+              std::cout << "Bonjour" << std::endl;
+              return 0;
+          }
+        tests:
+          - { input: '', output: Bonjour }
+      - id: cpp-comp-fill
+        type: fill
+        prompt: Complète la commande qui compile en C++23 avec les avertissements et produit l’exécutable `jeu`.
+        code: 'g++ -std={{?}} -Wall main.cpp {{?}} jeu'
+        blanks: [['c++23'], ['-o']]
+    project:
+      id: cpp-comp-projet
+      type: code
+      title: Fonction séparée
+      difficulty: 1
+      prompt: |
+        Déclare une fonction `int carre(int x);` **avant** `main` (prototype), utilise-la dans `main`, et **définis-la après** `main`.
+
+        Le programme lit un entier et affiche son carré.
+      starter: |
+        #include <iostream>
+
+        int main() {
+            int n;
+            std::cin >> n;
+            return 0;
+        }
+      solution: |
+        #include <iostream>
+
+        int carre(int x);
+
+        int main() {
+            int n;
+            std::cin >> n;
+            std::cout << carre(n) << "\n";
+            return 0;
+        }
+
+        int carre(int x) {
+            return x * x;
+        }
+      tests:
+        - { input: '7', output: '49' }
+        - { input: '-12', output: '144', hidden: true }
+        - { input: '0', output: '0', hidden: true }
+      require:
+        - { pattern: 'int\s+carre\s*\(\s*int\s+\w*\s*\)\s*;', message: 'Déclarer le prototype int carre(int x);' }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-comp-ex1
+          type: mcq
+          prompt: Que fait le préprocesseur avec `#include <iostream>` ?
+          choices: [Il insère le contenu de l’en-tête dans le fichier, Il télécharge la bibliothèque, Il compile iostream, Rien]
+          answer: 0
+        - id: cpp-comp-ex2
+          type: mcq
+          prompt: Quelle option aide à détecter les erreurs mémoire à l’exécution ?
+          choices: ['-fsanitize=address', '-O3', '-std=c++11', '-o']
+          answer: 0
+        - id: cpp-comp-ex3
+          type: mcq
+          prompt: Quelle extension porte un fichier objet produit par GCC ?
+          choices: ['.o', '.cpp', '.h', '.exe uniquement']
+          answer: 0
+        - id: cpp-comp-ex4
+          type: mcq
+          prompt: Quel compilateur est fourni par le projet LLVM ?
+          choices: [Clang, GCC, MSVC, javac]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-premier-programme
+    title: Premier programme
+    summary: La fonction main, les en-têtes, std::cout et std::cin, les flux d’entrée/sortie et les retours à la ligne.
+    minutes: 20
+    concepts: [affichage, main]
+    sections:
+      - title: Anatomie
+        body: |
+          ```cpp
+          #include <iostream>   // bibliothèque d’entrées/sorties
+
+          int main() {          // point d’entrée, renvoie un int
+              std::cout << "Bonjour !" << std::endl;
+              return 0;         // 0 = succès
+          }
+          ```
+
+          - `#include` importe un **en-tête** de la bibliothèque standard.
+          - `std::` désigne l’**espace de noms** standard (`std::cout` = « le cout de std »).
+          - `<<` envoie des données dans le flux de sortie.
+          - `std::endl` passe à la ligne **et vide le tampon** ; `'\n'` passe à la ligne (plus rapide).
+          - Chaque instruction se termine par `;`.
+      - title: Lire au clavier
+        body: |
+          ```cpp
+          #include <iostream>
+          #include <string>
+
+          int main() {
+              int age;
+              std::cout << "Ton âge ? ";
+              std::cin >> age;                    // lit un entier (s’arrête aux espaces)
+
+              std::string nom;
+              std::cin >> nom;                    // lit UN mot
+              std::string ligne;
+              std::getline(std::cin >> std::ws, ligne); // lit toute la ligne suivante
+              std::cout << nom << " a " << age << " ans\n";
+          }
+          ```
+
+          `using namespace std;` permet d’écrire `cout` au lieu de `std::cout`, mais c’est **déconseillé** dans les gros projets (risque de conflits de noms).
+    exercises:
+      - id: cpp-pp-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              std::cout << "A" << "B";
+              std::cout << "C\n" << "D" << std::endl;
+              std::cout << 1 + 2 << " " << 7 / 2 << '\n';
+          }
+        output: "ABC\nD\n3 3"
+      - id: cpp-pp-q1
+        type: mcq
+        prompt: Quelle différence entre `std::endl` et `'\n'` ?
+        choices: [endl vide aussi le tampon de sortie, Aucune, '\n ne fonctionne pas sur Windows', endl ajoute deux lignes]
+        answer: 0
+      - id: cpp-pp-fill
+        type: fill
+        prompt: Complète pour lire un entier puis afficher son double.
+        code: |
+          #include <iostream>
+          int main() {
+              int n;
+              std::{{?}} >> n;
+              std::cout << n * 2 << "\n";
+          }
+        blanks: [[cin]]
+        tests:
+          - { input: '21', output: '42' }
+      - id: cpp-pp-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          #include <iostream>
+          int main() {
+              std::cout << "Ligne 1\n"
+              std::cout << "Ligne 2\n";
+              return 0;
+          }
+        bugLines: [3]
+        choices:
+          - Il manque le point-virgule à la fin de l’instruction
+          - '\n est interdit'
+          - main doit renvoyer void
+        answer: 0
+        solution: |
+          #include <iostream>
+          int main() {
+              std::cout << "Ligne 1\n";
+              std::cout << "Ligne 2\n";
+              return 0;
+          }
+        tests:
+          - { input: '', output: "Ligne 1\nLigne 2" }
+      - id: cpp-pp-code
+        type: code
+        title: Addition
+        prompt: |
+          Lis deux entiers et affiche `a + b = résultat`.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              long long a, b;
+              std::cin >> a >> b;
+              return 0;
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              long long a, b;
+              std::cin >> a >> b;
+              std::cout << a << " + " << b << " = " << a + b << "\n";
+              return 0;
+          }
+        tests:
+          - { input: '2 3', output: 2 + 3 = 5 }
+          - { input: "10\n-4", output: 10 + -4 = 6, hidden: true }
+          - { input: 1000000000 2000000000, output: 1000000000 + 2000000000 = 3000000000, hidden: true }
+    project:
+      id: cpp-pp-projet
+      type: code
+      title: Ticket de caisse
+      difficulty: 1
+      prompt: |
+        Lis un nom d’article (une ligne, peut contenir des espaces) puis un prix en centimes. Affiche :
+
+        ```
+        Article : <nom>
+        Prix : <prix> centimes
+        Merci de votre visite !
+        ```
+      starter: |
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            std::string nom;
+            std::getline(std::cin, nom);
+            int prix;
+            std::cin >> prix;
+            return 0;
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            std::string nom;
+            std::getline(std::cin, nom);
+            int prix;
+            std::cin >> prix;
+            std::cout << "Article : " << nom << "\n";
+            std::cout << "Prix : " << prix << " centimes\n";
+            std::cout << "Merci de votre visite !\n";
+            return 0;
+        }
+      tests:
+        - { input: "Pain au chocolat\n130", output: "Article : Pain au chocolat\nPrix : 130 centimes\nMerci de votre visite !" }
+        - { input: "Clé USB\n999", output: "Article : Clé USB\nPrix : 999 centimes\nMerci de votre visite !", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-pp-ex1
+          type: mcq
+          prompt: Que renvoie `main` par convention en cas de succès ?
+          choices: ['0', '1', '-1', 'true']
+          answer: 0
+        - id: cpp-pp-ex2
+          type: mcq
+          prompt: Comment lire une ligne entière contenant des espaces ?
+          choices: ['std::getline(std::cin, s)', 'std::cin >> s', 'std::read(s)', 'scanf(s)']
+          answer: 0
+        - id: cpp-pp-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                int a = 5, b = 2;
+                std::cout << a << b << '\n' << a * b << std::endl;
+            }
+          output: "52\n10"
+        - id: cpp-pp-ex4
+          type: mcq
+          prompt: Pourquoi éviter `using namespace std;` dans les gros projets ?
+          choices: [Risque de conflits de noms, Ralentit le programme, Interdit par la norme, Augmente la mémoire]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-variables
+    title: Variables
+    summary: Déclaration, initialisation (y compris par accolades), auto, const, constexpr et portée des variables.
+    minutes: 25
+    concepts: [variables]
+    sections:
+      - title: Déclarer et initialiser
+        body: |
+          ```cpp
+          int age = 25;          // initialisation par copie
+          double taille{1.62};   // initialisation par accolades (recommandée)
+          char initiale = 'K';
+          bool actif{true};
+          std::string nom{"Kiri"};
+
+          int x;                 // ⚠️ NON initialisée : valeur indéterminée !
+          int y{};               // initialisée à 0
+          ```
+
+          L’initialisation par accolades `{}` **interdit les conversions avec perte** :
+
+          ```cpp
+          int a = 3.7;   // compile (a vaut 3) — avertissement
+          int b{3.7};    // ❌ erreur : narrowing conversion
+          ```
+
+          Contrairement à Rust, les variables C++ sont **modifiables par défaut**.
+      - title: auto, const et constexpr
+        body: |
+          ```cpp
+          auto n = 42;            // int (type déduit)
+          auto pi = 3.14159;      // double
+          const int MAX = 100;    // non modifiable
+          constexpr int CARRE = 12 * 12;   // calculé À LA COMPILATION
+          ```
+
+          - `const` : la valeur ne peut plus changer après l’initialisation.
+          - `constexpr` : la valeur doit être connue à la compilation (plus fort que `const`).
+
+          **Portée** : une variable vit jusqu’à la fin du bloc `{ }` où elle est déclarée. Une variable déclarée dans un bloc intérieur peut **masquer** une variable extérieure du même nom (à éviter, `-Wshadow` le signale).
+    exercises:
+      - id: cpp-var-q1
+        type: mcq
+        prompt: Quelle est la valeur de `int x;` déclarée dans une fonction sans initialisation ?
+        choices: ['0', Indéterminée (la lire est un comportement indéfini), '-1', 'null']
+        answer: 1
+      - id: cpp-var-q2
+        type: mcq
+        prompt: Que se passe-t-il avec `int b{3.7};` ?
+        choices: [b vaut 3, b vaut 4, Erreur de compilation (conversion avec perte), b vaut 3.7]
+        answer: 2
+      - id: cpp-var-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int a = 5;
+              {
+                  int a = 10;
+                  a += 1;
+                  std::cout << a << " ";
+              }
+              a *= 2;
+              auto b = a / 4;
+              std::cout << a << " " << b << "\n";
+          }
+        output: 11 10 2
+      - id: cpp-var-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          #include <iostream>
+          int main() {
+              const int vies = 3;
+              vies = vies - 1;
+              std::cout << vies << "\n";
+          }
+        bugLines: [3, 4]
+        choices:
+          - vies est const, on ne peut pas la modifier
+          - const doit s’écrire CONST
+          - On ne peut pas soustraire 1
+        answer: 0
+        solution: |
+          #include <iostream>
+          int main() {
+              int vies = 3;
+              vies = vies - 1;
+              std::cout << vies << "\n";
+          }
+        tests:
+          - { input: '', output: '2' }
+      - id: cpp-var-code
+        type: code
+        title: Échange de valeurs
+        prompt: |
+          Lis deux entiers `a` et `b`, échange leurs valeurs à l’aide d’une variable temporaire, puis affiche `a b`.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              int a, b;
+              std::cin >> a >> b;
+              // échange
+              std::cout << a << " " << b << "\n";
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              int a, b;
+              std::cin >> a >> b;
+              int tmp = a;
+              a = b;
+              b = tmp;
+              std::cout << a << " " << b << "\n";
+          }
+        tests:
+          - { input: '3 8', output: '8 3' }
+          - { input: '-1 0', output: '0 -1', hidden: true }
+        forbid:
+          - { pattern: 'swap', message: Ne pas utiliser std::swap ici }
+    project:
+      id: cpp-var-projet
+      type: code
+      title: Convertisseur de durée
+      difficulty: 2
+      prompt: |
+        Lis un nombre de secondes. Avec des constantes `constexpr` `SECONDES_PAR_MINUTE` et `SECONDES_PAR_HEURE`, affiche la durée au format `H h M min S s`.
+      starter: |
+        #include <iostream>
+
+        int main() {
+            long long total;
+            std::cin >> total;
+            return 0;
+        }
+      solution: |
+        #include <iostream>
+
+        constexpr long long SECONDES_PAR_MINUTE = 60;
+        constexpr long long SECONDES_PAR_HEURE = 60 * SECONDES_PAR_MINUTE;
+
+        int main() {
+            long long total;
+            std::cin >> total;
+            long long h = total / SECONDES_PAR_HEURE;
+            long long m = (total % SECONDES_PAR_HEURE) / SECONDES_PAR_MINUTE;
+            long long s = total % SECONDES_PAR_MINUTE;
+            std::cout << h << " h " << m << " min " << s << " s\n";
+            return 0;
+        }
+      tests:
+        - { input: '3725', output: 1 h 2 min 5 s }
+        - { input: '59', output: 0 h 0 min 59 s, hidden: true }
+        - { input: '90061', output: 25 h 1 min 1 s, hidden: true }
+      require:
+        - { pattern: 'constexpr', message: Utiliser constexpr pour les constantes }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-var-ex1
+          type: mcq
+          prompt: Quelle est la différence entre const et constexpr ?
+          choices: [constexpr exige une valeur connue à la compilation, Aucune, const est plus rapide, constexpr permet la modification]
+          answer: 0
+        - id: cpp-var-ex2
+          type: mcq
+          prompt: Quel type déduit `auto x = 2.5;` ?
+          choices: [float, double, int, auto]
+          answer: 1
+        - id: cpp-var-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                int x{};
+                int y = 7;
+                x += y++;
+                std::cout << x << " " << y << "\n";
+            }
+          output: 7 8
+          explanation: '`y++` renvoie l’ancienne valeur (7) puis incrémente y.'
+        - id: cpp-var-ex4
+          type: mcq
+          prompt: Par défaut, une variable C++ est…
+          choices: [modifiable, constante, globale, initialisée à zéro]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-types
+    title: Types
+    summary: Types fondamentaux, tailles, entiers signés/non signés, flottants, char, bool, conversions et static_cast.
+    minutes: 25
+    concepts: [types]
+    sections:
+      - title: Les types fondamentaux
+        body: |
+          | Type | Taille typique | Exemple |
+          |---|---|---|
+          | `bool` | 1 octet | `true` |
+          | `char` | 1 octet | `'a'` |
+          | `int` | 4 octets | `42` |
+          | `long long` | 8 octets | `9'000'000'000LL` |
+          | `float` | 4 octets | `3.14f` |
+          | `double` | 8 octets | `3.14` |
+
+          Les tailles exactes dépendent de la plateforme ; `<cstdint>` fournit des types de taille fixe : `int32_t`, `uint8_t`, `int64_t`…
+
+          `sizeof(T)` donne la taille en octets. Les apostrophes `1'000'000` séparent les chiffres (C++14).
+      - title: Pièges et conversions
+        body: |
+          - **Division entière** : `7 / 2 == 3`, mais `7.0 / 2 == 3.5`.
+          - **Dépassement** d’un entier signé : comportement indéfini ; d’un non signé : retour à 0 (modulo).
+          - Mélanger signé et non signé : `-1 < 0u` est **faux** (le -1 est converti en très grand nombre) !
+          - Les flottants sont approximatifs : `0.1 + 0.2 != 0.3`.
+
+          Conversion explicite recommandée :
+
+          ```cpp
+          int total = 31, n = 4;
+          double moyenne = static_cast<double>(total) / n;   // 7.75
+          int tronque = static_cast<int>(9.99);             // 9
+          ```
+
+          Les casts « à la C » `(double)total` existent mais sont déconseillés (moins visibles, moins sûrs).
+    exercises:
+      - id: cpp-types-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              std::cout << 7 / 2 << " " << 7.0 / 2 << " " << 7 % 3 << " ";
+              std::cout << static_cast<int>(3.99) << " " << sizeof(char) << "\n";
+          }
+        output: 3 3.5 1 3 1
+      - id: cpp-types-q1
+        type: mcq
+        prompt: Quel en-tête fournit `int32_t` et `uint64_t` ?
+        choices: ['<cstdint>', '<iostream>', '<string>', '<limits.h> uniquement']
+        answer: 0
+      - id: cpp-types-q2
+        type: mcq
+        prompt: Que vaut `-1 < 0u` (0u est un unsigned) ?
+        choices: ['true', 'false', Erreur de compilation]
+        answer: 1
+        explanation: -1 est converti en unsigned, ce qui donne une très grande valeur. -Wall avertit de ces comparaisons.
+      - id: cpp-types-fill
+        type: fill
+        prompt: Complète pour obtenir une moyenne décimale.
+        code: |
+          #include <iostream>
+          int main() {
+              int somme = 31, n = 4;
+              double m = {{?}}<double>(somme) / n;
+              std::cout << m << "\n";
+          }
+        blanks: [[static_cast]]
+        tests:
+          - { input: '', output: '7.75' }
+      - id: cpp-types-code
+        type: code
+        title: Moyenne de trois notes
+        prompt: |
+          Lis trois entiers et affiche leur moyenne avec **deux décimales**.
+
+          Utilise `#include <iomanip>` et `std::cout << std::fixed << std::setprecision(2)`.
+        starter: |
+          #include <iostream>
+          #include <iomanip>
+
+          int main() {
+              int a, b, c;
+              std::cin >> a >> b >> c;
+          }
+        solution: |
+          #include <iostream>
+          #include <iomanip>
+
+          int main() {
+              int a, b, c;
+              std::cin >> a >> b >> c;
+              double moyenne = static_cast<double>(a + b + c) / 3;
+              std::cout << std::fixed << std::setprecision(2) << moyenne << "\n";
+          }
+        tests:
+          - { input: 12 15 10, output: '12.33' }
+          - { input: 20 20 20, output: '20.00', hidden: true }
+          - { input: 0 1 1, output: '0.67', hidden: true }
+    project:
+      id: cpp-types-projet
+      type: code
+      title: Fiche d’un rectangle
+      difficulty: 2
+      prompt: |
+        Lis la largeur et la hauteur (décimaux). Affiche avec une décimale :
+
+        ```
+        Aire : …
+        Périmètre : …
+        Carré : oui|non
+        ```
+      starter: |
+        #include <iostream>
+        #include <iomanip>
+
+        int main() {
+            double l, h;
+            std::cin >> l >> h;
+        }
+      solution: |
+        #include <iostream>
+        #include <iomanip>
+
+        int main() {
+            double l, h;
+            std::cin >> l >> h;
+            std::cout << std::fixed << std::setprecision(1);
+            std::cout << "Aire : " << l * h << "\n";
+            std::cout << "Périmètre : " << 2 * (l + h) << "\n";
+            std::cout << "Carré : " << (l == h ? "oui" : "non") << "\n";
+        }
+      tests:
+        - { input: 3 4, output: "Aire : 12.0\nPérimètre : 14.0\nCarré : non" }
+        - { input: 2.5 2.5, output: "Aire : 6.2\nPérimètre : 10.0\nCarré : oui", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-types-ex1
+          type: mcq
+          prompt: Quel est le comportement d’un dépassement d’entier signé ?
+          choices: [Comportement indéfini, Retour à zéro garanti, Exception, Erreur de compilation]
+          answer: 0
+        - id: cpp-types-ex2
+          type: mcq
+          prompt: Quelle conversion est recommandée en C++ moderne ?
+          choices: ['static_cast<T>(x)', '(T)x', 'T(x) obligatoirement', 'convert<T>(x)']
+          answer: 0
+        - id: cpp-types-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                unsigned char c = 255;
+                c = c + 1;
+                std::cout << static_cast<int>(c) << " " << 1'000 * 3 << "\n";
+            }
+          output: 0 3000
+        - id: cpp-types-ex4
+          type: mcq
+          prompt: '`0.1 + 0.2 == 0.3` vaut…'
+          choices: ['true', 'false (précision des flottants)', Erreur, Indéfini]
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: cpp-operateurs
+    title: Opérateurs
+    summary: Arithmétique, incrémentation pré/post, comparaisons, logique, affectations composées, opérateur ternaire et priorités.
+    minutes: 20
+    concepts: [operateurs]
+    sections:
+      - title: Les opérateurs
+        body: |
+          | Catégorie | Opérateurs |
+          |---|---|
+          | Arithmétiques | `+ - * / %` |
+          | Incrémentation | `++x`, `x++`, `--x`, `x--` |
+          | Comparaison | `== != < <= > >=`, `<=>` (C++20) |
+          | Logiques | `&&`, `\|\|`, `!` |
+          | Affectation | `= += -= *= /= %=` |
+          | Ternaire | `condition ? a : b` |
+          | Bit à bit | `& \| ^ ~ << >>` |
+
+          **Pré vs post-incrémentation** :
+
+          ```cpp
+          int a = 5;
+          int b = a++;   // b = 5, puis a = 6
+          int c = ++a;   // a = 7, puis c = 7
+          ```
+      - title: Pièges
+        body: |
+          - `=` (affectation) au lieu de `==` (comparaison) : `if (x = 0)` compile mais affecte 0 ! (`-Wall` avertit).
+          - Modifier une variable deux fois dans la même expression (`i = i++ + 1`) : comportement indéfini ou non spécifié.
+          - `&&` et `||` sont **paresseux** : `p != nullptr && p->valeur > 0` est sûr.
+          - En cas de doute sur les priorités, ajoute des parenthèses.
+
+          ```cpp
+          int note = 14;
+          std::string mention = note >= 16 ? "très bien" : note >= 12 ? "bien" : "passable";
+          ```
+    exercises:
+      - id: cpp-op-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int a = 5;
+              int b = a++;
+              int c = ++a;
+              std::cout << a << " " << b << " " << c << " " << (a > 6 && b < 6) << "\n";
+          }
+        output: 7 5 7 1
+        explanation: '`true` s’affiche `1` avec cout (sauf avec `std::boolalpha`).'
+      - id: cpp-op-q1
+        type: mcq
+        prompt: Que fait `if (x = 0)` ?
+        choices: [Affecte 0 à x et teste la valeur 0 (toujours faux), Compare x à 0, Ne compile pas, Lève une exception]
+        answer: 0
+      - id: cpp-op-fill
+        type: fill
+        prompt: Complète avec l’opérateur ternaire.
+        code: |
+          #include <iostream>
+          int main() {
+              int n = 7;
+              std::cout << (n % 2 == 0 {{?}} "pair" {{?}} "impair") << "\n";
+          }
+        blanks: [['?'], [':']]
+        tests:
+          - { input: '', output: impair }
+      - id: cpp-op-bug
+        type: bugfix
+        prompt: Le programme affiche toujours « gagné ». Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          int main() {
+              int essai = 3, secret = 7;
+              if (essai = secret) {
+                  std::cout << "gagné\n";
+              } else {
+                  std::cout << "perdu\n";
+              }
+          }
+        bugLines: [4]
+        choices:
+          - '= affecte au lieu de comparer ; il faut =='
+          - Il faut des accolades doubles
+          - else est mal placé
+        answer: 0
+        solution: |
+          #include <iostream>
+          int main() {
+              int essai = 3, secret = 7;
+              if (essai == secret) {
+                  std::cout << "gagné\n";
+              } else {
+                  std::cout << "perdu\n";
+              }
+          }
+        tests:
+          - { input: '', output: perdu }
+      - id: cpp-op-code
+        type: code
+        title: Calculatrice
+        prompt: |
+          Lis deux entiers `a` et `b` (b ≠ 0) et affiche sur cinq lignes `a + b = …`, `a - b = …`, `a * b = …`, `a / b = …`, `a % b = …`.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              long long a, b;
+              std::cin >> a >> b;
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              long long a, b;
+              std::cin >> a >> b;
+              std::cout << a << " + " << b << " = " << a + b << "\n";
+              std::cout << a << " - " << b << " = " << a - b << "\n";
+              std::cout << a << " * " << b << " = " << a * b << "\n";
+              std::cout << a << " / " << b << " = " << a / b << "\n";
+              std::cout << a << " % " << b << " = " << a % b << "\n";
+          }
+        tests:
+          - { input: 17 5, output: "17 + 5 = 22\n17 - 5 = 12\n17 * 5 = 85\n17 / 5 = 3\n17 % 5 = 2" }
+          - { input: -9 4, output: "-9 + 4 = -5\n-9 - 4 = -13\n-9 * 4 = -36\n-9 / 4 = -2\n-9 % 4 = -1", hidden: true }
+    project:
+      id: cpp-op-projet
+      type: code
+      title: Année bissextile et calendrier
+      difficulty: 2
+      prompt: |
+        Pour chaque année lue (jusqu’à la fin de l’entrée), affiche `AAAA : bissextile (366 jours)` ou `AAAA : normale (365 jours)`.
+
+        Une année est bissextile si elle est divisible par 4 et non par 100, ou divisible par 400. Utilise une seule expression booléenne et l’opérateur ternaire.
+      starter: |
+        #include <iostream>
+
+        int main() {
+            int annee;
+            while (std::cin >> annee) {
+            }
+        }
+      solution: |
+        #include <iostream>
+
+        int main() {
+            int annee;
+            while (std::cin >> annee) {
+                bool bissextile = (annee % 4 == 0 && annee % 100 != 0) || annee % 400 == 0;
+                std::cout << annee << " : " << (bissextile ? "bissextile (366 jours)" : "normale (365 jours)") << "\n";
+            }
+        }
+      tests:
+        - { input: "2024 2023", output: "2024 : bissextile (366 jours)\n2023 : normale (365 jours)" }
+        - { input: "1900\n2000\n2100", output: "1900 : normale (365 jours)\n2000 : bissextile (366 jours)\n2100 : normale (365 jours)", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-op-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                int x = 10;
+                x += 5; x /= 4; x *= 3; x %= 5;
+                std::cout << x << "\n";
+            }
+          output: '4'
+        - id: cpp-op-ex2
+          type: mcq
+          prompt: Pourquoi `p != nullptr && p->v > 0` est-il sûr ?
+          choices: ['&& n’évalue pas la partie droite si la gauche est fausse', Parce que p est toujours valide, '&& évalue de droite à gauche', Ce n’est pas sûr]
+          answer: 0
+        - id: cpp-op-ex3
+          type: mcq
+          prompt: Que vaut `5 / 2 * 2.0` ?
+          choices: ['4', '5', '4.0', '5.0']
+          answer: 2
+          explanation: '`5 / 2` vaut 2 (division entière), puis `2 * 2.0` vaut 4.0.'
+        - id: cpp-op-ex4
+          type: mcq
+          prompt: Après `int a = 1; int b = ++a + 1;`, que vaut b ?
+          choices: ['2', '3', '1', Indéfini]
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: cpp-conditions
+    title: Conditions
+    summary: if / else if / else, switch avec break et fallthrough, if avec initialisation (C++17) et comparaisons de chaînes.
+    minutes: 25
+    concepts: [conditions]
+    sections:
+      - title: if et else
+        body: |
+          ```cpp
+          int t = 22;
+          if (t > 30) {
+              std::cout << "chaud\n";
+          } else if (t > 15) {
+              std::cout << "bon\n";
+          } else {
+              std::cout << "frais\n";
+          }
+          ```
+
+          - Les parenthèses autour de la condition sont **obligatoires**.
+          - Toute valeur non nulle est « vraie » (`if (n)` ⇔ `if (n != 0)`) — pratique mais source de confusion.
+          - C++17 : **if avec initialisation** : `if (auto r = calculer(); r > 0) { … }` — `r` n’existe que dans le if.
+      - title: switch
+        body: |
+          ```cpp
+          char op = '+';
+          switch (op) {
+              case '+': std::cout << "addition\n"; break;
+              case '-': std::cout << "soustraction\n"; break;
+              case '*':
+              case 'x': std::cout << "multiplication\n"; break;   // deux cas
+              default:  std::cout << "inconnu\n";
+          }
+          ```
+
+          ⚠️ Sans `break`, l’exécution **continue** dans le cas suivant (*fallthrough*). `switch` ne fonctionne qu’avec des entiers, `char` et énumérations — pas avec `std::string`.
+    exercises:
+      - id: cpp-cond-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int n = 2;
+              switch (n) {
+                  case 1: std::cout << "un ";
+                  case 2: std::cout << "deux ";
+                  case 3: std::cout << "trois ";
+                      break;
+                  default: std::cout << "autre ";
+              }
+              std::cout << "\n";
+          }
+        output: deux trois
+        explanation: Sans `break` après `case 2`, l’exécution continue dans `case 3`.
+      - id: cpp-cond-q1
+        type: mcq
+        prompt: Peut-on faire un switch sur une std::string ?
+        choices: [Non, seulement sur des types entiers, caractères et énumérations, Oui, Seulement en C++23, Seulement avec break]
+        answer: 0
+      - id: cpp-cond-fill
+        type: fill
+        prompt: Complète le if avec initialisation (C++17).
+        code: |
+          #include <iostream>
+          int main() {
+              int a = 7, b = 3;
+              if (int d = a - b{{?}} d > 0) {
+                  std::cout << "écart " << d << "\n";
+              }
+          }
+        blanks: [[';']]
+        tests:
+          - { input: '', output: écart 4 }
+      - id: cpp-cond-bug
+        type: bugfix
+        prompt: Ce programme affiche deux lignes au lieu d’une pour la note 'B'. Trouve la ligne à corriger.
+        code: |
+          #include <iostream>
+          int main() {
+              char note = 'B';
+              switch (note) {
+                  case 'A': std::cout << "excellent\n"; break;
+                  case 'B': std::cout << "bien\n";
+                  case 'C': std::cout << "assez bien\n"; break;
+                  default: std::cout << "?\n";
+              }
+          }
+        bugLines: [6]
+        choices:
+          - Il manque break après le cas 'B'
+          - Les char ne fonctionnent pas dans un switch
+          - default doit être en premier
+        answer: 0
+        solution: |
+          #include <iostream>
+          int main() {
+              char note = 'B';
+              switch (note) {
+                  case 'A': std::cout << "excellent\n"; break;
+                  case 'B': std::cout << "bien\n"; break;
+                  case 'C': std::cout << "assez bien\n"; break;
+                  default: std::cout << "?\n";
+              }
+          }
+        tests:
+          - { input: '', output: bien }
+      - id: cpp-cond-code
+        type: code
+        title: Catégorie d’âge
+        prompt: |
+          Lis un âge et affiche `enfant` (< 13), `adolescent` (13–17), `adulte` (18–64) ou `senior` (≥ 65).
+        starter: |
+          #include <iostream>
+
+          int main() {
+              int age;
+              std::cin >> age;
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              int age;
+              std::cin >> age;
+              if (age < 13) {
+                  std::cout << "enfant\n";
+              } else if (age < 18) {
+                  std::cout << "adolescent\n";
+              } else if (age < 65) {
+                  std::cout << "adulte\n";
+              } else {
+                  std::cout << "senior\n";
+              }
+          }
+        tests:
+          - { input: '8', output: enfant }
+          - { input: '13', output: adolescent, hidden: true }
+          - { input: '64', output: adulte, hidden: true }
+          - { input: '65', output: senior, hidden: true }
+    project:
+      id: cpp-cond-projet
+      type: code
+      title: Calculatrice à opérateur
+      difficulty: 2
+      prompt: |
+        Chaque ligne contient `a op b` (op parmi `+ - * / %`). Utilise un `switch` sur `op` et affiche le résultat, `erreur : division par zéro` ou `erreur : opérateur inconnu`.
+      starter: |
+        #include <iostream>
+
+        int main() {
+            long long a, b;
+            char op;
+            while (std::cin >> a >> op >> b) {
+            }
+        }
+      solution: |
+        #include <iostream>
+
+        int main() {
+            long long a, b;
+            char op;
+            while (std::cin >> a >> op >> b) {
+                switch (op) {
+                    case '+': std::cout << a + b << "\n"; break;
+                    case '-': std::cout << a - b << "\n"; break;
+                    case '*': std::cout << a * b << "\n"; break;
+                    case '/':
+                    case '%':
+                        if (b == 0) std::cout << "erreur : division par zéro\n";
+                        else std::cout << (op == '/' ? a / b : a % b) << "\n";
+                        break;
+                    default: std::cout << "erreur : opérateur inconnu\n";
+                }
+            }
+        }
+      tests:
+        - { input: "6 * 7\n10 / 0\n9 % 4", output: "42\nerreur : division par zéro\n1" }
+        - { input: "1 ^ 2\n-5 + 3", output: "erreur : opérateur inconnu\n-2", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-cond-ex1
+          type: mcq
+          prompt: Que fait l’oubli de break dans un case ?
+          choices: [L’exécution continue dans le case suivant, Erreur de compilation, Le switch s’arrête, Rien]
+          answer: 0
+        - id: cpp-cond-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                int x = 0;
+                if (x) std::cout << "A";
+                else if (x - 1) std::cout << "B";
+                else std::cout << "C";
+                std::cout << "\n";
+            }
+          output: B
+        - id: cpp-cond-ex3
+          type: mcq
+          prompt: Où est visible la variable déclarée dans `if (auto r = f(); r > 0)` ?
+          choices: [Seulement dans le if et ses branches else, Dans toute la fonction, Partout, Nulle part]
+          answer: 0
+        - id: cpp-cond-ex4
+          type: mcq
+          prompt: Les parenthèses autour de la condition d’un if sont…
+          choices: [obligatoires en C++, facultatives, interdites, remplacées par des accolades]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-boucles
+    title: Boucles
+    summary: for classique, while, do…while, boucle sur intervalle (range-based for), break, continue et pièges des indices.
+    minutes: 25
+    concepts: [boucles]
+    sections:
+      - title: Les boucles
+        body: |
+          ```cpp
+          for (int i = 0; i < 5; ++i) { std::cout << i << ' '; }   // 0 1 2 3 4
+
+          int n = 3;
+          while (n > 0) { std::cout << n-- << "… "; }               // 3… 2… 1…
+
+          int choix;
+          do {
+              std::cin >> choix;
+          } while (choix < 1 || choix > 3);   // exécutée au moins une fois
+
+          std::vector<int> notes{12, 17, 9};
+          for (int x : notes) { std::cout << x << ' '; }          // boucle sur intervalle
+          for (const auto& x : notes) { /* sans copie */ }
+          ```
+
+          `break` sort de la boucle, `continue` passe au tour suivant.
+      - title: Pièges
+        body: |
+          - Erreur « un de trop » (*off-by-one*) : `for (int i = 0; i <= n; ++i)` fait n+1 tours.
+          - Comparer un `int` avec `v.size()` (non signé) : avertissement `-Wsign-compare` ; utilise `std::size_t` ou la boucle sur intervalle.
+          - Boucle infinie : la variable de contrôle ne change jamais.
+          - Modifier un conteneur pendant qu’on le parcourt (ajout/suppression) : comportement indéfini.
+    exercises:
+      - id: cpp-loop-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int s = 0;
+              for (int i = 1; i <= 10; ++i) {
+                  if (i % 2 == 0) continue;
+                  if (i > 7) break;
+                  s += i;
+              }
+              std::cout << s << "\n";
+          }
+        output: '16'
+        explanation: 1 + 3 + 5 + 7 = 16.
+      - id: cpp-loop-q1
+        type: mcq
+        prompt: Quelle boucle s’exécute au moins une fois ?
+        choices: [do … while, while, for, for sur intervalle]
+        answer: 0
+      - id: cpp-loop-fill
+        type: fill
+        prompt: Complète la boucle sur intervalle qui parcourt le vecteur sans copier.
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <string>
+          int main() {
+              std::vector<std::string> mots{"un", "deux"};
+              for (const auto{{?}} m {{?}} mots) std::cout << m << ";";
+              std::cout << "\n";
+          }
+        blanks: [['&'], [':']]
+        tests:
+          - { input: '', output: un;deux; }
+      - id: cpp-loop-bug
+        type: bugfix
+        prompt: Ce programme a un comportement indéfini (lecture hors limites). Trouve la ligne.
+        code: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> v{10, 20, 30};
+              int s = 0;
+              for (std::size_t i = 0; i <= v.size(); ++i) {
+                  s += v.at(i);
+              }
+              std::cout << s << "\n";
+          }
+        bugLines: [6]
+        choices:
+          - La condition <= fait un tour de trop (il faut <)
+          - size_t est interdit
+          - at() n’existe pas
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> v{10, 20, 30};
+              int s = 0;
+              for (std::size_t i = 0; i < v.size(); ++i) {
+                  s += v.at(i);
+              }
+              std::cout << s << "\n";
+          }
+        tests:
+          - { input: '', output: '60' }
+      - id: cpp-loop-code
+        type: code
+        title: Somme des chiffres
+        prompt: Lis un entier positif et affiche la somme de ses chiffres avec une boucle `while`.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              unsigned long long n;
+              std::cin >> n;
+          }
+        solution: |
+          #include <iostream>
+
+          int main() {
+              unsigned long long n;
+              std::cin >> n;
+              unsigned long long s = 0;
+              while (n > 0) {
+                  s += n % 10;
+                  n /= 10;
+              }
+              std::cout << s << "\n";
+          }
+        tests:
+          - { input: '4096', output: '19' }
+          - { input: '0', output: '0', hidden: true }
+          - { input: '1000000007', output: '8', hidden: true }
+        require:
+          - { pattern: '\bwhile\b', message: Utiliser une boucle while }
+    project:
+      id: cpp-loop-projet
+      type: code
+      title: FizzBuzz
+      difficulty: 2
+      prompt: Lis `n` et affiche les nombres de 1 à n, en remplaçant les multiples de 3 par `Fizz`, de 5 par `Buzz`, de 15 par `FizzBuzz`.
+      starter: |
+        #include <iostream>
+
+        int main() {
+            int n;
+            std::cin >> n;
+        }
+      solution: |
+        #include <iostream>
+
+        int main() {
+            int n;
+            std::cin >> n;
+            for (int i = 1; i <= n; ++i) {
+                if (i % 15 == 0) std::cout << "FizzBuzz\n";
+                else if (i % 3 == 0) std::cout << "Fizz\n";
+                else if (i % 5 == 0) std::cout << "Buzz\n";
+                else std::cout << i << "\n";
+            }
+        }
+      tests:
+        - { input: '5', output: "1\n2\nFizz\n4\nBuzz" }
+        - { input: '15', output: "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-loop-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int main() {
+                int i = 10;
+                do { std::cout << i << " "; i -= 4; } while (i > 0);
+                std::cout << "\n";
+            }
+          output: 10 6 2
+        - id: cpp-loop-ex2
+          type: mcq
+          prompt: Combien de tours fait `for (int i = 0; i <= 5; ++i)` ?
+          choices: ['5', '6', '4', Infini]
+          answer: 1
+        - id: cpp-loop-ex3
+          type: mcq
+          prompt: 'Pourquoi écrire `for (const auto& x : v)` plutôt que `for (auto x : v)` pour des chaînes ?'
+          choices: [Pour éviter de copier chaque élément, Pour pouvoir les modifier, C’est obligatoire, Pour trier]
+          answer: 0
+        - id: cpp-loop-ex4
+          type: mcq
+          prompt: Que fait break dans deux boucles imbriquées ?
+          choices: [Il sort seulement de la boucle la plus intérieure, Il sort des deux, Il quitte la fonction, Il recommence]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-fonctions
+    title: Fonctions
+    summary: Déclaration, définition, paramètres par valeur et par référence, valeurs par défaut, surcharge et récursivité.
+    minutes: 30
+    concepts: [fonctions]
+    sections:
+      - title: Déclarer et définir
+        body: |
+          ```cpp
+          double moyenne(double a, double b);        // déclaration (prototype)
+
+          int main() {
+              std::cout << moyenne(4, 7) << "\n";     // 5.5
+          }
+
+          double moyenne(double a, double b) {        // définition
+              return (a + b) / 2;
+          }
+          ```
+
+          Une fonction doit être **déclarée avant son utilisation**. Dans un projet, les déclarations vont dans un en-tête `.h`/`.hpp`, les définitions dans un `.cpp`.
+
+          `void` signifie « ne renvoie rien ».
+      - title: Passage des paramètres
+        body: |
+          ```cpp
+          void parValeur(int x) { x = 99; }           // modifie une COPIE
+          void parReference(int& x) { x = 99; }       // modifie l’original
+          void lectureSeule(const std::string& s) {}  // sans copie, non modifiable
+          ```
+
+          Règle pratique :
+
+          - types simples (`int`, `double`) → par valeur ;
+          - gros objets en lecture → `const T&` ;
+          - paramètre à modifier → `T&`.
+
+          **Valeurs par défaut** et **surcharge** :
+
+          ```cpp
+          void saluer(const std::string& nom = "inconnu");
+          int    maximum(int a, int b)       { return a > b ? a : b; }
+          double maximum(double a, double b) { return a > b ? a : b; }   // surcharge
+          ```
+    exercises:
+      - id: cpp-fn-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          void f(int x) { x += 10; }
+          void g(int& x) { x += 10; }
+          int main() {
+              int a = 1, b = 1;
+              f(a);
+              g(b);
+              std::cout << a << " " << b << "\n";
+          }
+        output: 1 11
+        concepts: [fonctions]
+      - id: cpp-fn-q1
+        type: mcq
+        prompt: Comment passer une grosse std::string en lecture sans la copier ?
+        choices: ['const std::string&', 'std::string', 'std::string*', 'std::string&&']
+        answer: 0
+      - id: cpp-fn-fill
+        type: fill
+        prompt: Complète la fonction qui échange deux entiers.
+        code: |
+          #include <iostream>
+          void echanger(int{{?}} a, int{{?}} b) {
+              int t = a; a = b; b = t;
+          }
+          int main() {
+              int x = 1, y = 2;
+              echanger(x, y);
+              std::cout << x << y << "\n";
+          }
+        blanks: [['&'], ['&']]
+        tests:
+          - { input: '', output: '21' }
+        concepts: [fonctions]
+      - id: cpp-fn-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve la cause.
+        code: |
+          #include <iostream>
+          int main() {
+              std::cout << triple(4) << "\n";
+          }
+          int triple(int x) {
+              return 3 * x;
+          }
+        bugLines: [3]
+        choices:
+          - triple est utilisée avant d’être déclarée
+          - On ne peut pas multiplier par 3
+          - main doit être définie en dernier
+        answer: 0
+        solution: |
+          #include <iostream>
+          int triple(int x);
+          int main() {
+              std::cout << triple(4) << "\n";
+          }
+          int triple(int x) {
+              return 3 * x;
+          }
+        tests:
+          - { input: '', output: '12' }
+      - id: cpp-fn-code
+        type: code
+        title: Nombres premiers
+        prompt: |
+          Écris `bool estPremier(long long n)`. Pour chaque nombre lu, affiche `premier` ou `pas premier`.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              long long n;
+              while (std::cin >> n) {
+                  std::cout << (estPremier(n) ? "premier" : "pas premier") << "\n";
+              }
+          }
+        solution: |
+          #include <iostream>
+
+          bool estPremier(long long n) {
+              if (n < 2) return false;
+              for (long long d = 2; d * d <= n; ++d) {
+                  if (n % d == 0) return false;
+              }
+              return true;
+          }
+
+          int main() {
+              long long n;
+              while (std::cin >> n) {
+                  std::cout << (estPremier(n) ? "premier" : "pas premier") << "\n";
+              }
+          }
+        tests:
+          - { input: "7\n8", output: "premier\npas premier" }
+          - { input: "0 1 2 97 91 1000003", output: "pas premier\npas premier\npremier\npremier\npas premier\npremier", hidden: true }
+        concepts: [fonctions]
+    project:
+      id: cpp-fn-projet
+      type: code
+      title: Convertisseur de températures
+      difficulty: 2
+      prompt: |
+        Écris `double celsiusVersFahrenheit(double c)` et `double fahrenheitVersCelsius(double f)`. Chaque ligne contient `valeur unité` (`C` ou `F`). Affiche `100.0 C = 212.0 F` (une décimale).
+      starter: |
+        #include <iostream>
+        #include <iomanip>
+
+        int main() {
+            double v;
+            char u;
+            std::cout << std::fixed << std::setprecision(1);
+            while (std::cin >> v >> u) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <iomanip>
+
+        double celsiusVersFahrenheit(double c) { return c * 9 / 5 + 32; }
+        double fahrenheitVersCelsius(double f) { return (f - 32) * 5 / 9; }
+
+        int main() {
+            double v;
+            char u;
+            std::cout << std::fixed << std::setprecision(1);
+            while (std::cin >> v >> u) {
+                if (u == 'C') std::cout << v << " C = " << celsiusVersFahrenheit(v) << " F\n";
+                else std::cout << v << " F = " << fahrenheitVersCelsius(v) << " C\n";
+            }
+        }
+      tests:
+        - { input: "100 C\n212 F", output: "100.0 C = 212.0 F\n212.0 F = 100.0 C" }
+        - { input: "-40 C\n0 F", output: "-40.0 C = -40.0 F\n0.0 F = -17.8 C", hidden: true }
+      require:
+        - { pattern: 'celsiusVersFahrenheit\s*\(', message: Définir celsiusVersFahrenheit }
+      concepts: [fonctions]
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-fn-ex1
+          type: mcq
+          prompt: Qu’est-ce que la surcharge de fonctions ?
+          choices: [Plusieurs fonctions de même nom avec des paramètres différents, Une fonction trop longue, Une fonction récursive, Une fonction inline]
+          answer: 0
+        - id: cpp-fn-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            int puissance(int b, int e = 2) { return e == 0 ? 1 : b * puissance(b, e - 1); }
+            int main() {
+                std::cout << puissance(3) << " " << puissance(2, 5) << "\n";
+            }
+          output: 9 32
+        - id: cpp-fn-ex3
+          type: mcq
+          prompt: Que signifie `void` comme type de retour ?
+          choices: [La fonction ne renvoie rien, Elle renvoie 0, Elle renvoie un pointeur, Elle est vide]
+          answer: 0
+        - id: cpp-fn-ex4
+          type: mcq
+          prompt: Où place-t-on habituellement les déclarations de fonctions dans un projet ?
+          choices: [Dans un fichier d’en-tête .h ou .hpp, Dans main, Dans un fichier .txt, Dans le Makefile]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-tableaux
+    title: Tableaux
+    summary: Tableaux C, std::array et std::vector — déclaration, accès sécurisé avec at(), parcours, tri et tableaux à deux dimensions.
+    minutes: 30
+    concepts: [collections, tableaux]
+    sections:
+      - title: Trois sortes de tableaux
+        body: |
+          ```cpp
+          int notes[3] = {12, 15, 9};          // tableau C : taille fixe, à éviter
+          std::array<int, 3> a{12, 15, 9};     // taille fixe, sûr (#include <array>)
+          std::vector<int> v{12, 15, 9};       // taille dynamique (#include <vector>)
+
+          v.push_back(18);                     // ajoute à la fin
+          v.pop_back();                        // retire le dernier
+          std::cout << v.size() << " " << v[0] << " " << v.at(1) << "\n";
+          ```
+
+          - `v[i]` **ne vérifie pas** les bornes : un indice invalide est un comportement indéfini.
+          - `v.at(i)` vérifie et lève `std::out_of_range`.
+          - Préfère `std::vector` (dynamique) ou `std::array` (fixe) aux tableaux C.
+      - title: Algorithmes et 2D
+        body: |
+          ```cpp
+          #include <algorithm>
+          #include <numeric>
+
+          std::sort(v.begin(), v.end());                       // tri croissant
+          std::reverse(v.begin(), v.end());
+          int somme = std::accumulate(v.begin(), v.end(), 0);
+          int maxi = *std::max_element(v.begin(), v.end());
+          auto n = std::count(v.begin(), v.end(), 12);
+
+          std::vector<std::vector<int>> grille(3, std::vector<int>(4, 0)); // 3 lignes × 4 colonnes
+          grille[1][2] = 7;
+          ```
+    exercises:
+      - id: cpp-tab-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          int main() {
+              std::vector<int> v{5, 3, 8};
+              v.push_back(1);
+              std::sort(v.begin(), v.end());
+              std::cout << v.size() << " " << v.front() << " " << v.back() << " " << v[1] << "\n";
+          }
+        output: 4 1 8 3
+      - id: cpp-tab-q1
+        type: mcq
+        prompt: Quelle méthode vérifie les bornes et lève une exception ?
+        choices: ['v.at(i)', 'v[i]', 'v.get(i)', 'v.data()']
+        answer: 0
+      - id: cpp-tab-fill
+        type: fill
+        prompt: Complète pour calculer la somme avec <numeric>.
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <numeric>
+          int main() {
+              std::vector<int> v{1, 2, 3, 4};
+              std::cout << std::{{?}}(v.begin(), v.end(), 0) << "\n";
+          }
+        blanks: [[accumulate]]
+        tests:
+          - { input: '', output: '10' }
+      - id: cpp-tab-bug
+        type: bugfix
+        prompt: Ce programme lit hors du tableau. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          #include <array>
+          int main() {
+              std::array<int, 4> t{1, 2, 3, 4};
+              int s = 0;
+              for (int i = 1; i <= 4; ++i) s += t.at(i);
+              std::cout << s << "\n";
+          }
+        bugLines: [6]
+        choices:
+          - Les indices vont de 0 à 3 ; la boucle commence à 1 et va jusqu’à 4
+          - std::array ne supporte pas at()
+          - s doit être un double
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <array>
+          int main() {
+              std::array<int, 4> t{1, 2, 3, 4};
+              int s = 0;
+              for (int i = 0; i < 4; ++i) s += t.at(i);
+              std::cout << s << "\n";
+          }
+        tests:
+          - { input: '', output: '10' }
+      - id: cpp-tab-code
+        type: code
+        title: Plus grande hausse
+        prompt: |
+          Lis `n` puis `n` températures entières. Affiche la plus grande hausse entre deux jours consécutifs (0 s’il n’y en a aucune).
+        starter: |
+          #include <iostream>
+          #include <vector>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<int> t(n);
+              for (auto& x : t) std::cin >> x;
+          }
+        solution: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<int> t(n);
+              for (auto& x : t) std::cin >> x;
+              int meilleure = 0;
+              for (int i = 1; i < n; ++i) meilleure = std::max(meilleure, t[i] - t[i - 1]);
+              std::cout << meilleure << "\n";
+          }
+        tests:
+          - { input: "5\n12 15 11 19 18", output: '8' }
+          - { input: "3\n30 20 10", output: '0', hidden: true }
+          - { input: "1\n5", output: '0', hidden: true }
+    project:
+      id: cpp-tab-projet
+      type: code
+      title: Bulletin de notes
+      difficulty: 2
+      prompt: |
+        Lis `n` puis `n` notes (entiers 0–20). Affiche :
+
+        ```
+        Moyenne : X.XX
+        Min : …
+        Max : …
+        Au-dessus de la moyenne : K
+        Notes triées : a b c …
+        ```
+      starter: |
+        #include <iostream>
+        #include <vector>
+        #include <algorithm>
+        #include <numeric>
+        #include <iomanip>
+
+        int main() {
+            int n;
+            std::cin >> n;
+            std::vector<int> notes(n);
+            for (auto& x : notes) std::cin >> x;
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+        #include <algorithm>
+        #include <numeric>
+        #include <iomanip>
+
+        int main() {
+            int n;
+            std::cin >> n;
+            std::vector<int> notes(n);
+            for (auto& x : notes) std::cin >> x;
+            double moyenne = static_cast<double>(std::accumulate(notes.begin(), notes.end(), 0)) / n;
+            std::cout << std::fixed << std::setprecision(2) << "Moyenne : " << moyenne << "\n";
+            std::cout << "Min : " << *std::min_element(notes.begin(), notes.end()) << "\n";
+            std::cout << "Max : " << *std::max_element(notes.begin(), notes.end()) << "\n";
+            std::cout << "Au-dessus de la moyenne : " << std::count_if(notes.begin(), notes.end(), [&](int x) { return x > moyenne; }) << "\n";
+            std::sort(notes.begin(), notes.end());
+            std::cout << "Notes triées :";
+            for (int x : notes) std::cout << " " << x;
+            std::cout << "\n";
+        }
+      tests:
+        - { input: "5\n12 8 15 10 20", output: "Moyenne : 13.00\nMin : 8\nMax : 20\nAu-dessus de la moyenne : 2\nNotes triées : 8 10 12 15 20" }
+        - { input: "1\n7", output: "Moyenne : 7.00\nMin : 7\nMax : 7\nAu-dessus de la moyenne : 0\nNotes triées : 7", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-tab-ex1
+          type: mcq
+          prompt: Quel conteneur choisir pour un tableau dont la taille change ?
+          choices: ['std::vector', 'std::array', 'int t[10]', 'std::tuple']
+          answer: 0
+        - id: cpp-tab-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            #include <vector>
+            int main() {
+                std::vector<std::vector<int>> g(2, std::vector<int>(3, 1));
+                g[1][2] = 5;
+                int s = 0;
+                for (const auto& ligne : g) for (int x : ligne) s += x;
+                std::cout << g.size() << " " << g[0].size() << " " << s << "\n";
+            }
+          output: 2 3 10
+        - id: cpp-tab-ex3
+          type: mcq
+          prompt: Que se passe-t-il avec `v[10]` sur un vecteur de 3 éléments ?
+          choices: [Comportement indéfini, Exception out_of_range, Renvoie 0, Erreur de compilation]
+          answer: 0
+        - id: cpp-tab-ex4
+          type: mcq
+          prompt: Quel en-tête contient std::sort ?
+          choices: ['<algorithm>', '<vector>', '<sort>', '<numeric>']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-chaines
+    title: Chaînes de caractères
+    summary: std::string, concaténation, sous-chaînes, recherche, conversion nombre ↔ texte, caractères et std::string_view.
+    minutes: 30
+    concepts: [chaines]
+    sections:
+      - title: std::string
+        body: |
+          ```cpp
+          #include <string>
+
+          std::string s = "Bonjour";
+          s += " Kiri";                          // concaténation
+          std::cout << s.size() << "\n";         // nombre d’octets
+          std::cout << s[0] << s.back() << "\n"; // 'B' 'i'
+          std::string mot = s.substr(0, 7);      // "Bonjour"
+          auto pos = s.find("Kiri");             // 8 (std::string::npos si absent)
+          s.replace(0, 7, "Salut");              // "Salut Kiri"
+          bool vide = s.empty();
+          ```
+
+          Conversions : `std::to_string(42)`, `std::stoi("42")`, `std::stod("3.14")`. Comparaison : `==`, `<` (ordre lexicographique).
+
+          ⚠️ `std::string` stocke des **octets** : « é » en UTF-8 occupe 2 octets.
+      - title: Caractères et string_view
+        body: |
+          ```cpp
+          #include <cctype>
+          char c = 'a';
+          std::toupper(c);         // 'A' (renvoie un int, à convertir en char)
+          std::isdigit('7');       // vrai
+          std::isalpha('x');       // vrai
+
+          for (char& ch : s) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+          ```
+
+          `std::string_view` (C++17) : une **vue** non possédante sur une chaîne — idéale pour les paramètres en lecture seule (comme `&str` en Rust) :
+
+          ```cpp
+          bool commencePar(std::string_view s, std::string_view p) { return s.starts_with(p); } // C++20
+          ```
+
+          ⚠️ Une `string_view` ne doit pas survivre à la chaîne qu’elle regarde.
+    exercises:
+      - id: cpp-str-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <string>
+          int main() {
+              std::string s = "programmation";
+              std::cout << s.size() << " " << s.substr(3, 4) << " " << s.find('m') << " ";
+              s += "!";
+              std::cout << s.back() << " " << std::stoi("40") + 2 << "\n";
+          }
+        output: 13 gram 6 ! 42
+      - id: cpp-str-q1
+        type: mcq
+        prompt: Que renvoie `s.find("x")` si "x" est absent ?
+        choices: ['std::string::npos', '-1 (int)', '0', Une exception]
+        answer: 0
+      - id: cpp-str-fill
+        type: fill
+        prompt: Complète pour convertir un nombre en texte.
+        code: |
+          #include <iostream>
+          #include <string>
+          int main() {
+              int n = 7;
+              std::string s = "Agent 00" + std::{{?}}(n);
+              std::cout << s << "\n";
+          }
+        blanks: [[to_string]]
+        tests:
+          - { input: '', output: Agent 007 }
+      - id: cpp-str-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          #include <iostream>
+          #include <string>
+          int main() {
+              std::string nom = "Kiri";
+              std::string msg = "Bonjour " + nom + " tu as " + 16 + " ans";
+              std::cout << msg << "\n";
+          }
+        bugLines: [5]
+        choices:
+          - On ne peut pas concaténer directement un int à une std::string ; il faut std::to_string(16)
+          - Il manque des parenthèses
+          - std::string ne supporte pas +
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <string>
+          int main() {
+              std::string nom = "Kiri";
+              std::string msg = "Bonjour " + nom + " tu as " + std::to_string(16) + " ans";
+              std::cout << msg << "\n";
+          }
+        tests:
+          - { input: '', output: Bonjour Kiri tu as 16 ans }
+      - id: cpp-str-code
+        type: code
+        title: Palindrome
+        prompt: |
+          Pour chaque ligne, affiche `oui` si c’est un palindrome en ignorant les espaces et la casse (lettres ASCII), `non` sinon.
+        starter: |
+          #include <iostream>
+          #include <string>
+          #include <cctype>
+
+          int main() {
+              std::string ligne;
+              while (std::getline(std::cin, ligne)) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <cctype>
+
+          int main() {
+              std::string ligne;
+              while (std::getline(std::cin, ligne)) {
+                  std::string t;
+                  for (unsigned char c : ligne) {
+                      if (!std::isspace(c)) t += static_cast<char>(std::tolower(c));
+                  }
+                  std::string r(t.rbegin(), t.rend());
+                  std::cout << (t == r ? "oui" : "non") << "\n";
+              }
+          }
+        tests:
+          - { input: "Esope reste ici et se repose\nRust", output: "oui\nnon" }
+          - { input: "kayak\nA b A\nab", output: "oui\noui\nnon", hidden: true }
+    project:
+      id: cpp-str-projet
+      type: code
+      title: Chiffrement de César
+      difficulty: 2
+      prompt: |
+        Première ligne : un décalage `k` (peut être négatif). Lignes suivantes : du texte. Chiffre chaque ligne avec le code de César : chaque lettre ASCII est décalée de `k` positions dans l’alphabet (en conservant la casse, avec retour au début), les autres caractères sont inchangés.
+      starter: |
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            int k;
+            std::cin >> k;
+            std::string ligne;
+            std::getline(std::cin, ligne); // fin de la première ligne
+            while (std::getline(std::cin, ligne)) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+
+        char decaler(char c, int k) {
+            if (c >= 'a' && c <= 'z') return static_cast<char>('a' + ((c - 'a' + k) % 26 + 26) % 26);
+            if (c >= 'A' && c <= 'Z') return static_cast<char>('A' + ((c - 'A' + k) % 26 + 26) % 26);
+            return c;
+        }
+
+        int main() {
+            int k;
+            std::cin >> k;
+            std::string ligne;
+            std::getline(std::cin, ligne);
+            while (std::getline(std::cin, ligne)) {
+                for (char& c : ligne) c = decaler(c, k);
+                std::cout << ligne << "\n";
+            }
+        }
+      tests:
+        - { input: "3\nBonjour, Kiri !", output: 'Erqmrxu, Nlul !' }
+        - { input: "-1\nabc XYZ\nzA", output: "zab WXY\nyZ", hidden: true }
+        - { input: "29\nHello", output: Khoor, hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-str-ex1
+          type: mcq
+          prompt: Quel type utiliser pour un paramètre de chaîne en lecture seule sans copie (C++17) ?
+          choices: ['std::string_view', 'std::string', 'char', 'std::vector<char>']
+          answer: 0
+        - id: cpp-str-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            #include <string>
+            int main() {
+                std::string a = "abc", b = "abd";
+                std::cout << (a < b) << " " << (a + b).size() << " " << std::stod("2.5") * 2 << "\n";
+            }
+          output: 1 6 5
+        - id: cpp-str-ex3
+          type: mcq
+          prompt: Que renvoie `s.size()` pour "été" encodé en UTF-8 ?
+          choices: ['5', '3', '6', '4']
+          answer: 0
+        - id: cpp-str-ex4
+          type: mcq
+          prompt: Quelle fonction convertit "42" en int ?
+          choices: ['std::stoi', 'std::to_int', 'std::atoi uniquement', 'int("42")']
+          answer: 0
