@@ -1,0 +1,2114 @@
+language: java
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: java-threads
+    title: Multithreading
+    summary: Créer et coordonner des threads — Thread, Runnable, start/join, threads virtuels (Java 21), états et interruption.
+    minutes: 35
+    concepts: [concurrence]
+    sections:
+      - title: Créer des threads
+        body: |
+          ```java
+          Thread t = new Thread(() -> System.out.println("dans " + Thread.currentThread().getName()));
+          t.start();          // lance l’exécution en parallèle (run() l’exécuterait dans le thread courant !)
+          t.join();           // attend la fin du thread
+
+          Thread v = Thread.ofVirtual().start(() -> travail());   // thread virtuel (Java 21)
+          try (var ex = Executors.newVirtualThreadPerTaskExecutor()) {
+              for (int i = 0; i < 10_000; i++) ex.submit(() -> appelReseau());
+          }
+          ```
+
+          Les **threads virtuels** sont très légers (gérés par la JVM, pas par l’OS) : idéaux pour des milliers de tâches qui attendent des E/S.
+      - title: Cycle de vie et interruption
+        body: |
+          États : `NEW` → `RUNNABLE` → (`BLOCKED`, `WAITING`, `TIMED_WAITING`) → `TERMINATED`.
+
+          On n’arrête pas un thread de force : on lui **demande** de s’arrêter.
+
+          ```java
+          Thread t = new Thread(() -> {
+              while (!Thread.currentThread().isInterrupted()) {
+                  try { Thread.sleep(100); }
+                  catch (InterruptedException e) { Thread.currentThread().interrupt(); }  // rétablir le drapeau
+              }
+          });
+          t.start();
+          t.interrupt();
+          ```
+
+          L’ordre d’exécution entre threads n’est **pas déterministe** : un programme correct ne doit pas en dépendre. Pour obtenir un résultat reproductible, on **joint** les threads puis on combine leurs résultats.
+    exercises:
+      - id: java-thr-q1
+        type: mcq
+        prompt: Que se passe-t-il si on appelle t.run() au lieu de t.start() ?
+        choices: ['Le code s’exécute dans le thread courant, sans parallélisme', 'Le thread démarre normalement', 'Une exception est levée', 'Le thread est interrompu']
+        answer: 0
+      - id: java-thr-q2
+        type: mcq
+        prompt: À quoi servent les threads virtuels de Java 21 ?
+        choices: ['Exécuter des milliers de tâches bloquantes (E/S) à très faible coût', 'Remplacer le GC', 'Accélérer les calculs CPU purs', 'Simuler un processeur']
+        answer: 0
+      - id: java-thr-predict
+        type: predict
+        prompt: Que va afficher ce programme (déterministe grâce à join) ?
+        code: |
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  long[] partiel = new long[4];
+                  Thread[] ts = new Thread[4];
+                  for (int i = 0; i < 4; i++) {
+                      final int id = i;
+                      ts[i] = new Thread(() -> { for (int k = id * 25 + 1; k <= (id + 1) * 25; k++) partiel[id] += k; });
+                      ts[i].start();
+                  }
+                  for (Thread t : ts) t.join();
+                  long total = 0;
+                  for (long p : partiel) total += p;
+                  System.out.println(partiel[0] + " " + total + " " + ts[0].getState());
+              }
+          }
+        output: 325 5050 TERMINATED
+        concepts: [concurrence]
+      - id: java-thr-code
+        type: code
+        title: Somme parallèle
+        prompt: 'Lis `n` puis `k`. Découpe l’intervalle `1..n` en `k` tranches contiguës, calcule la somme des carrés de chaque tranche dans **un thread par tranche**, joins-les et affiche chaque somme partielle (une par ligne) puis `total : T`.'
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  Scanner sc = new Scanner(System.in);
+                  long n = sc.nextLong();
+                  int k = sc.nextInt();
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  Scanner sc = new Scanner(System.in);
+                  long n = sc.nextLong();
+                  int k = sc.nextInt();
+                  long[] res = new long[k];
+                  Thread[] ts = new Thread[k];
+                  long taille = (n + k - 1) / k;
+                  for (int i = 0; i < k; i++) {
+                      final int id = i;
+                      ts[i] = new Thread(() -> {
+                          long debut = id * taille + 1, fin = Math.min(n, (id + 1) * taille);
+                          for (long x = debut; x <= fin; x++) res[id] += x * x;
+                      });
+                      ts[i].start();
+                  }
+                  long total = 0;
+                  for (int i = 0; i < k; i++) { ts[i].join(); System.out.println(res[i]); total += res[i]; }
+                  System.out.println("total : " + total);
+              }
+          }
+        tests:
+          - { input: 10 3, output: "30\n174\n181\ntotal : 385" }
+          - { input: 4 2, output: "5\n25\ntotal : 30", hidden: true }
+        require:
+          - { pattern: '\.join\(', message: Attendre les threads avec join }
+    project:
+      id: java-thr-projet
+      type: code
+      title: Recherche parallèle de nombres premiers
+      difficulty: 3
+      prompt: 'Lis `n` et `k`. Chaque thread `i` (0 ≤ i < k) teste les nombres `x` de 2 à n tels que `x % k == i` et les ajoute à sa propre liste. Une fois les threads joints, fusionne, trie et affiche le nombre de premiers, puis les 5 plus grands (ordre croissant), puis le nombre trouvé par chaque thread (`thread i : c`).'
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws InterruptedException {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            static boolean premier(int x) {
+                if (x < 2) return false;
+                for (int d = 2; (long) d * d <= x; d++) if (x % d == 0) return false;
+                return true;
+            }
+            public static void main(String[] args) throws InterruptedException {
+                Scanner sc = new Scanner(System.in);
+                int n = sc.nextInt(), k = sc.nextInt();
+                List<List<Integer>> listes = new ArrayList<>();
+                Thread[] ts = new Thread[k];
+                for (int i = 0; i < k; i++) {
+                    List<Integer> l = new ArrayList<>();
+                    listes.add(l);
+                    final int id = i;
+                    ts[i] = new Thread(() -> { for (int x = 2; x <= n; x++) if (x % k == id && premier(x)) l.add(x); });
+                    ts[i].start();
+                }
+                for (Thread t : ts) t.join();
+                List<Integer> tous = new ArrayList<>();
+                listes.forEach(tous::addAll);
+                Collections.sort(tous);
+                System.out.println(tous.size());
+                System.out.println(tous.subList(Math.max(0, tous.size() - 5), tous.size()));
+                for (int i = 0; i < k; i++) System.out.println("thread " + i + " : " + listes.get(i).size());
+            }
+        }
+      tests:
+        - { input: 50 3, output: "15\n[31, 37, 41, 43, 47]\nthread 0 : 1\nthread 1 : 6\nthread 2 : 8" }
+        - { input: 10 2, output: "4\n[2, 3, 5, 7]\nthread 0 : 1\nthread 1 : 3", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-thr-ex1
+          type: mcq
+          prompt: Que fait t.join() ?
+          choices: ['Attend que le thread t se termine', 'Démarre t', 'Fusionne deux threads', 'Interrompt t']
+          answer: 0
+        - id: java-thr-ex2
+          type: mcq
+          prompt: Comment demander proprement à un thread de s’arrêter ?
+          choices: ['t.interrupt() et vérifier isInterrupted() dans le thread', 't.stop()', 'System.exit()', 't.destroy()']
+          answer: 0
+        - id: java-thr-ex3
+          type: mcq
+          prompt: L’ordre d’exécution de deux threads démarrés successivement est-il garanti ?
+          choices: ['Non', 'Oui, dans l’ordre de start()', 'Oui, par ordre alphabétique des noms', 'Seulement avec des threads virtuels']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-synchronisation
+    title: Synchronisation
+    summary: Conditions de course, synchronized, volatile, verrous (ReentrantLock), classes atomiques, collections concurrentes et interblocages.
+    minutes: 35
+    concepts: [concurrence]
+    sections:
+      - title: Conditions de course
+        body: |
+          `compteur++` n’est **pas atomique** : lire, ajouter, écrire. Deux threads peuvent lire la même valeur et perdre une incrémentation.
+
+          ```java
+          class Compteur {
+              private int valeur;
+              synchronized void incrementer() { valeur++; }     // un seul thread à la fois sur cet objet
+              synchronized int get() { return valeur; }
+          }
+
+          AtomicInteger a = new AtomicInteger();
+          a.incrementAndGet();                                  // atomique, sans verrou (CAS)
+          LongAdder adder = new LongAdder();                    // encore plus rapide sous forte contention
+
+          private final ReentrantLock verrou = new ReentrantLock();
+          verrou.lock();
+          try { … } finally { verrou.unlock(); }               // toujours dans un finally
+          ```
+
+          `volatile` garantit la **visibilité** d’une écriture entre threads, mais pas l’atomicité d’un `++`.
+      - title: Outils de haut niveau et interblocages
+        body: |
+          - `ConcurrentHashMap` (avec `merge`, `compute` atomiques), `CopyOnWriteArrayList`, `BlockingQueue` (producteur/consommateur) ;
+          - `CountDownLatch` (attendre N événements), `Semaphore` (limiter l’accès), `CyclicBarrier`.
+
+          **Interblocage** (deadlock) : T1 tient A et attend B, T2 tient B et attend A. Solutions : toujours prendre les verrous **dans le même ordre**, `tryLock` avec délai, limiter la portée des verrous.
+
+          ```java
+          BlockingQueue<String> file = new ArrayBlockingQueue<>(10);
+          file.put("tâche");      // bloque si pleine
+          String t = file.take(); // bloque si vide
+          ```
+    exercises:
+      - id: java-sync-q1
+        type: mcq
+        prompt: Pourquoi compteur++ partagé entre threads peut-il perdre des incrémentations ?
+        choices: ['Ce n’est pas une opération atomique (lecture-modification-écriture)', 'Les int sont limités', 'Le GC supprime des valeurs', 'Ça ne peut pas arriver']
+        answer: 0
+      - id: java-sync-q2
+        type: mcq
+        prompt: Que garantit volatile ?
+        choices: ['La visibilité des écritures entre threads', 'L’atomicité de ++', 'L’exclusion mutuelle', 'L’absence d’interblocage']
+        answer: 0
+      - id: java-sync-bug
+        type: bugfix
+        prompt: Ce programme devrait afficher 400 mais affiche 0. Quelle ligne corriger ?
+        code: |
+          import java.util.*;
+          public class Main {
+              static int total = 0;
+              static synchronized void ajouter(int n) { total += n; }
+              public static void main(String[] args) {
+                  List<Thread> ts = new ArrayList<>();
+                  for (int i = 0; i < 4; i++) ts.add(new Thread(() -> {
+                      try { Thread.sleep(50); ajouter(100); } catch (InterruptedException e) { }
+                  }));
+                  for (Thread t : ts) t.start();
+                  for (Thread t : ts) t.interrupt();
+                  System.out.println(total);
+              }
+          }
+        bugLines: [11]
+        choices:
+          - On interrompt les threads au lieu d’attendre leur fin avec join()
+          - ajouter ne doit pas être synchronized
+          - Il faut appeler run() au lieu de start()
+        answer: 0
+        solution: |
+          import java.util.*;
+          public class Main {
+              static int total = 0;
+              static synchronized void ajouter(int n) { total += n; }
+              public static void main(String[] args) throws InterruptedException {
+                  List<Thread> ts = new ArrayList<>();
+                  for (int i = 0; i < 4; i++) ts.add(new Thread(() -> {
+                      try { Thread.sleep(50); ajouter(100); } catch (InterruptedException e) { }
+                  }));
+                  for (Thread t : ts) t.start();
+                  for (Thread t : ts) t.join();
+                  System.out.println(total);
+              }
+          }
+        tests:
+          - { input: '', output: '400' }
+      - id: java-sync-code
+        type: code
+        title: Compteur de mots concurrent
+        prompt: 'Chaque ligne d’entrée est traitée par **un thread** qui compte ses mots (en minuscules) dans une `ConcurrentHashMap<String, Integer>` partagée avec `merge`. Après avoir joint tous les threads, affiche les mots triés `mot : n`.'
+        starter: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> lignes = new ArrayList<>();
+                  while (sc.hasNextLine()) lignes.add(sc.nextLine());
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> lignes = new ArrayList<>();
+                  while (sc.hasNextLine()) lignes.add(sc.nextLine());
+                  ConcurrentHashMap<String, Integer> freq = new ConcurrentHashMap<>();
+                  List<Thread> ts = new ArrayList<>();
+                  for (String l : lignes) {
+                      Thread t = new Thread(() -> {
+                          for (String m : l.toLowerCase().split("\\s+")) if (!m.isEmpty()) freq.merge(m, 1, Integer::sum);
+                      });
+                      ts.add(t);
+                      t.start();
+                  }
+                  for (Thread t : ts) t.join();
+                  new TreeMap<>(freq).forEach((m, n) -> System.out.println(m + " : " + n));
+              }
+          }
+        tests:
+          - { input: "le chat\nLe chien\nle chat dort", output: "chat : 2\nchien : 1\ndort : 1\nle : 3" }
+          - { input: a a a, output: 'a : 3', hidden: true }
+        require:
+          - { pattern: 'ConcurrentHashMap', message: Utiliser une ConcurrentHashMap }
+    project:
+      id: java-sync-projet
+      type: code
+      title: Virements sans interblocage
+      difficulty: 3
+      prompt: |
+        `n` comptes (solde initial lu). Chaque virement `de vers montant` est exécuté dans **son propre thread** : il verrouille les deux comptes (`ReentrantLock` par compte) **toujours dans l’ordre croissant des identifiants** pour éviter l’interblocage, et n’effectue le virement que si le solde suffit (compte un refus sinon).
+
+        Entrée : `n`, les soldes, puis des lignes de virements. Comme les threads s’exécutent dans un ordre quelconque, les refus dépendraient de l’ordre : ici, tous les virements sont **finançables** sauf mention contraire et la sortie attendue est `total : T` (conservé) puis `refus : R`.
+      starter: |
+        import java.util.*;
+        import java.util.concurrent.locks.*;
+
+        public class Main {
+            public static void main(String[] args) throws InterruptedException {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.concurrent.atomic.AtomicInteger;
+        import java.util.concurrent.locks.*;
+
+        public class Main {
+            public static void main(String[] args) throws InterruptedException {
+                Scanner sc = new Scanner(System.in);
+                int n = sc.nextInt();
+                long[] solde = new long[n];
+                ReentrantLock[] verrous = new ReentrantLock[n];
+                for (int i = 0; i < n; i++) { solde[i] = sc.nextLong(); verrous[i] = new ReentrantLock(); }
+                AtomicInteger refus = new AtomicInteger();
+                List<Thread> ts = new ArrayList<>();
+                while (sc.hasNextInt()) {
+                    int de = sc.nextInt(), vers = sc.nextInt();
+                    long m = sc.nextLong();
+                    Thread t = new Thread(() -> {
+                        ReentrantLock a = verrous[Math.min(de, vers)], b = verrous[Math.max(de, vers)];
+                        a.lock();
+                        try {
+                            b.lock();
+                            try {
+                                if (solde[de] >= m) { solde[de] -= m; solde[vers] += m; }
+                                else refus.incrementAndGet();
+                            } finally { b.unlock(); }
+                        } finally { a.unlock(); }
+                    });
+                    ts.add(t);
+                    t.start();
+                }
+                for (Thread t : ts) t.join();
+                long total = 0;
+                for (long s : solde) total += s;
+                System.out.println("total : " + total);
+                System.out.println("refus : " + refus.get());
+            }
+        }
+      tests:
+        - { input: "3\n1000 1000 1000\n0 1 10\n1 0 10\n1 2 20\n2 0 5\n0 2 7", output: "total : 3000\nrefus : 0" }
+        - { input: "2\n0 10\n0 1 50", output: "total : 10\nrefus : 1", hidden: true }
+      require:
+        - { pattern: 'ReentrantLock', message: Utiliser des ReentrantLock }
+    exam:
+      pass: 70
+      questions:
+        - id: java-sync-ex1
+          type: mcq
+          prompt: Comment éviter un interblocage entre deux verrous ?
+          choices: ['Toujours les acquérir dans le même ordre', 'Utiliser volatile', 'Ajouter des sleep', 'Utiliser plus de threads']
+          answer: 0
+        - id: java-sync-ex2
+          type: mcq
+          prompt: Pourquoi appeler unlock() dans un bloc finally ?
+          choices: ['Pour libérer le verrou même si une exception est levée', 'Par convention de style', 'Pour la performance', 'C’est obligatoire syntaxiquement']
+          answer: 0
+        - id: java-sync-ex3
+          type: mcq
+          prompt: Quelle structure est adaptée au modèle producteur/consommateur ?
+          choices: ['BlockingQueue', 'HashMap', 'ArrayList', 'TreeSet']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-executor
+    title: ExecutorService
+    summary: Pools de threads, submit et Future, Callable, invokeAll, arrêt propre et choix de la taille du pool.
+    minutes: 30
+    concepts: [concurrence]
+    sections:
+      - title: Pools de threads
+        body: |
+          Créer un thread par tâche coûte cher. Un **ExecutorService** réutilise un pool de threads :
+
+          ```java
+          ExecutorService pool = Executors.newFixedThreadPool(4);
+          Future<Integer> f = pool.submit(() -> calcul());   // Callable<Integer>
+          int r = f.get();                                    // bloque jusqu’au résultat
+          f.get(2, TimeUnit.SECONDS);                         // avec délai (TimeoutException)
+
+          List<Callable<Long>> taches = …;
+          List<Future<Long>> resultats = pool.invokeAll(taches);   // dans l’ordre des tâches
+
+          pool.shutdown();                                    // plus de nouvelles tâches
+          pool.awaitTermination(1, TimeUnit.MINUTES);
+          ```
+
+          Depuis Java 19, `ExecutorService` est `AutoCloseable` : `try (var pool = Executors.newFixedThreadPool(4)) { … }` attend la fin des tâches.
+      - title: Bonnes pratiques
+        body: |
+          - Tâches **CPU** : pool ≈ nombre de cœurs (`Runtime.getRuntime().availableProcessors()`).
+          - Tâches **E/S** : threads virtuels (`newVirtualThreadPerTaskExecutor`).
+          - Une exception dans une tâche est encapsulée dans une `ExecutionException` levée par `get()`.
+          - Toujours arrêter le pool, sinon la JVM peut ne pas se terminer.
+          - `ScheduledExecutorService` exécute des tâches périodiques (`scheduleAtFixedRate`).
+    exercises:
+      - id: java-exe-q1
+        type: mcq
+        prompt: Que renvoie pool.submit(callable) ?
+        choices: ['Un Future représentant le résultat à venir', 'Le résultat directement', 'Un Thread', 'void']
+        answer: 0
+      - id: java-exe-q2
+        type: mcq
+        prompt: Comment est propagée une exception levée dans une tâche soumise ?
+        choices: ['Encapsulée dans une ExecutionException levée par Future.get()', 'Elle arrête la JVM', 'Elle est perdue silencieusement toujours', 'Elle est affichée et ignorée']
+        answer: 0
+      - id: java-exe-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          import java.util.concurrent.*;
+          public class Main {
+              public static void main(String[] args) throws Exception {
+                  try (ExecutorService pool = Executors.newFixedThreadPool(3)) {
+                      List<Callable<Integer>> t = new ArrayList<>();
+                      for (int i = 1; i <= 4; i++) { final int x = i; t.add(() -> x * x); }
+                      int s = 0;
+                      for (Future<Integer> f : pool.invokeAll(t)) s += f.get();
+                      Future<Integer> err = pool.submit(() -> 1 / 0);
+                      try { err.get(); } catch (ExecutionException e) { System.out.println(e.getCause().getClass().getSimpleName()); }
+                      System.out.println(s);
+                  }
+              }
+          }
+        output: "ArithmeticException\n30"
+      - id: java-exe-code
+        type: code
+        title: Téléchargements simulés
+        prompt: |
+          Chaque ligne : `nom taille`. Avec un pool de 3 threads, soumets une tâche `Callable<String>` par fichier qui « télécharge » (calcule une somme de contrôle = somme des codes des caractères du nom × taille) et renvoie `nom : checksum`. Si la taille est négative, la tâche lève `IllegalArgumentException("taille invalide")`.
+
+          Affiche les résultats **dans l’ordre d’entrée** (`nom : erreur (taille invalide)` pour les échecs), puis `succès : S/N`.
+        starter: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> noms = new ArrayList<>();
+                  List<Future<String>> fs = new ArrayList<>();
+                  int ok = 0;
+                  try (ExecutorService pool = Executors.newFixedThreadPool(3)) {
+                      while (sc.hasNext()) {
+                          String nom = sc.next();
+                          long taille = sc.nextLong();
+                          noms.add(nom);
+                          fs.add(pool.submit(() -> {
+                              if (taille < 0) throw new IllegalArgumentException("taille invalide");
+                              long s = 0;
+                              for (char c : nom.toCharArray()) s += c;
+                              return nom + " : " + s * taille;
+                          }));
+                      }
+                      for (int i = 0; i < fs.size(); i++) {
+                          try { System.out.println(fs.get(i).get()); ok++; }
+                          catch (ExecutionException e) { System.out.println(noms.get(i) + " : erreur (" + e.getCause().getMessage() + ")"); }
+                      }
+                  }
+                  System.out.println("succès : " + ok + "/" + fs.size());
+              }
+          }
+        tests:
+          - { input: "a 2\nab -1\nbc 10", output: "a : 194\nab : erreur (taille invalide)\nbc : 1970\nsuccès : 2/3" }
+          - { input: z 1, output: "z : 122\nsuccès : 1/1", hidden: true }
+        require:
+          - { pattern: 'Executors\.newFixedThreadPool', message: Utiliser un pool fixe }
+    project:
+      id: java-exe-projet
+      type: code
+      title: Traitement par lots avec délai
+      difficulty: 3
+      prompt: |
+        Chaque ligne : `id duree_ms`. Soumets chaque tâche (qui dort `duree_ms` puis renvoie `id`) à un pool de 4 threads. Récupère chaque résultat avec `get(300, TimeUnit.MILLISECONDS)` **mesuré depuis la soumission de toutes les tâches** : pour simplifier, une tâche de durée > 250 ms est considérée comme expirée sans attendre (annule-la avec `cancel(true)`).
+
+        Affiche pour chaque tâche dans l’ordre `id : ok` ou `id : expirée`, puis `terminées : N`.
+      starter: |
+        import java.util.*;
+        import java.util.concurrent.*;
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.concurrent.*;
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+                List<String> ids = new ArrayList<>();
+                List<Long> durees = new ArrayList<>();
+                while (sc.hasNext()) { ids.add(sc.next()); durees.add(sc.nextLong()); }
+                ExecutorService pool = Executors.newFixedThreadPool(4);
+                List<Future<String>> fs = new ArrayList<>();
+                for (int i = 0; i < ids.size(); i++) {
+                    final String id = ids.get(i);
+                    final long d = durees.get(i);
+                    fs.add(pool.submit(() -> { Thread.sleep(d); return id; }));
+                }
+                int termines = 0;
+                for (int i = 0; i < fs.size(); i++) {
+                    Future<String> f = fs.get(i);
+                    if (durees.get(i) > 250) { f.cancel(true); System.out.println(ids.get(i) + " : expirée"); continue; }
+                    try { f.get(300, TimeUnit.MILLISECONDS); termines++; System.out.println(ids.get(i) + " : ok"); }
+                    catch (TimeoutException e) { f.cancel(true); System.out.println(ids.get(i) + " : expirée"); }
+                }
+                pool.shutdownNow();
+                System.out.println("terminées : " + termines);
+            }
+        }
+      tests:
+        - { input: "a 10\nb 1000\nc 50\nd 5000", output: "a : ok\nb : expirée\nc : ok\nd : expirée\nterminées : 2" }
+        - { input: x 1, output: "x : ok\nterminées : 1", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-exe-ex1
+          type: mcq
+          prompt: Quelle taille de pool conseiller pour des calculs CPU intensifs ?
+          choices: ['Environ le nombre de cœurs', '1000 threads', '1 thread', 'Le nombre de tâches']
+          answer: 0
+        - id: java-exe-ex2
+          type: mcq
+          prompt: Que fait pool.shutdown() ?
+          choices: ['Refuse les nouvelles tâches et laisse finir celles en cours', 'Tue immédiatement toutes les tâches', 'Redémarre le pool', 'Vide la file sans rien exécuter']
+          answer: 0
+        - id: java-exe-ex3
+          type: mcq
+          prompt: Quelle différence entre Runnable et Callable ?
+          choices: ['Callable renvoie une valeur et peut lever des exceptions vérifiées', 'Aucune', 'Runnable est plus récent', 'Callable ne peut pas être soumis à un pool']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-completablefuture
+    title: CompletableFuture
+    summary: Composer des calculs asynchrones — supplyAsync, thenApply, thenCompose, thenCombine, allOf, gestion d’erreurs.
+    minutes: 30
+    concepts: [async]
+    sections:
+      - title: Chaîner des étapes
+        body: |
+          ```java
+          CompletableFuture<String> cf = CompletableFuture
+              .supplyAsync(() -> chargerUtilisateur(42))          // dans le ForkJoinPool commun
+              .thenApply(u -> u.nom())                            // transformation
+              .thenCompose(nom -> chargerProfilAsync(nom))        // étape asynchrone (flatMap)
+              .exceptionally(e -> "anonyme");                     // valeur de secours
+
+          CompletableFuture<Integer> a = supplyAsync(() -> 2), b = supplyAsync(() -> 3);
+          CompletableFuture<Integer> somme = a.thenCombine(b, Integer::sum);   // 5
+
+          CompletableFuture.allOf(a, b).join();      // attendre toutes les étapes
+          CompletableFuture.anyOf(a, b);             // la première terminée
+          String r = cf.join();                      // comme get() mais exception non vérifiée
+          ```
+      - title: Erreurs et exécuteurs
+        body: |
+          - `exceptionally(fn)` : remplace une erreur par une valeur ;
+          - `handle((valeur, erreur) -> …)` : traite les deux cas ;
+          - `whenComplete` : effet de bord sans changer le résultat ;
+          - `orTimeout(1, SECONDS)` / `completeOnTimeout(defaut, 1, SECONDS)`.
+
+          Une exception dans une étape **saute** les `thenApply` suivants jusqu’au premier gestionnaire. `join()` la relance encapsulée dans une `CompletionException`.
+
+          Passe un exécuteur dédié (`supplyAsync(tache, pool)`) pour les E/S bloquantes, afin de ne pas saturer le pool commun.
+    exercises:
+      - id: java-cf-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.concurrent.*;
+          public class Main {
+              public static void main(String[] args) {
+                  CompletableFuture<Integer> a = CompletableFuture.supplyAsync(() -> 20);
+                  CompletableFuture<Integer> b = CompletableFuture.supplyAsync(() -> 22);
+                  String r = a.thenCombine(b, Integer::sum).thenApply(x -> "total=" + x).join();
+                  String e = CompletableFuture.supplyAsync(() -> Integer.parseInt("x"))
+                      .thenApply(x -> x * 2)
+                      .handle((v, err) -> err == null ? "ok " + v : "erreur " + err.getCause().getClass().getSimpleName())
+                      .join();
+                  System.out.println(r + " | " + e);
+              }
+          }
+        output: total=42 | erreur NumberFormatException
+        concepts: [async]
+      - id: java-cf-q1
+        type: mcq
+        prompt: Quelle méthode utiliser quand l’étape suivante renvoie elle-même un CompletableFuture ?
+        choices: ['thenCompose', 'thenApply', 'thenAccept', 'thenRun']
+        answer: 0
+      - id: java-cf-q2
+        type: mcq
+        prompt: Que fait CompletableFuture.allOf(f1, f2, f3) ?
+        choices: ['Renvoie un futur terminé quand tous sont terminés', 'Renvoie le premier résultat', 'Annule tous les futurs', 'Exécute séquentiellement']
+        answer: 0
+      - id: java-cf-code
+        type: code
+        title: Agrégateur de prix
+        prompt: |
+          Chaque ligne : `boutique prix` (prix = `indisponible` si la boutique ne répond pas). Lance une `supplyAsync` par boutique qui parse le prix (lève une exception si invalide), avec `exceptionally` → `Double.MAX_VALUE`. Attends tout avec `allOf`, puis affiche `meilleur : boutique (prix)` (2 décimales, Locale.US ; égalité : première en entrée) et `réponses : R/N`. Si aucune réponse : `aucune offre`.
+        starter: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> noms = new ArrayList<>();
+                  List<CompletableFuture<Double>> fs = new ArrayList<>();
+                  while (sc.hasNext()) {
+                      noms.add(sc.next());
+                      String p = sc.next();
+                      fs.add(CompletableFuture.supplyAsync(() -> Double.parseDouble(p)).exceptionally(e -> Double.MAX_VALUE));
+                  }
+                  CompletableFuture.allOf(fs.toArray(new CompletableFuture[0])).join();
+                  int best = -1, rep = 0;
+                  for (int i = 0; i < fs.size(); i++) {
+                      double v = fs.get(i).join();
+                      if (v == Double.MAX_VALUE) continue;
+                      rep++;
+                      if (best < 0 || v < fs.get(best).join()) best = i;
+                  }
+                  if (best < 0) System.out.println("aucune offre");
+                  else System.out.println(String.format(Locale.US, "meilleur : %s (%.2f)", noms.get(best), fs.get(best).join()));
+                  System.out.println("réponses : " + rep + "/" + fs.size());
+              }
+          }
+        tests:
+          - { input: "alpha 19.99\nbeta indisponible\ngamma 17.5\ndelta 17.5", output: "meilleur : gamma (17.50)\nréponses : 3/4" }
+          - { input: x indisponible, output: "aucune offre\nréponses : 0/1", hidden: true }
+        require:
+          - { pattern: 'supplyAsync', message: Utiliser supplyAsync }
+    project:
+      id: java-cf-projet
+      type: code
+      title: Pipeline de commande asynchrone
+      difficulty: 3
+      prompt: |
+        Pour chaque commande `id quantite stock`, construis un pipeline : `supplyAsync(valider)` (quantité > 0 sinon exception `quantité invalide`) → `thenCompose(reserver)` (asynchrone ; stock ≥ quantité sinon `stock insuffisant`) → `thenApply(facturer)` (montant = quantite × 12) → `handle` qui produit `id : facturée M €` ou `id : refusée (raison)`.
+
+        Affiche les résultats dans l’ordre puis `CA : total €`.
+      starter: |
+        import java.util.*;
+        import java.util.concurrent.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.concurrent.*;
+
+        public class Main {
+            record Res(String texte, long montant) {}
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<CompletableFuture<Res>> fs = new ArrayList<>();
+                while (sc.hasNext()) {
+                    String id = sc.next();
+                    int q = sc.nextInt(), stock = sc.nextInt();
+                    fs.add(CompletableFuture
+                        .supplyAsync(() -> { if (q <= 0) throw new IllegalArgumentException("quantité invalide"); return q; })
+                        .thenCompose(x -> CompletableFuture.supplyAsync(() -> { if (stock < x) throw new IllegalStateException("stock insuffisant"); return x; }))
+                        .thenApply(x -> x * 12L)
+                        .handle((m, e) -> e == null ? new Res(id + " : facturée " + m + " €", m)
+                                                    : new Res(id + " : refusée (" + e.getCause().getMessage() + ")", 0)));
+                }
+                long ca = 0;
+                for (var f : fs) { Res r = f.join(); System.out.println(r.texte()); ca += r.montant(); }
+                System.out.println("CA : " + ca + " €");
+            }
+        }
+      tests:
+        - { input: "c1 2 10\nc2 0 10\nc3 5 3\nc4 1 1", output: "c1 : facturée 24 €\nc2 : refusée (quantité invalide)\nc3 : refusée (stock insuffisant)\nc4 : facturée 12 €\nCA : 36 €" }
+        - { input: z 3 3, output: "z : facturée 36 €\nCA : 36 €", hidden: true }
+      require:
+        - { pattern: 'thenCompose', message: Utiliser thenCompose }
+    exam:
+      pass: 70
+      questions:
+        - id: java-cf-ex1
+          type: mcq
+          prompt: Quelle méthode combine deux futurs indépendants ?
+          choices: ['thenCombine', 'thenCompose', 'thenApply', 'allOf']
+          answer: 0
+        - id: java-cf-ex2
+          type: mcq
+          prompt: Sur quel exécuteur s’exécute supplyAsync sans exécuteur explicite ?
+          choices: ['Le ForkJoinPool commun', 'Le thread main', 'Un nouveau thread à chaque fois', 'Un thread virtuel']
+          answer: 0
+        - id: java-cf-ex3
+          type: mcq
+          prompt: Que fait exceptionally ?
+          choices: ['Fournit une valeur de remplacement en cas d’erreur', 'Lève une exception', 'Annule le futur', 'Relance la tâche']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-async
+    title: Programmation asynchrone
+    summary: Modèles asynchrones — callbacks, boucle d’événements, producteur/consommateur, threads virtuels vs réactif, structured concurrency.
+    minutes: 30
+    concepts: [async]
+    sections:
+      - title: Modèles d’asynchronisme
+        body: |
+          | Modèle | Idée | Exemple Java |
+          |---|---|---|
+          | Callbacks | « rappelle-moi quand c’est fini » | listeners, `whenComplete` |
+          | Futures | une valeur à venir | `CompletableFuture` |
+          | Réactif | flux d’événements avec contre-pression | `Flow`, Reactor, RxJava |
+          | Threads virtuels | code bloquant simple, mais pas cher | `Thread.ofVirtual()` |
+
+          Avec les threads virtuels de Java 21, on peut souvent revenir à du **code séquentiel lisible** tout en gérant des milliers de connexions.
+      - title: Boucle d’événements et file de messages
+        body: |
+          Une **boucle d’événements** traite les événements un par un depuis une file : aucun verrou nécessaire, car un seul thread touche à l’état.
+
+          ```java
+          BlockingQueue<Runnable> evenements = new LinkedBlockingQueue<>();
+          Thread boucle = new Thread(() -> {
+              try {
+                  while (true) {
+                      Runnable e = evenements.take();
+                      if (e == ARRET) break;
+                      e.run();
+                  }
+              } catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+          });
+          ```
+
+          C’est le modèle de Node.js, des interfaces graphiques (Swing EDT, JavaFX) et de nombreux serveurs (Netty).
+    exercises:
+      - id: java-async-q1
+        type: mcq
+        prompt: Pourquoi une boucle d’événements mono-thread n’a-t-elle pas besoin de verrous pour son état ?
+        choices: ['Un seul thread accède à l’état', 'Java verrouille automatiquement', 'Les événements sont immuables', 'Elle en a besoin']
+        answer: 0
+      - id: java-async-q2
+        type: mcq
+        prompt: Que signifie la contre-pression (backpressure) en programmation réactive ?
+        choices: ['Le consommateur limite le débit du producteur', 'Le producteur accélère', 'Une erreur réseau', 'Un type de GC']
+        answer: 0
+      - id: java-async-code
+        type: code
+        title: Producteur / consommateur
+        prompt: |
+          Un thread **producteur** lit les entiers de l’entrée et les place dans une `ArrayBlockingQueue<Integer>` de capacité 2, puis envoie le marqueur `-1` (pas présent dans les données). Un thread **consommateur** les retire, affiche `traité x -> x²`, et compte. Le main joint les deux threads puis affiche `total : N`.
+        starter: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  Scanner sc = new Scanner(System.in);
+                  List<Integer> donnees = new ArrayList<>();
+                  while (sc.hasNextInt()) donnees.add(sc.nextInt());
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.concurrent.*;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  Scanner sc = new Scanner(System.in);
+                  List<Integer> donnees = new ArrayList<>();
+                  while (sc.hasNextInt()) donnees.add(sc.nextInt());
+                  BlockingQueue<Integer> file = new ArrayBlockingQueue<>(2);
+                  int[] compte = {0};
+                  Thread prod = new Thread(() -> {
+                      try { for (int x : donnees) file.put(x); file.put(-1); }
+                      catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                  });
+                  Thread cons = new Thread(() -> {
+                      try {
+                          while (true) {
+                              int x = file.take();
+                              if (x == -1) break;
+                              System.out.println("traité " + x + " -> " + x * x);
+                              compte[0]++;
+                          }
+                      } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                  });
+                  prod.start(); cons.start();
+                  prod.join(); cons.join();
+                  System.out.println("total : " + compte[0]);
+              }
+          }
+        tests:
+          - { input: 3 5 7 9, output: "traité 3 -> 9\ntraité 5 -> 25\ntraité 7 -> 49\ntraité 9 -> 81\ntotal : 4" }
+          - { input: '', output: 'total : 0', hidden: true }
+        require:
+          - { pattern: 'BlockingQueue', message: Utiliser une BlockingQueue }
+    project:
+      id: java-async-projet
+      type: code
+      title: Boucle d’événements avec minuteries
+      difficulty: 3
+      prompt: |
+        Simule une boucle d’événements à temps virtuel. Commandes : `timeout NOM DELAI` (planifie l’événement NOM à `maintenant + DELAI`), `tick N` (avance le temps de N unités en déclenchant dans l’ordre les événements échus : par heure d’échéance, puis ordre de planification), `annuler NOM`.
+
+        Quand un événement se déclenche, affiche `[t=HEURE] NOM`. Un événement nommé `relance-X` replanifie automatiquement `X` 5 unités plus tard. Termine par `en attente : N`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            record Ev(long heure, long seq, String nom) {}
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                PriorityQueue<Ev> file = new PriorityQueue<>(Comparator.comparingLong(Ev::heure).thenComparingLong(Ev::seq));
+                long maintenant = 0, seq = 0;
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "timeout" -> { String n = sc.next(); file.add(new Ev(maintenant + sc.nextLong(), seq++, n)); }
+                        case "annuler" -> { String n = sc.next(); file.removeIf(e -> e.nom().equals(n)); }
+                        default -> {
+                            long fin = maintenant + sc.nextLong();
+                            while (!file.isEmpty() && file.peek().heure() <= fin) {
+                                Ev e = file.poll();
+                                maintenant = e.heure();
+                                System.out.println("[t=" + maintenant + "] " + e.nom());
+                                if (e.nom().startsWith("relance-")) file.add(new Ev(maintenant + 5, seq++, e.nom().substring(8)));
+                            }
+                            maintenant = fin;
+                        }
+                    }
+                }
+                System.out.println("en attente : " + file.size());
+            }
+        }
+      tests:
+        - { input: "timeout a 3\ntimeout b 1\ntimeout relance-c 2\ntimeout d 50\ntick 10\nannuler d\ntimeout e 1\ntick 1", output: "[t=1] b\n[t=2] relance-c\n[t=3] a\n[t=7] c\n[t=11] e\nen attente : 0" }
+        - { input: "timeout x 5\ntick 4", output: 'en attente : 1', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-async-ex1
+          type: mcq
+          prompt: Quel avantage principal des threads virtuels pour le code asynchrone ?
+          choices: ['Écrire du code bloquant simple qui passe à l’échelle', 'Ils sont plus rapides en calcul pur', 'Ils évitent les exceptions', 'Ils remplacent le JIT']
+          answer: 0
+        - id: java-async-ex2
+          type: mcq
+          prompt: Quelle API standard de Java définit les flux réactifs ?
+          choices: ['java.util.concurrent.Flow', 'java.io.Stream', 'java.nio.Reactive', 'java.lang.Async']
+          answer: 0
+        - id: java-async-ex3
+          type: mcq
+          prompt: Quel framework réseau Java repose sur une boucle d’événements ?
+          choices: ['Netty', 'JUnit', 'Hibernate', 'Lombok']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-gc
+    title: Garbage Collector
+    summary: Comment la JVM libère la mémoire — accessibilité, générations, G1/ZGC, fuites de mémoire en Java et références faibles.
+    minutes: 30
+    concepts: [memoire]
+    sections:
+      - title: Accessibilité et générations
+        body: |
+          Le GC libère les objets **inaccessibles** : aucun chemin de références depuis les **racines** (variables locales des threads actifs, attributs statiques, références JNI). Les cycles d’objets inaccessibles sont collectés aussi (contrairement au comptage de références).
+
+          **Hypothèse générationnelle** : la plupart des objets meurent jeunes. Le tas est découpé :
+
+          - **jeune génération** (Eden + survivants) : collectée souvent et rapidement ;
+          - **vieille génération** : objets ayant survécu à plusieurs collectes.
+
+          Collecteurs : **G1** (défaut, équilibré), **ZGC** (pauses < 1 ms, gros tas), **Parallel** (débit), **Serial** (petits conteneurs).
+      - title: Fuites et réglages
+        body: |
+          Une « fuite » en Java = des objets encore **référencés** par erreur :
+
+          - collections statiques qui grossissent sans fin (caches) ;
+          - listeners jamais désinscrits ;
+          - `ThreadLocal` non nettoyés dans les pools.
+
+          Outils : `-Xmx512m` (taille max), `-XX:+UseZGC`, `-Xlog:gc`, `jcmd <pid> GC.heap_info`, analyse de *heap dump* (Eclipse MAT, VisualVM, JFR).
+
+          `WeakReference<T>` / `WeakHashMap` : références qui n’empêchent pas la collecte — utiles pour des caches. `System.gc()` n’est qu’une **suggestion**.
+    exercises:
+      - id: java-gc-q1
+        type: mcq
+        prompt: Quand un objet devient-il éligible au garbage collector ?
+        choices: ['Quand il n’est plus accessible depuis les racines', 'Quand on appelle delete', 'Après 1 seconde', 'Quand son compteur de références vaut 0 uniquement']
+        answer: 0
+      - id: java-gc-q2
+        type: mcq
+        prompt: Deux objets qui se référencent mutuellement mais inaccessibles seront-ils collectés ?
+        choices: ['Oui', 'Non, c’est une fuite', 'Seulement avec ZGC', 'Seulement après System.gc()']
+        answer: 0
+      - id: java-gc-q3
+        type: mcq
+        prompt: Quelle situation provoque une fuite mémoire en Java ?
+        choices: ['Un cache statique qui ne supprime jamais d’entrées', 'Créer beaucoup d’objets temporaires', 'Utiliser des lambdas', 'Appeler new dans une boucle']
+        answer: 0
+      - id: java-gc-code
+        type: code
+        title: Simulateur mark & sweep
+        prompt: |
+          Simule un GC. Lignes : `obj A`, `ref A B` (A référence B), `unref A B`, `racine A`, `noracine A`, `gc`. Lors d’un `gc`, marque tous les objets accessibles depuis les racines (parcours de graphe), supprime les autres (et leurs références) et affiche `gc : collectés [triés]` (`aucun` si vide). Termine par `vivants : [triés]`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Map<String, Set<String>> tas = new TreeMap<>();
+                  Set<String> racines = new HashSet<>();
+                  while (sc.hasNext()) {
+                      switch (sc.next()) {
+                          case "obj" -> tas.put(sc.next(), new HashSet<>());
+                          case "ref" -> { String a = sc.next(), b = sc.next(); tas.get(a).add(b); }
+                          case "unref" -> { String a = sc.next(), b = sc.next(); tas.get(a).remove(b); }
+                          case "racine" -> racines.add(sc.next());
+                          case "noracine" -> racines.remove(sc.next());
+                          default -> {
+                              Set<String> marques = new HashSet<>();
+                              Deque<String> pile = new ArrayDeque<>(racines);
+                              while (!pile.isEmpty()) {
+                                  String o = pile.pop();
+                                  if (tas.containsKey(o) && marques.add(o)) pile.addAll(tas.get(o));
+                              }
+                              List<String> morts = new ArrayList<>();
+                              for (String o : tas.keySet()) if (!marques.contains(o)) morts.add(o);
+                              morts.forEach(tas::remove);
+                              System.out.println("gc : " + (morts.isEmpty() ? "aucun" : String.join(" ", morts)));
+                          }
+                      }
+                  }
+                  System.out.println("vivants : " + tas.keySet());
+              }
+          }
+        tests:
+          - { input: "obj A\nobj B\nobj C\nobj D\nracine A\nref A B\nref C D\nref D C\ngc\nunref A B\ngc\nracine C\ngc", output: "gc : C D\ngc : B\ngc : aucun\nvivants : [A]" }
+          - { input: "obj X\ngc", output: "gc : X\nvivants : []", hidden: true }
+        concepts: [memoire]
+    project:
+      id: java-gc-projet
+      type: code
+      title: GC générationnel simplifié
+      difficulty: 3
+      prompt: |
+        Simule un GC à deux générations. Commandes : `new NOM` (crée dans la jeune génération), `root NOM` / `unroot NOM`, `ref A B`, `minor` (collecte la jeune génération : un jeune objet accessible survit et son âge augmente ; à l’âge 2 il est promu en vieille génération), `major` (collecte tout le tas).
+
+        L’accessibilité se calcule depuis les racines sur tout le graphe. Après chaque collecte affiche `minor : morts=[…] promus=[…]` ou `major : morts=[…]` (listes triées, crochets vides si rien). Termine par `jeunes=[…] vieux=[…]`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Map<String, Set<String>> refs = new HashMap<>();
+                Map<String, Integer> jeunes = new TreeMap<>();
+                Set<String> vieux = new TreeSet<>(), racines = new HashSet<>();
+                while (sc.hasNext()) {
+                    String c = sc.next();
+                    switch (c) {
+                        case "new" -> { String n = sc.next(); jeunes.put(n, 0); refs.put(n, new HashSet<>()); }
+                        case "root" -> racines.add(sc.next());
+                        case "unroot" -> racines.remove(sc.next());
+                        case "ref" -> { String a = sc.next(), b = sc.next(); refs.get(a).add(b); }
+                        default -> {
+                            Set<String> vivants = new HashSet<>();
+                            Deque<String> pile = new ArrayDeque<>(racines);
+                            while (!pile.isEmpty()) {
+                                String o = pile.pop();
+                                if (refs.containsKey(o) && vivants.add(o)) pile.addAll(refs.get(o));
+                            }
+                            List<String> morts = new ArrayList<>(), promus = new ArrayList<>();
+                            for (String o : new ArrayList<>(jeunes.keySet())) {
+                                if (!vivants.contains(o)) { morts.add(o); jeunes.remove(o); refs.remove(o); }
+                                else if (c.equals("minor")) {
+                                    int age = jeunes.get(o) + 1;
+                                    if (age >= 2) { jeunes.remove(o); vieux.add(o); promus.add(o); } else jeunes.put(o, age);
+                                }
+                            }
+                            if (c.equals("major")) {
+                                for (String o : new ArrayList<>(vieux)) if (!vivants.contains(o)) { morts.add(o); vieux.remove(o); refs.remove(o); }
+                                Collections.sort(morts);
+                                System.out.println("major : morts=" + morts);
+                            } else {
+                                System.out.println("minor : morts=" + morts + " promus=" + promus);
+                            }
+                        }
+                    }
+                }
+                System.out.println("jeunes=" + jeunes.keySet() + " vieux=" + vieux);
+            }
+        }
+      tests:
+        - { input: "new a\nnew b\nnew c\nroot a\nref a b\nminor\nminor\nnew d\nroot d\nunroot a\nminor\nmajor", output: "minor : morts=[c] promus=[]\nminor : morts=[] promus=[a, b]\nminor : morts=[] promus=[]\nmajor : morts=[a, b]\njeunes=[d] vieux=[]" }
+        - { input: "new x\nminor", output: "minor : morts=[x] promus=[]\njeunes=[] vieux=[]", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-gc-ex1
+          type: mcq
+          prompt: Sur quelle hypothèse reposent les GC générationnels ?
+          choices: ['La plupart des objets meurent jeunes', 'Les objets vivent tous longtemps', 'Les gros objets meurent d’abord', 'Les objets sont immuables']
+          answer: 0
+        - id: java-gc-ex2
+          type: mcq
+          prompt: Quel collecteur vise des pauses inférieures à la milliseconde sur de gros tas ?
+          choices: ['ZGC', 'Serial', 'Parallel', 'CMS']
+          answer: 0
+        - id: java-gc-ex3
+          type: mcq
+          prompt: Que fait System.gc() ?
+          choices: ['Suggère une collecte à la JVM, sans garantie', 'Force immédiatement une collecte complète', 'Désactive le GC', 'Libère un objet précis']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-jvm
+    title: JVM
+    summary: Fonctionnement de la JVM — bytecode, chargement des classes, zones mémoire, JIT, javap et options de démarrage.
+    minutes: 30
+    concepts: [compilation]
+    sections:
+      - title: Du source au bytecode
+        body: |
+          `javac` compile le Java en **bytecode** (`.class`), indépendant de la plateforme. La JVM l’exécute :
+
+          1. **chargement** des classes à la demande par les *class loaders* (bootstrap → plateforme → application) ;
+          2. **vérification** du bytecode (sécurité), préparation, résolution ;
+          3. **initialisation** (blocs `static`) ;
+          4. **exécution** : interprétée d’abord, puis compilée en code machine par le **JIT** (C1 puis C2) pour les méthodes « chaudes ».
+
+          ```bash
+          javap -c Main.class
+          # 0: iconst_2   1: iconst_3   2: iadd   3: istore_1 ...
+          ```
+
+          Le bytecode est une **machine à pile** : les instructions dépilent leurs opérandes et empilent leur résultat.
+      - title: Zones mémoire et options
+        body: |
+          | Zone | Contenu |
+          |---|---|
+          | Tas (heap) | objets, tableaux (partagé, géré par le GC) |
+          | Pile de chaque thread | cadres d’appel, variables locales, pile d’opérandes |
+          | Metaspace | métadonnées des classes |
+          | Code cache | code compilé par le JIT |
+
+          Options utiles : `-Xmx`/`-Xms` (tas), `-Xss` (pile), `-XX:+PrintFlagsFinal`, `-XX:TieredStopAtLevel=1` (démarrage rapide). Outils : `jcmd`, `jstack` (threads), **JFR** (profilage en production), **GraalVM native-image** (compilation AOT).
+
+          Une récursion trop profonde → `StackOverflowError` ; un tas plein → `OutOfMemoryError`.
+    exercises:
+      - id: java-vm-q1
+        type: mcq
+        prompt: Que produit javac ?
+        choices: ['Du bytecode (.class) exécuté par la JVM', 'Du code machine natif', 'Du code C', 'Un script interprété']
+        answer: 0
+      - id: java-vm-q2
+        type: mcq
+        prompt: Quel est le rôle du compilateur JIT ?
+        choices: ['Compiler en code machine les méthodes fréquemment exécutées', 'Vérifier la syntaxe', 'Collecter les objets morts', 'Charger les classes']
+        answer: 0
+      - id: java-vm-predict
+        type: predict
+        prompt: Dans quel ordre s’affichent les messages (initialisation des classes à la demande) ?
+        code: |
+          public class Main {
+              static class A { static { System.out.println("init A"); } static int x = 1; }
+              static class B { static { System.out.println("init B"); } static void f() { System.out.println("B.f"); } }
+              public static void main(String[] args) {
+                  System.out.println("début");
+                  B.f();
+                  System.out.println(A.x + A.x);
+              }
+          }
+        output: "début\ninit B\nB.f\ninit A\n2"
+      - id: java-vm-code
+        type: code
+        title: Mini machine à pile
+        prompt: |
+          Interprète un mini-bytecode, une instruction par ligne : `push N`, `add`, `sub`, `mul`, `div` (division entière ; division par zéro → affiche `ArithmeticException` et arrête), `dup`, `swap`, `print` (affiche et dépile le sommet), `load i` / `store i` (variables locales 0..9, initialisées à 0), `jz L` (dépile ; saute à la ligne L — numérotée à partir de 0 — si la valeur vaut 0), `jmp L`, `halt`.
+
+          Pour sécurité, arrête-toi après 10 000 instructions exécutées en affichant `limite atteinte`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String[]> prog = new ArrayList<>();
+                  while (sc.hasNextLine()) { String l = sc.nextLine().trim(); if (!l.isEmpty()) prog.add(l.split("\\s+")); }
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String[]> prog = new ArrayList<>();
+                  while (sc.hasNextLine()) { String l = sc.nextLine().trim(); if (!l.isEmpty()) prog.add(l.split("\\s+")); }
+                  Deque<Long> pile = new ArrayDeque<>();
+                  long[] locales = new long[10];
+                  int pc = 0, pas = 0;
+                  while (pc < prog.size()) {
+                      if (++pas > 10000) { System.out.println("limite atteinte"); return; }
+                      String[] ins = prog.get(pc++);
+                      switch (ins[0]) {
+                          case "push" -> pile.push(Long.parseLong(ins[1]));
+                          case "add" -> { long b = pile.pop(), a = pile.pop(); pile.push(a + b); }
+                          case "sub" -> { long b = pile.pop(), a = pile.pop(); pile.push(a - b); }
+                          case "mul" -> { long b = pile.pop(), a = pile.pop(); pile.push(a * b); }
+                          case "div" -> {
+                              long b = pile.pop(), a = pile.pop();
+                              if (b == 0) { System.out.println("ArithmeticException"); return; }
+                              pile.push(a / b);
+                          }
+                          case "dup" -> pile.push(pile.peek());
+                          case "swap" -> { long b = pile.pop(), a = pile.pop(); pile.push(b); pile.push(a); }
+                          case "print" -> System.out.println(pile.pop());
+                          case "load" -> pile.push(locales[Integer.parseInt(ins[1])]);
+                          case "store" -> locales[Integer.parseInt(ins[1])] = pile.pop();
+                          case "jz" -> { if (pile.pop() == 0) pc = Integer.parseInt(ins[1]); }
+                          case "jmp" -> pc = Integer.parseInt(ins[1]);
+                          case "halt" -> { return; }
+                      }
+                  }
+              }
+          }
+        tests:
+          - { input: "push 2\npush 3\nadd\npush 4\nmul\nprint", output: '20' }
+          - { input: "push 5\nstore 0\npush 1\nstore 1\nload 0\njz 15\nload 1\nload 0\nmul\nstore 1\nload 0\npush 1\nsub\nstore 0\njmp 4\nload 1\nprint", output: '120', hidden: true }
+          - { input: "push 1\npush 0\ndiv\nprint", output: ArithmeticException, hidden: true }
+          - { input: jmp 0, output: limite atteinte, hidden: true }
+    project:
+      id: java-vm-projet
+      type: code
+      title: Compilateur d’expressions vers bytecode
+      difficulty: 3
+      prompt: |
+        Comme `javac`, compile des expressions arithmétiques (entiers, `+ - * /`, parenthèses, priorités usuelles, associativité à gauche) vers des instructions de machine à pile, puis exécute-les.
+
+        Pour chaque ligne, affiche le bytecode sur une ligne (`iconst 2 | iconst 3 | iadd …` avec `iadd`, `isub`, `imul`, `idiv`) puis `= résultat`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            static String s;
+            static int pos;
+            static List<String> code;
+
+            static void expr() {
+                terme();
+                while (pos < s.length() && (s.charAt(pos) == '+' || s.charAt(pos) == '-')) {
+                    char op = s.charAt(pos++);
+                    terme();
+                    code.add(op == '+' ? "iadd" : "isub");
+                }
+            }
+            static void terme() {
+                facteur();
+                while (pos < s.length() && (s.charAt(pos) == '*' || s.charAt(pos) == '/')) {
+                    char op = s.charAt(pos++);
+                    facteur();
+                    code.add(op == '*' ? "imul" : "idiv");
+                }
+            }
+            static void facteur() {
+                if (s.charAt(pos) == '(') { pos++; expr(); pos++; return; }
+                int debut = pos;
+                while (pos < s.length() && Character.isDigit(s.charAt(pos))) pos++;
+                code.add("iconst " + s.substring(debut, pos));
+            }
+            static long executer(List<String> c) {
+                Deque<Long> p = new ArrayDeque<>();
+                for (String i : c) {
+                    if (i.startsWith("iconst")) { p.push(Long.parseLong(i.substring(7))); continue; }
+                    long b = p.pop(), a = p.pop();
+                    p.push(switch (i) { case "iadd" -> a + b; case "isub" -> a - b; case "imul" -> a * b; default -> a / b; });
+                }
+                return p.pop();
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                    s = sc.nextLine().replace(" ", "");
+                    if (s.isEmpty()) continue;
+                    pos = 0;
+                    code = new ArrayList<>();
+                    expr();
+                    System.out.println(String.join(" | ", code));
+                    System.out.println("= " + executer(code));
+                }
+            }
+        }
+      tests:
+        - { input: "2 + 3 * 4\n(2 + 3) * 4\n10 - 4 - 3", output: "iconst 2 | iconst 3 | iconst 4 | imul | iadd\n= 14\niconst 2 | iconst 3 | iadd | iconst 4 | imul\n= 20\niconst 10 | iconst 4 | isub | iconst 3 | isub\n= 3" }
+        - { input: 100/(2*5), output: "iconst 100 | iconst 2 | iconst 5 | imul | idiv\n= 10", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-vm-ex1
+          type: mcq
+          prompt: Quel outil affiche le bytecode d’une classe ?
+          choices: ['javap -c', 'javac -v', 'jar -x', 'jdb']
+          answer: 0
+        - id: java-vm-ex2
+          type: mcq
+          prompt: Où sont stockés les objets créés avec new ?
+          choices: ['Dans le tas', 'Dans la pile du thread', 'Dans le Metaspace', 'Dans le code cache']
+          answer: 0
+        - id: java-vm-ex3
+          type: mcq
+          prompt: Quelle erreur provoque une récursion infinie ?
+          choices: ['StackOverflowError', 'OutOfMemoryError', 'NullPointerException', 'ClassNotFoundException']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-reflexion
+    title: Réflexion
+    summary: Inspecter et manipuler les classes à l’exécution — Class, Field, Method, Constructor, invoke, setAccessible et usages en frameworks.
+    minutes: 30
+    concepts: [reflexion]
+    sections:
+      - title: Introspection
+        body: |
+          ```java
+          Class<?> c = Personne.class;              // ou objet.getClass(), Class.forName("fr.Personne")
+          c.getSimpleName();
+          c.getSuperclass();
+          for (Field f : c.getDeclaredFields()) System.out.println(f.getType().getSimpleName() + " " + f.getName());
+          for (Method m : c.getDeclaredMethods()) System.out.println(m.getName() + " " + m.getParameterCount());
+          Modifier.isPrivate(f.getModifiers());
+          c.isRecord(); c.getRecordComponents();
+          ```
+
+          ⚠️ L’ordre renvoyé par `getDeclaredFields()`/`getDeclaredMethods()` **n’est pas garanti** : trie-les si l’ordre compte.
+      - title: Manipulation dynamique
+        body: |
+          ```java
+          Object o = c.getDeclaredConstructor(String.class).newInstance("Ada");
+          Method m = c.getMethod("saluer", String.class);
+          Object r = m.invoke(o, "Bob");                  // appel dynamique
+
+          Field f = c.getDeclaredField("age");
+          f.setAccessible(true);                          // contourne private (si les modules le permettent)
+          f.set(o, 37);
+          ```
+
+          Usages : frameworks d’injection de dépendances (Spring), ORM (Hibernate), sérialisation (Jackson), tests (JUnit). Inconvénients : plus lent, pas de vérification à la compilation, casse l’encapsulation. Alternatives modernes : `MethodHandle`, génération de code à la compilation (annotation processors).
+    exercises:
+      - id: java-refl-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.lang.reflect.*;
+          import java.util.*;
+          public class Main {
+              static class Chat { private String nom = "Kiri"; private int age = 3; public String miauler(int n) { return "miaou".repeat(n); } }
+              public static void main(String[] args) throws Exception {
+                  Chat c = new Chat();
+                  Field f = Chat.class.getDeclaredField("nom");
+                  f.setAccessible(true);
+                  f.set(c, "Neko");
+                  Method m = Chat.class.getMethod("miauler", int.class);
+                  List<String> champs = new ArrayList<>();
+                  for (Field x : Chat.class.getDeclaredFields()) champs.add(x.getName());
+                  Collections.sort(champs);
+                  System.out.println(f.get(c) + " " + m.invoke(c, 2) + " " + champs);
+              }
+          }
+        output: Neko miaoumiaou [age, nom]
+        concepts: [reflexion]
+      - id: java-refl-q1
+        type: mcq
+        prompt: Quel inconvénient majeur a la réflexion ?
+        choices: ['Pas de vérification à la compilation et performances moindres', 'Elle est interdite en Java 21', 'Elle ne voit que les méthodes publiques', 'Elle modifie le bytecode']
+        answer: 0
+      - id: java-refl-q2
+        type: mcq
+        prompt: Que fait field.setAccessible(true) ?
+        choices: ['Autorise l’accès à un membre privé par réflexion', 'Rend le champ public dans le code source', 'Rend le champ final', 'Supprime le champ']
+        answer: 0
+      - id: java-refl-code
+        type: code
+        title: toString générique
+        prompt: |
+          Écris `static String decrire(Object o)` qui produit `NomClasse{champ1=valeur1, champ2=valeur2}` en listant **par réflexion** tous les champs déclarés non statiques, triés par nom.
+
+          Le programme fourni l’applique à deux classes avec les données lues.
+        starter: |
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          public class Main {
+              static class Produit { private String nom; private double prix; private static int compteur = 0; Produit(String n, double p) { nom = n; prix = p; } }
+              static class Point { int y; int x; Point(int x, int y) { this.x = x; this.y = y; } }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  System.out.println(decrire(new Produit(sc.next(), sc.nextDouble())));
+                  System.out.println(decrire(new Point(sc.nextInt(), sc.nextInt())));
+              }
+          }
+        solution: |
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          public class Main {
+              static class Produit { private String nom; private double prix; private static int compteur = 0; Produit(String n, double p) { nom = n; prix = p; } }
+              static class Point { int y; int x; Point(int x, int y) { this.x = x; this.y = y; } }
+
+              static String decrire(Object o) throws IllegalAccessException {
+                  List<Field> champs = new ArrayList<>();
+                  for (Field f : o.getClass().getDeclaredFields()) if (!Modifier.isStatic(f.getModifiers())) champs.add(f);
+                  champs.sort(Comparator.comparing(Field::getName));
+                  StringJoiner j = new StringJoiner(", ", o.getClass().getSimpleName() + "{", "}");
+                  for (Field f : champs) { f.setAccessible(true); j.add(f.getName() + "=" + f.get(o)); }
+                  return j.toString();
+              }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  System.out.println(decrire(new Produit(sc.next(), sc.nextDouble())));
+                  System.out.println(decrire(new Point(sc.nextInt(), sc.nextInt())));
+              }
+          }
+        tests:
+          - { input: stylo 1.5 3 4, output: "Produit{nom=stylo, prix=1.5}\nPoint{x=3, y=4}" }
+          - { input: gomme 0.0 -1 0, output: "Produit{nom=gomme, prix=0.0}\nPoint{x=-1, y=0}", hidden: true }
+        require:
+          - { pattern: 'getDeclaredFields', message: Utiliser la réflexion }
+    project:
+      id: java-refl-projet
+      type: code
+      title: Conteneur d’injection de dépendances
+      difficulty: 3
+      prompt: |
+        Recrée le principe de Spring : un `Conteneur` qui, pour une classe demandée, choisit son **unique constructeur public**, résout récursivement chaque paramètre (en créant les dépendances une seule fois : singletons), détecte les cycles (`IllegalStateException("cycle : A -> B -> A")`) et affiche `création X` à chaque instanciation.
+
+        Les classes (fournies) : `Config()`, `Depot(Config)`, `Mailer(Config)`, `ServiceUtilisateur(Depot, Mailer)`, `Controleur(ServiceUtilisateur, Mailer)`, et un cycle `Oeuf(Poule)` / `Poule(Oeuf)`. L’entrée liste les noms de classes à obtenir ; affiche ensuite `ok NomClasse` ou `erreur : message`.
+      starter: |
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        public class Main {
+            public static class Config { public Config() {} }
+            public static class Depot { public Depot(Config c) {} }
+            public static class Mailer { public Mailer(Config c) {} }
+            public static class ServiceUtilisateur { public ServiceUtilisateur(Depot d, Mailer m) {} }
+            public static class Controleur { public Controleur(ServiceUtilisateur s, Mailer m) {} }
+            public static class Oeuf { public Oeuf(Poule p) {} }
+            public static class Poule { public Poule(Oeuf o) {} }
+
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNext()) {
+                    Class<?> c = Class.forName("Main$" + sc.next());
+                }
+            }
+        }
+      solution: |
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        public class Main {
+            public static class Config { public Config() {} }
+            public static class Depot { public Depot(Config c) {} }
+            public static class Mailer { public Mailer(Config c) {} }
+            public static class ServiceUtilisateur { public ServiceUtilisateur(Depot d, Mailer m) {} }
+            public static class Controleur { public Controleur(ServiceUtilisateur s, Mailer m) {} }
+            public static class Oeuf { public Oeuf(Poule p) {} }
+            public static class Poule { public Poule(Oeuf o) {} }
+
+            static class Conteneur {
+                private final Map<Class<?>, Object> singletons = new HashMap<>();
+                private final Deque<Class<?>> enCours = new ArrayDeque<>();
+
+                <T> T obtenir(Class<T> c) throws ReflectiveOperationException {
+                    if (singletons.containsKey(c)) return c.cast(singletons.get(c));
+                    if (enCours.contains(c)) {
+                        StringJoiner j = new StringJoiner(" -> ", "cycle : ", "");
+                        List<Class<?>> chemin = new ArrayList<>(enCours);
+                        Collections.reverse(chemin);
+                        for (int i = chemin.indexOf(c); i < chemin.size(); i++) j.add(chemin.get(i).getSimpleName());
+                        j.add(c.getSimpleName());
+                        throw new IllegalStateException(j.toString());
+                    }
+                    enCours.push(c);
+                    try {
+                        Constructor<?> k = c.getConstructors()[0];
+                        Object[] params = new Object[k.getParameterCount()];
+                        Class<?>[] types = k.getParameterTypes();
+                        for (int i = 0; i < params.length; i++) params[i] = obtenir(types[i]);
+                        Object o = k.newInstance(params);
+                        System.out.println("création " + c.getSimpleName());
+                        singletons.put(c, o);
+                        return c.cast(o);
+                    } finally {
+                        enCours.pop();
+                    }
+                }
+            }
+
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+                Conteneur ct = new Conteneur();
+                while (sc.hasNext()) {
+                    Class<?> c = Class.forName("Main$" + sc.next());
+                    try { ct.obtenir(c); System.out.println("ok " + c.getSimpleName()); }
+                    catch (IllegalStateException e) { System.out.println("erreur : " + e.getMessage()); }
+                }
+            }
+        }
+      tests:
+        - { input: Controleur Depot Oeuf, output: "création Config\ncréation Depot\ncréation Mailer\ncréation ServiceUtilisateur\ncréation Controleur\nok Controleur\nok Depot\nerreur : cycle : Oeuf -> Poule -> Oeuf" }
+        - { input: Mailer Mailer, output: "création Config\ncréation Mailer\nok Mailer\nok Mailer", hidden: true }
+      require:
+        - { pattern: 'getConstructors|getDeclaredConstructors', message: Utiliser la réflexion sur les constructeurs }
+    exam:
+      pass: 70
+      questions:
+        - id: java-refl-ex1
+          type: mcq
+          prompt: Comment obtenir l’objet Class d’une instance o ?
+          choices: ['o.getClass()', 'o.class', 'Class.of(o)', 'typeof(o)']
+          answer: 0
+        - id: java-refl-ex2
+          type: mcq
+          prompt: Quelle méthode appelle dynamiquement une méthode obtenue par réflexion ?
+          choices: ['method.invoke(objet, args…)', 'method.call()', 'method.run()', 'objet.invoke(method)']
+          answer: 0
+        - id: java-refl-ex3
+          type: mcq
+          prompt: L’ordre de getDeclaredMethods() est-il garanti ?
+          choices: ['Non', 'Oui, ordre du code source', 'Oui, ordre alphabétique', 'Oui, ordre de visibilité']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-annotations
+    title: Annotations
+    summary: Annotations standard, création d’annotations personnalisées, rétention, cibles, attributs et traitement par réflexion.
+    minutes: 30
+    concepts: [reflexion]
+    sections:
+      - title: Annotations standard et personnalisées
+        body: |
+          Annotations courantes : `@Override`, `@Deprecated`, `@SuppressWarnings("unchecked")`, `@FunctionalInterface`, `@SafeVarargs`.
+
+          ```java
+          @Retention(RetentionPolicy.RUNTIME)     // SOURCE, CLASS ou RUNTIME (lisible par réflexion)
+          @Target({ElementType.FIELD})            // où l’annotation est autorisée
+          @interface Longueur {
+              int min() default 0;
+              int max() default Integer.MAX_VALUE;
+              String message() default "longueur invalide";
+          }
+
+          class Utilisateur {
+              @Longueur(min = 3, max = 20) String pseudo;
+          }
+          ```
+
+          Attributs autorisés : primitifs, `String`, `Class`, enums, annotations et tableaux de ceux-ci. Un attribut nommé `value` peut être passé sans nom : `@Role("admin")`.
+      - title: Traiter les annotations
+        body: |
+          À l’exécution, par réflexion :
+
+          ```java
+          for (Field f : obj.getClass().getDeclaredFields()) {
+              Longueur l = f.getAnnotation(Longueur.class);
+              if (l != null) {
+                  f.setAccessible(true);
+                  String v = (String) f.get(obj);
+                  if (v.length() < l.min() || v.length() > l.max()) erreurs.add(f.getName() + " : " + l.message());
+              }
+          }
+          ```
+
+          À la compilation : les **annotation processors** génèrent du code (Lombok, MapStruct, Dagger) sans coût à l’exécution. C’est ainsi que fonctionnent Bean Validation (`@NotNull`, `@Size`), JPA (`@Entity`, `@Id`) ou Spring (`@Component`, `@GetMapping`).
+    exercises:
+      - id: java-ann-q1
+        type: mcq
+        prompt: Quelle rétention permet de lire une annotation par réflexion à l’exécution ?
+        choices: ['RetentionPolicy.RUNTIME', 'RetentionPolicy.SOURCE', 'RetentionPolicy.CLASS', 'Aucune n’est nécessaire']
+        answer: 0
+      - id: java-ann-q2
+        type: mcq
+        prompt: Que vérifie @Override ?
+        choices: ['Que la méthode redéfinit bien une méthode du parent', 'Que la méthode est publique', 'Que la méthode est rapide', 'Rien']
+        answer: 0
+      - id: java-ann-fill
+        type: fill
+        prompt: Complète la déclaration de l’annotation.
+        code: |
+          import java.lang.annotation.*;
+          @Retention(RetentionPolicy.RUNTIME)
+          @{{?}}(ElementType.METHOD)
+          @{{?}} Route {
+              String value();
+          }
+          public class Main {
+              @Route("/accueil") static void accueil() {}
+              public static void main(String[] args) throws Exception {
+                  System.out.println(Main.class.getDeclaredMethod("accueil").getAnnotation(Route.class).value());
+              }
+          }
+        blanks: [[Target], [interface]]
+        tests:
+          - { input: '', output: /accueil }
+      - id: java-ann-code
+        type: code
+        title: Validation déclarative
+        prompt: |
+          Crée les annotations `@NonVide` et `@Plage(min, max)` (RUNTIME, sur champs) et un validateur `List<String> valider(Object)` qui parcourt les champs (triés par nom) et renvoie les erreurs `champ : ne doit pas être vide` / `champ : doit être entre MIN et MAX`.
+
+          La classe `Inscription` (à annoter) a `pseudo` (`@NonVide`), `age` (`@Plage(min = 13, max = 120)`) et `email` (`@NonVide`). Chaque ligne d’entrée : `pseudo age email` (`_` représente une chaîne vide). Affiche `valide` ou les erreurs séparées par ` ; `.
+        starter: |
+          import java.lang.annotation.*;
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          public class Main {
+              static class Inscription {
+                  String pseudo;
+                  int age;
+                  String email;
+                  Inscription(String p, int a, String e) { pseudo = p; age = a; email = e; }
+              }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNext()) {
+                      String p = sc.next(); int a = sc.nextInt(); String e = sc.next();
+                      Inscription i = new Inscription(p.equals("_") ? "" : p, a, e.equals("_") ? "" : e);
+                  }
+              }
+          }
+        solution: |
+          import java.lang.annotation.*;
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.FIELD) @interface NonVide {}
+          @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.FIELD) @interface Plage { int min(); int max(); }
+
+          public class Main {
+              static class Inscription {
+                  @NonVide String pseudo;
+                  @Plage(min = 13, max = 120) int age;
+                  @NonVide String email;
+                  Inscription(String p, int a, String e) { pseudo = p; age = a; email = e; }
+              }
+
+              static List<String> valider(Object o) throws IllegalAccessException {
+                  List<String> erreurs = new ArrayList<>();
+                  Field[] champs = o.getClass().getDeclaredFields();
+                  Arrays.sort(champs, Comparator.comparing(Field::getName));
+                  for (Field f : champs) {
+                      f.setAccessible(true);
+                      if (f.isAnnotationPresent(NonVide.class)) {
+                          Object v = f.get(o);
+                          if (v == null || v.toString().isEmpty()) erreurs.add(f.getName() + " : ne doit pas être vide");
+                      }
+                      Plage p = f.getAnnotation(Plage.class);
+                      if (p != null) {
+                          int v = f.getInt(o);
+                          if (v < p.min() || v > p.max()) erreurs.add(f.getName() + " : doit être entre " + p.min() + " et " + p.max());
+                      }
+                  }
+                  return erreurs;
+              }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNext()) {
+                      String p = sc.next(); int a = sc.nextInt(); String e = sc.next();
+                      Inscription i = new Inscription(p.equals("_") ? "" : p, a, e.equals("_") ? "" : e);
+                      List<String> err = valider(i);
+                      System.out.println(err.isEmpty() ? "valide" : String.join(" ; ", err));
+                  }
+              }
+          }
+        tests:
+          - { input: "kiri 16 k@ex.fr\n_ 8 _", output: "valide\nage : doit être entre 13 et 120 ; email : ne doit pas être vide ; pseudo : ne doit pas être vide" }
+          - { input: a 200 b, output: 'age : doit être entre 13 et 120', hidden: true }
+        require:
+          - { pattern: '@interface', message: Déclarer des annotations }
+    project:
+      id: java-ann-projet
+      type: code
+      title: Routeur HTTP par annotations
+      difficulty: 3
+      prompt: |
+        Recrée le routage de Spring MVC : annotation `@Get("/chemin")` (RUNTIME, méthodes) dont le chemin peut contenir un paramètre `{nom}`. Une classe `Controleur` expose :
+
+        - `@Get("/")` → `Bienvenue sur Codemori`
+        - `@Get("/cours")` → `Cours : rust, cpp, java`
+        - `@Get("/cours/{id}")` → `Cours ID` (le paramètre est passé à la méthode en `String`)
+        - `@Get("/utilisateurs/{nom}")` → `Profil de NOM`
+
+        Ton routeur découvre les routes par réflexion. Pour chaque ligne `GET /chemin`, affiche `200 réponse` ou `404 Introuvable` (méthode autre que GET : `405 Méthode non autorisée`).
+      starter: |
+        import java.lang.annotation.*;
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.lang.annotation.*;
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.METHOD) @interface Get { String value(); }
+
+        class Controleur {
+            @Get("/") public String accueil() { return "Bienvenue sur Codemori"; }
+            @Get("/cours") public String cours() { return "Cours : rust, cpp, java"; }
+            @Get("/cours/{id}") public String unCours(String id) { return "Cours " + id; }
+            @Get("/utilisateurs/{nom}") public String profil(String nom) { return "Profil de " + nom; }
+        }
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+                Controleur ctrl = new Controleur();
+                Map<String, Method> routes = new HashMap<>();
+                for (Method m : Controleur.class.getDeclaredMethods()) {
+                    Get g = m.getAnnotation(Get.class);
+                    if (g != null) routes.put(g.value(), m);
+                }
+                while (sc.hasNext()) {
+                    String verbe = sc.next(), chemin = sc.next();
+                    if (!verbe.equals("GET")) { System.out.println("405 Méthode non autorisée"); continue; }
+                    String reponse = null;
+                    String[] seg = chemin.split("/", -1);
+                    for (var e : routes.entrySet()) {
+                        String[] motif = e.getKey().split("/", -1);
+                        if (motif.length != seg.length) continue;
+                        List<Object> params = new ArrayList<>();
+                        boolean ok = true;
+                        for (int i = 0; i < motif.length && ok; i++) {
+                            if (motif[i].startsWith("{")) { if (seg[i].isEmpty()) ok = false; else params.add(seg[i]); }
+                            else if (!motif[i].equals(seg[i])) ok = false;
+                        }
+                        if (ok) { reponse = (String) e.getValue().invoke(ctrl, params.toArray()); break; }
+                    }
+                    System.out.println(reponse == null ? "404 Introuvable" : "200 " + reponse);
+                }
+            }
+        }
+      tests:
+        - { input: "GET /\nGET /cours\nGET /cours/42\nGET /utilisateurs/kiri\nGET /inconnu\nPOST /cours", output: "200 Bienvenue sur Codemori\n200 Cours : rust, cpp, java\n200 Cours 42\n200 Profil de kiri\n404 Introuvable\n405 Méthode non autorisée" }
+        - { input: GET /cours/42/plus, output: 404 Introuvable, hidden: true }
+      require:
+        - { pattern: 'getAnnotation', message: Lire les annotations par réflexion }
+    exam:
+      pass: 70
+      questions:
+        - id: java-ann-ex1
+          type: mcq
+          prompt: Quel type ne peut PAS être un attribut d’annotation ?
+          choices: ['List<String>', 'String', 'int', 'Class<?>']
+          answer: 0
+        - id: java-ann-ex2
+          type: mcq
+          prompt: Comment fonctionne Lombok ?
+          choices: ['Par un processeur d’annotations à la compilation', 'Par réflexion à l’exécution', 'Par un agent JVM obligatoire', 'Par un plugin Maven uniquement']
+          answer: 0
+        - id: java-ann-ex3
+          type: mcq
+          prompt: Que contrôle @Target ?
+          choices: ['Les éléments sur lesquels l’annotation peut être placée', 'La durée de vie de l’annotation', 'La classe cible de la réflexion', 'La version de Java']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-jdbc
+    title: JDBC
+    summary: Accéder à une base de données relationnelle — Connection, PreparedStatement, ResultSet, transactions, injections SQL et pools.
+    minutes: 35
+    concepts: [base-de-donnees]
+    sections:
+      - title: Requêtes avec JDBC
+        body: |
+          ```java
+          String url = "jdbc:postgresql://localhost:5432/codemori";
+          try (Connection cx = DriverManager.getConnection(url, "user", "motdepasse");
+               PreparedStatement ps = cx.prepareStatement("SELECT id, nom FROM eleves WHERE niveau >= ?")) {
+              ps.setInt(1, 3);                              // paramètre lié (indice à partir de 1)
+              try (ResultSet rs = ps.executeQuery()) {
+                  while (rs.next()) System.out.println(rs.getLong("id") + " " + rs.getString("nom"));
+              }
+          }
+
+          int lignes = cx.prepareStatement("UPDATE …").executeUpdate();
+          ```
+
+          Le pilote (`org.postgresql:postgresql`, `com.h2database:h2`…) s’ajoute comme dépendance Maven/Gradle.
+      - title: Sécurité et transactions
+        body: |
+          **Injection SQL** : ne **jamais** concaténer une entrée utilisateur dans une requête.
+
+          ```java
+          // ❌ "SELECT * FROM comptes WHERE nom = '" + nom + "'"   → nom = "x' OR '1'='1"
+          // ✅ PreparedStatement avec ?
+          ```
+
+          **Transactions** :
+
+          ```java
+          cx.setAutoCommit(false);
+          try {
+              debiter.executeUpdate();
+              crediter.executeUpdate();
+              cx.commit();
+          } catch (SQLException e) {
+              cx.rollback();
+              throw e;
+          }
+          ```
+
+          En production : un **pool de connexions** (HikariCP), et souvent une couche au-dessus (JdbcTemplate, jOOQ, JPA/Hibernate).
+
+          > 💡 Le bac à sable n’a ni réseau ni base de données : les exercices simulent les mécanismes (liaison de paramètres, transactions) pour bien les comprendre.
+    exercises:
+      - id: java-jdbc-q1
+        type: mcq
+        prompt: Pourquoi utiliser PreparedStatement plutôt que concaténer des chaînes ?
+        choices: ['Pour empêcher les injections SQL (et réutiliser le plan de requête)', 'Parce que Statement est supprimé', 'Pour avoir des résultats triés', 'Pour fermer la connexion']
+        answer: 0
+      - id: java-jdbc-q2
+        type: mcq
+        prompt: Quel est l’indice du premier paramètre ? d’un PreparedStatement ?
+        choices: ['1', '0', '-1', 'Il se nomme :p1']
+        answer: 0
+      - id: java-jdbc-order
+        type: order
+        prompt: Remets dans l’ordre les étapes d’une requête JDBC.
+        lines:
+          - Ouvrir une Connection
+          - Préparer un PreparedStatement
+          - Lier les paramètres (setInt, setString…)
+          - Exécuter (executeQuery)
+          - Parcourir le ResultSet avec next()
+          - Fermer les ressources (try-with-resources)
+      - id: java-jdbc-code
+        type: code
+        title: Liaison de paramètres sécurisée
+        prompt: |
+          Simule ce que fait un pilote JDBC : première ligne, une requête contenant des `?`. Lignes suivantes : les valeurs à lier, chacune préfixée par son type (`int 42`, `str texte avec espaces`, `null`).
+
+          Produis la requête finale : les entiers tels quels, `NULL`, et les chaînes entre apostrophes avec chaque `'` doublé (`''`). Si le nombre de valeurs ne correspond pas au nombre de `?` (hors chaînes déjà entre apostrophes dans la requête), affiche `SQLException : N paramètres attendus, M fournis`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  String sql = sc.nextLine();
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  String sql = sc.nextLine();
+                  List<String> valeurs = new ArrayList<>();
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine();
+                      if (l.isEmpty()) continue;
+                      if (l.equals("null")) valeurs.add("NULL");
+                      else if (l.startsWith("int ")) valeurs.add(String.valueOf(Long.parseLong(l.substring(4).trim())));
+                      else valeurs.add("'" + l.substring(4).replace("'", "''") + "'");
+                  }
+                  StringBuilder sb = new StringBuilder();
+                  boolean dansChaine = false;
+                  int n = 0;
+                  List<Integer> positions = new ArrayList<>();
+                  for (char c : sql.toCharArray()) {
+                      if (c == '\'') dansChaine = !dansChaine;
+                      if (c == '?' && !dansChaine) { positions.add(sb.length()); n++; sb.append('\0'); }
+                      else sb.append(c);
+                  }
+                  if (n != valeurs.size()) { System.out.println("SQLException : " + n + " paramètres attendus, " + valeurs.size() + " fournis"); return; }
+                  StringBuilder res = new StringBuilder();
+                  int k = 0;
+                  for (int i = 0; i < sb.length(); i++) {
+                      if (sb.charAt(i) == '\0') res.append(valeurs.get(k++));
+                      else res.append(sb.charAt(i));
+                  }
+                  System.out.println(res);
+              }
+          }
+        tests:
+          - { input: "SELECT * FROM comptes WHERE nom = ? AND age > ? AND note = ?\nstr x' OR '1'='1\nint 18\nnull", output: "SELECT * FROM comptes WHERE nom = 'x'' OR ''1''=''1' AND age > 18 AND note = NULL" }
+          - { input: "INSERT INTO t VALUES (?, '?')\nint 1\nint 2", output: 'SQLException : 1 paramètres attendus, 2 fournis', hidden: true }
+          - { input: "UPDATE t SET a = ? WHERE b = 'ok?'\nstr l'été", output: "UPDATE t SET a = 'l''été' WHERE b = 'ok?'", hidden: true }
+    project:
+      id: java-jdbc-projet
+      type: code
+      title: Transactions en mémoire
+      difficulty: 3
+      prompt: |
+        Simule une base clé-valeur transactionnelle comme une connexion JDBC avec `setAutoCommit(false)`. Commandes : `set K V`, `get K` (affiche la valeur ou `NULL`), `delete K`, `begin`, `commit`, `rollback`. Les transactions peuvent être **imbriquées** (points de sauvegarde) : `rollback` annule uniquement la transaction la plus interne ; `commit` valide **toutes** les transactions ouvertes. `rollback` ou `commit` sans transaction : `aucune transaction`.
+
+        Termine par l’état final trié `K=V` séparé par des espaces (ou `vide`).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Map<String, String> donnees = new TreeMap<>();
+                Deque<Map<String, Optional<String>>> journal = new ArrayDeque<>();
+                while (sc.hasNext()) {
+                    String c = sc.next();
+                    switch (c) {
+                        case "set", "delete" -> {
+                            String k = sc.next();
+                            String v = c.equals("set") ? sc.next() : null;
+                            if (!journal.isEmpty()) journal.peek().putIfAbsent(k, Optional.ofNullable(donnees.get(k)));
+                            if (v == null) donnees.remove(k); else donnees.put(k, v);
+                        }
+                        case "get" -> System.out.println(donnees.getOrDefault(sc.next(), "NULL"));
+                        case "begin" -> journal.push(new HashMap<>());
+                        case "rollback" -> {
+                            if (journal.isEmpty()) { System.out.println("aucune transaction"); break; }
+                            journal.pop().forEach((k, ancien) -> {
+                                if (ancien.isPresent()) donnees.put(k, ancien.get()); else donnees.remove(k);
+                            });
+                        }
+                        default -> {
+                            if (journal.isEmpty()) System.out.println("aucune transaction");
+                            journal.clear();
+                        }
+                    }
+                }
+                StringJoiner j = new StringJoiner(" ");
+                donnees.forEach((k, v) -> j.add(k + "=" + v));
+                System.out.println(donnees.isEmpty() ? "vide" : j.toString());
+            }
+        }
+      tests:
+        - { input: "set a 10\nbegin\nset a 20\nbegin\nset b 5\ndelete a\nget a\nrollback\nget a\nget b\nrollback\nget a\nrollback", output: "NULL\n20\nNULL\n10\naucune transaction\na=10" }
+        - { input: "begin\nset x 1\nbegin\nset y 2\ncommit\nrollback\nget y", output: "aucune transaction\n2\nx=1 y=2", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-jdbc-ex1
+          type: mcq
+          prompt: Que faut-il appeler pour démarrer une transaction manuelle ?
+          choices: ['connection.setAutoCommit(false)', 'connection.begin()', 'statement.transaction()', 'DriverManager.start()']
+          answer: 0
+        - id: java-jdbc-ex2
+          type: mcq
+          prompt: Quelle bibliothèque est un pool de connexions très utilisé ?
+          choices: ['HikariCP', 'JUnit', 'Gson', 'SLF4J']
+          answer: 0
+        - id: java-jdbc-ex3
+          type: mcq
+          prompt: Que renvoie rs.next() ?
+          choices: ['true s’il reste une ligne (et avance le curseur)', 'La ligne suivante', 'Le nombre de lignes', 'Un Optional']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-performances
+    title: Gestion des performances
+    summary: Mesurer avant d’optimiser — JMH, profilage, complexité, StringBuilder, boxing, structures adaptées et allocations.
+    minutes: 30
+    concepts: [performance]
+    sections:
+      - title: Mesurer correctement
+        body: |
+          Le JIT, le GC et le préchauffage faussent les mesures naïves avec `System.nanoTime()`. Utilise **JMH** :
+
+          ```java
+          @Benchmark
+          @BenchmarkMode(Mode.AverageTime)
+          public long somme(Etat e) { return e.liste.stream().mapToLong(x -> x).sum(); }
+          ```
+
+          Profilage : **JFR** + JDK Mission Control, async-profiler (flame graphs), VisualVM. Cherche d’abord les **points chauds** : 90 % du temps est souvent passé dans 10 % du code.
+      - title: Pièges classiques
+        body: |
+          | Piège | Solution |
+          |---|---|
+          | `s += x` dans une boucle (O(n²)) | `StringBuilder` |
+          | `List<Integer>` pour des millions de valeurs (boxing) | `int[]`, `IntStream` |
+          | `list.contains` dans une boucle | `HashSet` |
+          | `LinkedList.get(i)` | `ArrayList` |
+          | regex recompilée à chaque appel | `Pattern` statique |
+          | exceptions pour le contrôle de flux | tests explicites |
+          | algorithme O(n²) | meilleur algorithme (tri, hachage, préfixes) |
+
+          Le gain le plus important vient presque toujours de l’**algorithme** et des **structures de données**, pas des micro-optimisations.
+    exercises:
+      - id: java-perf-q1
+        type: mcq
+        prompt: Pourquoi s += x dans une boucle est-il lent sur de grandes chaînes ?
+        choices: ['Chaque concaténation recopie toute la chaîne (O(n²))', 'Les String sont limitées', 'Le GC est désactivé', 'Ce n’est pas lent']
+        answer: 0
+      - id: java-perf-q2
+        type: mcq
+        prompt: Quel outil utiliser pour des micro-benchmarks fiables en Java ?
+        choices: ['JMH', 'System.currentTimeMillis seul', 'JUnit', 'javap']
+        answer: 0
+      - id: java-perf-q3
+        type: mcq
+        prompt: Quelle optimisation apporte généralement le plus grand gain ?
+        choices: ['Un meilleur algorithme ou une meilleure structure de données', 'Rendre les variables final', 'Supprimer les commentaires', 'Utiliser des noms courts']
+        answer: 0
+      - id: java-perf-code
+        type: code
+        title: Paires de somme cible
+        prompt: |
+          Première ligne : `n` et `cible`. Deuxième ligne : `n` entiers (n jusqu’à 200 000). Compte le nombre de paires d’indices `i < j` telles que `a[i] + a[j] == cible`.
+
+          Une double boucle O(n²) sera trop lente : utilise une `HashMap` des occurrences vues (O(n)). Lis l’entrée rapidement (`BufferedReader` + `StreamTokenizer` ou `split`).
+        starter: |
+          import java.io.*;
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) throws IOException {
+                  BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+              }
+          }
+        solution: |
+          import java.io.*;
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) throws IOException {
+                  StreamTokenizer st = new StreamTokenizer(new BufferedReader(new InputStreamReader(System.in)));
+                  st.nextToken(); int n = (int) st.nval;
+                  st.nextToken(); long cible = (long) st.nval;
+                  Map<Long, Integer> vus = new HashMap<>();
+                  long paires = 0;
+                  for (int i = 0; i < n; i++) {
+                      st.nextToken();
+                      long x = (long) st.nval;
+                      paires += vus.getOrDefault(cible - x, 0);
+                      vus.merge(x, 1, Integer::sum);
+                  }
+                  System.out.println(paires);
+              }
+          }
+        tests:
+          - { input: "6 7\n1 6 3 4 3 4", output: '5' }
+          - { input: "4 0\n0 0 0 0", output: '6', hidden: true }
+        concepts: [performance]
+    project:
+      id: java-perf-projet
+      type: code
+      title: Requêtes de sommes sur intervalles
+      difficulty: 3
+      prompt: |
+        Première ligne : `n q`. Deuxième : `n` entiers. Puis `q` requêtes `l r` (indices à partir de 1, inclus). Pour chaque requête affiche la somme de `a[l..r]`, puis à la fin `max : M` (la plus grande somme demandée).
+
+        Avec n et q jusqu’à 200 000, recalculer chaque somme serait O(n·q) : utilise des **sommes préfixes** (`long[]`) et une sortie bufferisée (`StringBuilder` ou `PrintWriter`).
+      starter: |
+        import java.io.*;
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws IOException {
+            }
+        }
+      solution: |
+        import java.io.*;
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws IOException {
+                StreamTokenizer st = new StreamTokenizer(new BufferedReader(new InputStreamReader(System.in)));
+                st.nextToken(); int n = (int) st.nval;
+                st.nextToken(); int q = (int) st.nval;
+                long[] pre = new long[n + 1];
+                for (int i = 1; i <= n; i++) { st.nextToken(); pre[i] = pre[i - 1] + (long) st.nval; }
+                StringBuilder sb = new StringBuilder();
+                long max = Long.MIN_VALUE;
+                for (int k = 0; k < q; k++) {
+                    st.nextToken(); int l = (int) st.nval;
+                    st.nextToken(); int r = (int) st.nval;
+                    long s = pre[r] - pre[l - 1];
+                    max = Math.max(max, s);
+                    sb.append(s).append('\n');
+                }
+                sb.append("max : ").append(max);
+                System.out.println(sb);
+            }
+        }
+      tests:
+        - { input: "5 3\n3 -1 4 1 5\n1 3\n2 5\n4 4", output: "6\n9\n1\nmax : 9" }
+        - { input: "1 1\n-7\n1 1", output: "-7\nmax : -7", hidden: true }
+      require:
+        - { pattern: 'long\s*\[\]', message: Utiliser un tableau de sommes préfixes }
+    exam:
+      pass: 70
+      questions:
+        - id: java-perf-ex1
+          type: mcq
+          prompt: Pourquoi préchauffer avant de mesurer une performance en Java ?
+          choices: ['Le JIT compile les méthodes chaudes après plusieurs exécutions', 'Le processeur doit chauffer', 'Le GC doit être désactivé', 'Ce n’est pas utile']
+          answer: 0
+        - id: java-perf-ex2
+          type: mcq
+          prompt: Quel est le coût caché de List<Integer> par rapport à int[] ?
+          choices: ['Le boxing (un objet par valeur) et la mémoire', 'Aucun', 'Les entiers sont limités à 16 bits', 'La liste est immuable']
+          answer: 0
+        - id: java-perf-ex3
+          type: mcq
+          prompt: Quel outil intégré au JDK permet de profiler en production avec un faible surcoût ?
+          choices: ['Java Flight Recorder (JFR)', 'javadoc', 'jshell', 'jar']
+          answer: 0
