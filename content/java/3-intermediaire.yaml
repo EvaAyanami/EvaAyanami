@@ -1,0 +1,2346 @@
+language: java
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: java-collections
+    title: Collections
+    summary: Le framework Collections — interfaces List, Set, Map, Queue, Deque, implémentations, collections immuables et utilitaires.
+    minutes: 25
+    concepts: [collections]
+    sections:
+      - title: Interfaces et implémentations
+        body: |
+          | Interface | Implémentations courantes | Particularité |
+          |---|---|---|
+          | `List<E>` | `ArrayList`, `LinkedList` | ordonnée, indices, doublons |
+          | `Set<E>` | `HashSet`, `LinkedHashSet`, `TreeSet` | sans doublon |
+          | `Map<K,V>` | `HashMap`, `LinkedHashMap`, `TreeMap` | clé → valeur |
+          | `Queue<E>` / `Deque<E>` | `ArrayDeque`, `PriorityQueue` | file, pile, priorité |
+
+          On déclare avec l’**interface** et on instancie avec l’implémentation : `List<String> noms = new ArrayList<>();` — on peut ainsi changer d’implémentation sans toucher au reste du code.
+      - title: Immuables et utilitaires
+        body: |
+          ```java
+          List<Integer> fixe = List.of(1, 2, 3);           // immuable (add → UnsupportedOperationException)
+          Map<String, Integer> m = Map.of("a", 1, "b", 2);
+          Set<String> s = Set.copyOf(liste);
+
+          Collections.sort(liste);
+          Collections.reverse(liste);
+          Collections.max(liste);
+          Collections.frequency(liste, "x");
+          Collections.unmodifiableList(liste);              // vue non modifiable
+
+          Deque<Integer> pile = new ArrayDeque<>();
+          pile.push(1); pile.pop();                         // pile (LIFO)
+          Queue<Integer> file = new ArrayDeque<>();
+          file.offer(1); file.poll();                       // file (FIFO)
+          PriorityQueue<Integer> tas = new PriorityQueue<>(); // plus petit en tête
+          ```
+
+          Java 21 ajoute les **SequencedCollection** : `getFirst()`, `getLast()`, `reversed()` sur les listes, deques et `LinkedHashSet`.
+    exercises:
+      - id: java-coll-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  Deque<Integer> pile = new ArrayDeque<>();
+                  Queue<Integer> file = new ArrayDeque<>();
+                  PriorityQueue<Integer> tas = new PriorityQueue<>(Comparator.reverseOrder());
+                  for (int x : new int[]{3, 1, 2}) { pile.push(x); file.offer(x); tas.offer(x); }
+                  System.out.println(pile.pop() + " " + file.poll() + " " + tas.poll() + " " + new TreeSet<>(List.of(5, 1, 5, 3)));
+              }
+          }
+        output: 2 3 3 [1, 3, 5]
+      - id: java-coll-q1
+        type: mcq
+        prompt: Que se passe-t-il avec List.of(1, 2).add(3) ?
+        choices: ['UnsupportedOperationException', 'La liste devient [1, 2, 3]', 'Erreur de compilation', 'Rien']
+        answer: 0
+      - id: java-coll-q2
+        type: mcq
+        prompt: Pourquoi déclarer `List<String> l = new ArrayList<>();` plutôt que `ArrayList<String> l` ?
+        choices: ['Pour dépendre de l’interface et pouvoir changer d’implémentation', 'C’est plus rapide', 'ArrayList est déprécié', 'Par obligation du compilateur']
+        answer: 0
+      - id: java-coll-code
+        type: code
+        title: Parenthèses équilibrées
+        prompt: Pour chaque ligne, affiche `ok` si les parenthèses `()`, crochets `[]` et accolades `{}` sont correctement équilibrées et imbriquées, `erreur` sinon. Utilise un `Deque<Character>` comme pile.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine();
+                  }
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static boolean equilibre(String s) {
+                  Deque<Character> pile = new ArrayDeque<>();
+                  for (char c : s.toCharArray()) {
+                      if ("([{".indexOf(c) >= 0) pile.push(c);
+                      else if (")]}".indexOf(c) >= 0) {
+                          if (pile.isEmpty()) return false;
+                          char o = pile.pop();
+                          if ("([{".indexOf(o) != ")]}".indexOf(c)) return false;
+                      }
+                  }
+                  return pile.isEmpty();
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) System.out.println(equilibre(sc.nextLine()) ? "ok" : "erreur");
+              }
+          }
+        tests:
+          - { input: "f(a[1]) { x }\n(]\n((", output: "ok\nerreur\nerreur" }
+          - { input: "\n{[()()]}\n)(", output: "ok\nok\nerreur", hidden: true }
+        require:
+          - { pattern: 'Deque', message: Utiliser un Deque comme pile }
+    project:
+      id: java-coll-projet
+      type: code
+      title: Guichet avec priorité
+      difficulty: 2
+      prompt: |
+        Deux files `ArrayDeque<String>` : prioritaire et normale. Commandes : `arrivee NOM`, `arrivee_prio NOM`, `appel` (`Guichet : NOM` en servant d’abord la file prioritaire, ou `Personne en attente`), `attente` (`En attente : P prioritaires, N normales`).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Deque<String> prio = new ArrayDeque<>(), normale = new ArrayDeque<>();
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "arrivee" -> normale.offer(sc.next());
+                        case "arrivee_prio" -> prio.offer(sc.next());
+                        case "appel" -> {
+                            String n = !prio.isEmpty() ? prio.poll() : normale.poll();
+                            System.out.println(n == null ? "Personne en attente" : "Guichet : " + n);
+                        }
+                        default -> System.out.println("En attente : " + prio.size() + " prioritaires, " + normale.size() + " normales");
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "arrivee Ada\narrivee Bob\narrivee_prio Zoe\nattente\nappel\nappel\nappel\nappel", output: "En attente : 1 prioritaires, 2 normales\nGuichet : Zoe\nGuichet : Ada\nGuichet : Bob\nPersonne en attente" }
+        - { input: appel, output: Personne en attente, hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-coll-ex1
+          type: mcq
+          prompt: Quelle implémentation de Set garde les éléments triés ?
+          choices: ['TreeSet', 'HashSet', 'LinkedHashSet', 'EnumSet']
+          answer: 0
+        - id: java-coll-ex2
+          type: mcq
+          prompt: Quelle classe recommander pour une pile ou une file ?
+          choices: ['ArrayDeque', 'Stack', 'Vector', 'LinkedList obligatoirement']
+          answer: 0
+        - id: java-coll-ex3
+          type: mcq
+          prompt: Que renvoie poll() sur une file vide ?
+          choices: ['null', 'Une exception', '0', 'Un Optional']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-arraylist
+    title: ArrayList
+    summary: Liste dynamique — ajout, accès, suppression, recherche, tri, removeIf, itérateurs et performances.
+    minutes: 25
+    concepts: [collections, vecteurs]
+    sections:
+      - title: Manipuler une ArrayList
+        body: |
+          ```java
+          List<String> l = new ArrayList<>();
+          l.add("b"); l.add("c");
+          l.add(0, "a");               // insertion à l’indice 0
+          l.get(1);                    // "b"
+          l.set(1, "B");
+          l.remove("c");               // par valeur
+          l.remove(0);                 // par indice
+          l.contains("B"); l.indexOf("B"); l.size(); l.isEmpty();
+          l.addAll(List.of("x", "y"));
+          l.removeIf(s -> s.startsWith("x"));
+          l.sort(Comparator.naturalOrder());
+          List<String> sous = l.subList(0, 1);   // vue
+          ```
+
+          ⚠️ `List<Integer>` : `l.remove(1)` supprime l’**indice** 1, `l.remove(Integer.valueOf(1))` supprime la **valeur** 1.
+      - title: Performances
+        body: |
+          `ArrayList` repose sur un tableau qui s’agrandit (≈ ×1,5) :
+
+          | Opération | Coût |
+          |---|---|
+          | `get(i)`, `set(i)` | O(1) |
+          | `add(x)` en fin | O(1) amorti |
+          | `add(0, x)`, `remove(0)` | O(n) (décalage) |
+          | `contains(x)` | O(n) |
+
+          `LinkedList` n’est presque jamais plus rapide en pratique (mauvaise localité mémoire). Pour des recherches fréquentes, utilise un `HashSet`.
+    exercises:
+      - id: java-al-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> l = new ArrayList<>(List.of(5, 1, 4, 1, 3));
+                  l.remove(1);
+                  l.remove(Integer.valueOf(1));
+                  l.add(0, 9);
+                  l.removeIf(x -> x % 2 == 0);
+                  System.out.println(l + " " + l.size() + " " + l.indexOf(3));
+              }
+          }
+        output: '[9, 5, 3] 3 2'
+      - id: java-al-q1
+        type: mcq
+        prompt: Quelle est la complexité de l.add(0, x) sur une ArrayList ?
+        choices: ['O(n)', 'O(1)', 'O(log n)', 'O(n²)']
+        answer: 0
+      - id: java-al-bug
+        type: bugfix
+        prompt: Ce programme lève une ConcurrentModificationException. Trouve la ligne fautive.
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> l = new ArrayList<>(List.of(1, 2, 3, 4));
+                  for (Integer x : l) {
+                      if (x % 2 == 0) l.remove(x);
+                  }
+                  System.out.println(l);
+              }
+          }
+        bugLines: [6]
+        choices:
+          - On modifie la liste pendant qu’on la parcourt avec un for-each ; il faut removeIf ou un Iterator
+          - remove n’accepte pas d’Integer
+          - La liste est immuable
+        answer: 0
+        solution: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> l = new ArrayList<>(List.of(1, 2, 3, 4));
+                  l.removeIf(x -> x % 2 == 0);
+                  System.out.println(l);
+              }
+          }
+        tests:
+          - { input: '', output: '[1, 3]' }
+      - id: java-al-code
+        type: code
+        title: Nettoyage de données
+        prompt: Lis des entiers. Supprime les négatifs (`removeIf`), supprime les doublons en conservant l’ordre de première apparition, puis affiche la taille et la liste.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<Integer> l = new ArrayList<>();
+                  while (sc.hasNextInt()) l.add(sc.nextInt());
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<Integer> l = new ArrayList<>();
+                  while (sc.hasNextInt()) l.add(sc.nextInt());
+                  l.removeIf(x -> x < 0);
+                  List<Integer> r = new ArrayList<>(new LinkedHashSet<>(l));
+                  System.out.println(r.size());
+                  System.out.println(r);
+              }
+          }
+        tests:
+          - { input: 5 -1 3 5 0 -7 3 9, output: "4\n[5, 3, 0, 9]" }
+          - { input: -1 -2, output: "0\n[]", hidden: true }
+        require:
+          - { pattern: 'removeIf', message: Utiliser removeIf }
+    project:
+      id: java-al-projet
+      type: code
+      title: Bulletin de notes
+      difficulty: 2
+      prompt: |
+        Lis des notes (0–20) dans une `ArrayList<Integer>`. Affiche `Moyenne : X.XX`, `Min : …`, `Max : …`, `Au-dessus de la moyenne : K`, puis `Notes triées : …` (Locale.US pour la moyenne). Il y a au moins une note.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<Integer> notes = new ArrayList<>();
+                while (sc.hasNextInt()) notes.add(sc.nextInt());
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<Integer> notes = new ArrayList<>();
+                while (sc.hasNextInt()) notes.add(sc.nextInt());
+                double somme = 0;
+                for (int n : notes) somme += n;
+                double moyenne = somme / notes.size();
+                int dessus = 0;
+                for (int n : notes) if (n > moyenne) dessus++;
+                System.out.println(String.format(Locale.US, "Moyenne : %.2f", moyenne));
+                System.out.println("Min : " + Collections.min(notes));
+                System.out.println("Max : " + Collections.max(notes));
+                System.out.println("Au-dessus de la moyenne : " + dessus);
+                Collections.sort(notes);
+                StringBuilder sb = new StringBuilder("Notes triées :");
+                for (int n : notes) sb.append(' ').append(n);
+                System.out.println(sb);
+            }
+        }
+      tests:
+        - { input: 12 8 15 10 20, output: "Moyenne : 13.00\nMin : 8\nMax : 20\nAu-dessus de la moyenne : 2\nNotes triées : 8 10 12 15 20" }
+        - { input: '7', output: "Moyenne : 7.00\nMin : 7\nMax : 7\nAu-dessus de la moyenne : 0\nNotes triées : 7", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-al-ex1
+          type: mcq
+          prompt: Sur une List<Integer>, que supprime l.remove(1) ?
+          choices: ['L’élément d’indice 1', 'La valeur 1', 'Le premier élément', 'Tous les 1']
+          answer: 0
+        - id: java-al-ex2
+          type: mcq
+          prompt: Que renvoie subList(0, 2) ?
+          choices: ['Une vue sur la liste d’origine', 'Une copie indépendante', 'Un tableau', 'Un Set']
+          answer: 0
+        - id: java-al-ex3
+          type: mcq
+          prompt: Quelle opération est en O(1) sur une ArrayList ?
+          choices: ['get(i)', 'contains(x)', 'remove(0)', 'add(0, x)']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-hashmap
+    title: HashMap
+    summary: Associer des clés à des valeurs — put, get, getOrDefault, merge, computeIfAbsent, parcours et ordre des clés.
+    minutes: 30
+    concepts: [hashmap, collections]
+    sections:
+      - title: Les bases
+        body: |
+          ```java
+          Map<String, Integer> ages = new HashMap<>();
+          ages.put("Ada", 36);
+          ages.put("Bob", 25);
+          ages.get("Ada");                    // 36
+          ages.get("Zoe");                    // null !
+          ages.getOrDefault("Zoe", 0);        // 0
+          ages.containsKey("Bob");
+          ages.remove("Bob");
+          ages.putIfAbsent("Kiri", 16);
+
+          for (Map.Entry<String, Integer> e : ages.entrySet()) {
+              System.out.println(e.getKey() + " → " + e.getValue());
+          }
+          ages.forEach((k, v) -> System.out.println(k + " " + v));
+          ```
+
+          L’ordre de parcours d’un `HashMap` n’est **pas garanti** : `LinkedHashMap` conserve l’ordre d’insertion, `TreeMap` trie les clés.
+      - title: Compter et regrouper
+        body: |
+          ```java
+          Map<String, Integer> freq = new HashMap<>();
+          for (String mot : mots) freq.merge(mot, 1, Integer::sum);       // compteur
+
+          Map<Integer, List<String>> parLongueur = new TreeMap<>();
+          for (String mot : mots) parLongueur.computeIfAbsent(mot.length(), k -> new ArrayList<>()).add(mot);
+          ```
+
+          Les clés doivent avoir un `equals`/`hashCode` cohérents (les `String`, `Integer` et records le font). Ne jamais modifier une clé après l’avoir insérée.
+    exercises:
+      - id: java-hm-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  Map<Character, Integer> m = new TreeMap<>();
+                  for (char c : "abracadabra".toCharArray()) m.merge(c, 1, Integer::sum);
+                  System.out.println(m + " " + m.getOrDefault('z', 0) + " " + m.get('z'));
+              }
+          }
+        output: '{a=5, b=2, c=1, d=1, r=2} 0 null'
+        concepts: [hashmap]
+      - id: java-hm-q1
+        type: mcq
+        prompt: Que renvoie map.get(cle) si la clé est absente ?
+        choices: ['null', 'Une exception', '0', 'Optional.empty()']
+        answer: 0
+      - id: java-hm-fill
+        type: fill
+        prompt: Complète le regroupement des mots par première lettre.
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  Map<Character, List<String>> g = new TreeMap<>();
+                  for (String m : List.of("ane", "bob", "avion"))
+                      g.{{?}}(m.charAt(0), k -> new ArrayList<>()).add(m);
+                  System.out.println(g);
+              }
+          }
+        blanks: [[computeIfAbsent]]
+        tests:
+          - { input: '', output: '{a=[ane, avion], b=[bob]}' }
+      - id: java-hm-code
+        type: code
+        title: Mots les plus fréquents
+        prompt: 'Lis un texte, compte les mots (en minuscules) et affiche les 3 plus fréquents (`mot : n`) par fréquence décroissante puis ordre alphabétique.'
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Map<String, Integer> freq = new HashMap<>();
+                  while (sc.hasNext()) freq.merge(sc.next().toLowerCase(), 1, Integer::sum);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Map<String, Integer> freq = new HashMap<>();
+                  while (sc.hasNext()) freq.merge(sc.next().toLowerCase(), 1, Integer::sum);
+                  List<Map.Entry<String, Integer>> l = new ArrayList<>(freq.entrySet());
+                  l.sort(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()));
+                  for (int i = 0; i < Math.min(3, l.size()); i++) System.out.println(l.get(i).getKey() + " : " + l.get(i).getValue());
+              }
+          }
+        tests:
+          - { input: le chat voit le chien et le chat fuit, output: "le : 3\nchat : 2\nchien : 1" }
+          - { input: B a b A c, output: "a : 2\nb : 2\nc : 1", hidden: true }
+    project:
+      id: java-hm-projet
+      type: code
+      title: Index de livre
+      difficulty: 3
+      prompt: 'Chaque ligne est une page (numérotée à partir de 1). Construis un index des mots d’au moins 4 lettres (en minuscules) vers l’ensemble trié des pages. Affiche les mots triés `mot : p1, p2, …` (`TreeMap<String, TreeSet<Integer>>`).'
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Map<String, TreeSet<Integer>> index = new TreeMap<>();
+                int page = 0;
+                while (sc.hasNextLine()) {
+                    page++;
+                    for (String m : sc.nextLine().toLowerCase().split("\\s+")) {
+                        if (m.length() >= 4) index.computeIfAbsent(m, k -> new TreeSet<>()).add(page);
+                    }
+                }
+                index.forEach((m, pages) -> {
+                    StringJoiner j = new StringJoiner(", ");
+                    for (int p : pages) j.add(String.valueOf(p));
+                    System.out.println(m + " : " + j);
+                });
+            }
+        }
+      tests:
+        - { input: "Java est rapide\nJava est sûr\nle code Java compile", output: "code : 3\ncompile : 3\njava : 1, 2, 3\nrapide : 1" }
+        - { input: "Data data DATA\nnope\nData", output: "data : 1, 3\nnope : 2", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-hm-ex1
+          type: mcq
+          prompt: Quelle Map conserve l’ordre d’insertion ?
+          choices: ['LinkedHashMap', 'HashMap', 'TreeMap', 'Hashtable']
+          answer: 0
+        - id: java-hm-ex2
+          type: mcq
+          prompt: Que fait map.merge(k, 1, Integer::sum) ?
+          choices: ['Insère 1 si k est absent, sinon ajoute 1 à la valeur', 'Remplace toujours par 1', 'Supprime k', 'Fusionne deux maps']
+          answer: 0
+        - id: java-hm-ex3
+          type: mcq
+          prompt: Que faut-il pour qu’une classe soit une bonne clé de HashMap ?
+          choices: ['equals et hashCode cohérents (et clé non modifiée)', 'Implémenter Comparable', 'Être sérialisable', 'Être final']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-hashset
+    title: HashSet
+    summary: Ensembles sans doublons — ajout, test d’appartenance, opérations ensemblistes, LinkedHashSet, TreeSet et hashCode.
+    minutes: 20
+    concepts: [collections]
+    sections:
+      - title: Ensembles
+        body: |
+          ```java
+          Set<String> vus = new HashSet<>();
+          boolean nouveau = vus.add("kiri");     // false si déjà présent
+          vus.contains("kiri");                   // O(1) en moyenne
+          vus.remove("kiri");
+
+          Set<Integer> a = new TreeSet<>(List.of(1, 2, 3)), b = Set.of(2, 3, 4);
+          Set<Integer> inter = new TreeSet<>(a); inter.retainAll(b);   // {2, 3}
+          Set<Integer> union = new TreeSet<>(a); union.addAll(b);      // {1, 2, 3, 4}
+          Set<Integer> diff = new TreeSet<>(a); diff.removeAll(b);     // {1}
+          ```
+
+          `HashSet` (aucun ordre), `LinkedHashSet` (ordre d’insertion), `TreeSet` (trié, avec `first()`, `ceiling(x)`, `headSet(x)`…).
+      - title: equals et hashCode
+        body: |
+          Un `HashSet` range les objets selon leur `hashCode`, puis compare avec `equals`. Si une classe redéfinit `equals` sans `hashCode`, deux objets « égaux » peuvent tous deux entrer dans l’ensemble !
+
+          Contrat : `a.equals(b)` ⇒ `a.hashCode() == b.hashCode()`. Les **records** respectent ce contrat automatiquement :
+
+          ```java
+          record Point(int x, int y) {}
+          Set<Point> s = new HashSet<>();
+          s.add(new Point(1, 2));
+          s.contains(new Point(1, 2));   // true
+          ```
+    exercises:
+      - id: java-hs-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              record P(int x) {}
+              static class Q { int x; Q(int x) { this.x = x; } }
+              public static void main(String[] args) {
+                  Set<P> a = new HashSet<>(List.of(new P(1), new P(1)));
+                  Set<Q> b = new HashSet<>(List.of(new Q(1), new Q(1)));
+                  TreeSet<Integer> t = new TreeSet<>(List.of(10, 5, 20));
+                  System.out.println(a.size() + " " + b.size() + " " + t.ceiling(6) + " " + t.first());
+              }
+          }
+        output: 1 2 10 5
+      - id: java-hs-q1
+        type: mcq
+        prompt: Que renvoie set.add(x) si x est déjà présent ?
+        choices: ['false', 'true', 'Une exception', 'null']
+        answer: 0
+      - id: java-hs-q2
+        type: mcq
+        prompt: Quelle opération calcule l’intersection de deux ensembles (en modifiant le premier) ?
+        choices: ['retainAll', 'addAll', 'removeAll', 'containsAll']
+        answer: 0
+      - id: java-hs-code
+        type: code
+        title: Élèves communs
+        prompt: 'Deux lignes : les élèves du club A puis du club B. Affiche les élèves des deux clubs (triés), ceux seulement dans A (triés), et le nombre total d’élèves distincts. Liste vide : `-`.'
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static TreeSet<String> lire(String l) {
+                  TreeSet<String> s = new TreeSet<>();
+                  for (String m : l.trim().split("\\s+")) if (!m.isEmpty()) s.add(m);
+                  return s;
+              }
+              static String afficher(Set<String> s) { return s.isEmpty() ? "-" : String.join(" ", s); }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  TreeSet<String> a = lire(sc.nextLine()), b = lire(sc.nextLine());
+                  TreeSet<String> inter = new TreeSet<>(a); inter.retainAll(b);
+                  TreeSet<String> diff = new TreeSet<>(a); diff.removeAll(b);
+                  TreeSet<String> uni = new TreeSet<>(a); uni.addAll(b);
+                  System.out.println(afficher(inter));
+                  System.out.println(afficher(diff));
+                  System.out.println(uni.size());
+              }
+          }
+        tests:
+          - { input: "Zoe Ada Bob\nBob Kiri Ada", output: "Ada Bob\nZoe\n4" }
+          - { input: "X\nY", output: "-\nX\n2", hidden: true }
+    project:
+      id: java-hs-projet
+      type: code
+      title: Détecteur de doublons
+      difficulty: 2
+      prompt: 'Pour chaque identifiant lu, affiche `nouveau` ou `doublon` (avec un `HashSet`). Puis `uniques : N` et les identifiants uniques triés par longueur puis ordre alphabétique (un `TreeSet` avec Comparator).'
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Set<String> vus = new HashSet<>();
+                Set<String> tries = new TreeSet<>(Comparator.comparingInt(String::length).thenComparing(Comparator.naturalOrder()));
+                while (sc.hasNext()) {
+                    String id = sc.next();
+                    System.out.println(vus.add(id) ? "nouveau" : "doublon");
+                    tries.add(id);
+                }
+                System.out.println("uniques : " + vus.size());
+                System.out.println(String.join(" ", tries));
+            }
+        }
+      tests:
+        - { input: abc de abc fgh de z, output: "nouveau\nnouveau\ndoublon\nnouveau\ndoublon\nnouveau\nuniques : 4\nz de abc fgh" }
+        - { input: x, output: "nouveau\nuniques : 1\nx", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-hs-ex1
+          type: mcq
+          prompt: Quel contrat lie equals et hashCode ?
+          choices: ['Si a.equals(b), alors a.hashCode() == b.hashCode()', 'hashCode doit être unique', 'equals doit appeler hashCode', 'Aucun']
+          answer: 0
+        - id: java-hs-ex2
+          type: mcq
+          prompt: Quel Set conserve l’ordre d’insertion ?
+          choices: ['LinkedHashSet', 'HashSet', 'TreeSet', 'EnumSet']
+          answer: 0
+        - id: java-hs-ex3
+          type: mcq
+          prompt: Complexité moyenne de contains sur un HashSet ?
+          choices: ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-generics
+    title: Generics
+    summary: Classes et méthodes génériques, bornes extends, jokers ? extends / ? super (PECS) et effacement de type.
+    minutes: 30
+    concepts: [generiques]
+    sections:
+      - title: Classes et méthodes génériques
+        body: |
+          ```java
+          class Boite<T> {
+              private T contenu;
+              void mettre(T x) { contenu = x; }
+              T prendre() { return contenu; }
+          }
+          Boite<String> b = new Boite<>();   // <> : type déduit (diamant)
+
+          static <T extends Comparable<T>> T max(List<T> l) {   // borne
+              T m = l.get(0);
+              for (T x : l) if (x.compareTo(m) > 0) m = x;
+              return m;
+          }
+
+          record Paire<A, B>(A premier, B second) {}
+          ```
+
+          Les génériques donnent la **sûreté de type à la compilation** : plus de casts ni de `ClassCastException`.
+      - title: Jokers et effacement
+        body: |
+          `List<Integer>` n’est **pas** un sous-type de `List<Number>`. Les jokers assouplissent cela :
+
+          ```java
+          static double somme(List<? extends Number> l) { … }   // lecture : « producteur »
+          static void remplir(List<? super Integer> l) { l.add(1); } // écriture : « consommateur »
+          ```
+
+          Règle **PECS** : *Producer Extends, Consumer Super*.
+
+          **Effacement de type** : les génériques n’existent qu’à la compilation ; à l’exécution, `List<String>` et `List<Integer>` sont toutes deux de simples `List`. Conséquences : pas de `new T()`, pas de `T[]`, pas de génériques de primitifs (`List<int>` interdit → `List<Integer>`).
+    exercises:
+      - id: java-gen-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              record Paire<A, B>(A a, B b) { Paire<B, A> inverser() { return new Paire<>(b, a); } }
+              static <T extends Comparable<T>> T max(List<T> l) { T m = l.get(0); for (T x : l) if (x.compareTo(m) > 0) m = x; return m; }
+              static double somme(List<? extends Number> l) { double s = 0; for (Number n : l) s += n.doubleValue(); return s; }
+              public static void main(String[] args) {
+                  System.out.println(new Paire<>(1, "un").inverser() + " " + max(List.of("kiwi", "pomme", "abricot")) + " " + somme(List.of(1, 2.5)));
+              }
+          }
+        output: Paire[a=un, b=1] pomme 3.5
+        concepts: [generiques]
+      - id: java-gen-q1
+        type: mcq
+        prompt: Que signifie la règle PECS ?
+        choices: ['Producer Extends, Consumer Super', 'Public Extends, Class Super', 'Pas d’Extends Sans Super', 'Une convention de nommage']
+        answer: 0
+      - id: java-gen-q2
+        type: mcq
+        prompt: Pourquoi ne peut-on pas écrire List<int> ?
+        choices: ['Les génériques ne fonctionnent qu’avec des types référence (effacement de type)', 'int est déprécié', 'Par erreur du compilateur', 'On peut']
+        answer: 0
+      - id: java-gen-code
+        type: code
+        title: Pile générique
+        prompt: |
+          Implémente `class Pile<T>` (sur une `ArrayList<T>`) avec `empiler`, `T depiler()` (lève `IllegalStateException("pile vide")`), `Optional<T> sommet()`, `int taille()`.
+
+          Le programme (fourni) l’utilise avec des `String` et des `Integer`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Pile<String> mots = new Pile<>();
+                  Pile<Integer> longueurs = new Pile<>();
+                  while (sc.hasNext()) {
+                      String m = sc.next();
+                      if (m.equals("-")) {
+                          try { System.out.println("dépilé " + mots.depiler()); longueurs.depiler(); }
+                          catch (IllegalStateException e) { System.out.println(e.getMessage()); }
+                      } else { mots.empiler(m); longueurs.empiler(m.length()); }
+                  }
+                  System.out.println(mots.taille() + " " + mots.sommet() + " " + longueurs.sommet());
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          class Pile<T> {
+              private final List<T> elements = new ArrayList<>();
+              void empiler(T x) { elements.add(x); }
+              T depiler() {
+                  if (elements.isEmpty()) throw new IllegalStateException("pile vide");
+                  return elements.remove(elements.size() - 1);
+              }
+              Optional<T> sommet() { return elements.isEmpty() ? Optional.empty() : Optional.of(elements.get(elements.size() - 1)); }
+              int taille() { return elements.size(); }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Pile<String> mots = new Pile<>();
+                  Pile<Integer> longueurs = new Pile<>();
+                  while (sc.hasNext()) {
+                      String m = sc.next();
+                      if (m.equals("-")) {
+                          try { System.out.println("dépilé " + mots.depiler()); longueurs.depiler(); }
+                          catch (IllegalStateException e) { System.out.println(e.getMessage()); }
+                      } else { mots.empiler(m); longueurs.empiler(m.length()); }
+                  }
+                  System.out.println(mots.taille() + " " + mots.sommet() + " " + longueurs.sommet());
+              }
+          }
+        tests:
+          - { input: un deux - trois, output: "dépilé deux\n2 Optional[trois] Optional[5]" }
+          - { input: '-', output: "pile vide\n0 Optional.empty Optional.empty", hidden: true }
+        concepts: [generiques]
+    project:
+      id: java-gen-projet
+      type: code
+      title: Cache LRU générique
+      difficulty: 3
+      prompt: |
+        Implémente `class CacheLRU<K, V>` de capacité fixe (en t’appuyant sur `LinkedHashMap` avec `accessOrder = true` et `removeEldestEntry`). Méthodes : `Optional<V> get(K)`, `void put(K, V)`, `List<K> cles()` (de la moins récemment utilisée à la plus récente).
+
+        Première ligne : capacité. Commandes : `put k v`, `get k` (affiche la valeur ou `absent`), `etat` (affiche les clés).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        class CacheLRU<K, V> {
+            private final LinkedHashMap<K, V> m;
+            CacheLRU(int capacite) {
+                m = new LinkedHashMap<>(16, 0.75f, true) {
+                    @Override protected boolean removeEldestEntry(Map.Entry<K, V> e) { return size() > capacite; }
+                };
+            }
+            Optional<V> get(K k) { return Optional.ofNullable(m.get(k)); }
+            void put(K k, V v) { m.put(k, v); }
+            List<K> cles() { return new ArrayList<>(m.keySet()); }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                CacheLRU<String, String> c = new CacheLRU<>(sc.nextInt());
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "put" -> c.put(sc.next(), sc.next());
+                        case "get" -> System.out.println(c.get(sc.next()).orElse("absent"));
+                        default -> System.out.println(c.cles());
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "2\nput a 1\nput b 2\nget a\nput c 3\nget b\netat", output: "1\nabsent\n[a, c]" }
+        - { input: "1\nget x\nput x 9\nput y 8\netat", output: "absent\n[y]", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-gen-ex1
+          type: mcq
+          prompt: List<Integer> est-il un sous-type de List<Number> ?
+          choices: ['Non', 'Oui', 'Seulement en Java 21', 'Seulement si la liste est vide']
+          answer: 0
+        - id: java-gen-ex2
+          type: mcq
+          prompt: Quel joker utiliser pour une méthode qui lit des nombres d’une liste ?
+          choices: ['List<? extends Number>', 'List<? super Number>', 'List<Number>', 'List<?>']
+          answer: 0
+        - id: java-gen-ex3
+          type: mcq
+          prompt: Qu’est-ce que l’effacement de type ?
+          choices: ['Les informations de type générique sont supprimées à la compilation', 'La suppression des variables inutilisées', 'Une optimisation du GC', 'Le cast automatique']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-exceptions
+    title: Exceptions
+    summary: try/catch/finally, exceptions vérifiées et non vérifiées, throw et throws, exceptions personnalisées et try-with-resources.
+    minutes: 30
+    concepts: [erreurs]
+    sections:
+      - title: Lever et attraper
+        body: |
+          ```java
+          static int diviser(int a, int b) {
+              if (b == 0) throw new ArithmeticException("division par zéro");
+              return a / b;
+          }
+
+          try {
+              int r = diviser(1, 0);
+          } catch (ArithmeticException | NumberFormatException e) {   // multi-catch
+              System.out.println("Erreur : " + e.getMessage());
+          } finally {
+              System.out.println("toujours exécuté");
+          }
+          ```
+
+          Hiérarchie : `Throwable` → `Error` (graves, ne pas attraper : `OutOfMemoryError`) et `Exception` → `RuntimeException` (**non vérifiées** : `NullPointerException`, `IllegalArgumentException`, `IndexOutOfBoundsException`) et les autres (**vérifiées** : `IOException`, `SQLException`).
+      - title: Vérifiées, personnalisées, ressources
+        body: |
+          Une exception **vérifiée** doit être attrapée ou déclarée avec `throws` :
+
+          ```java
+          static String lire(Path p) throws IOException { return Files.readString(p); }
+
+          class SoldeInsuffisantException extends Exception {
+              private final long manque;
+              SoldeInsuffisantException(long manque) { super("solde insuffisant"); this.manque = manque; }
+              long getManque() { return manque; }
+          }
+
+          try (BufferedReader r = Files.newBufferedReader(p)) {   // fermé automatiquement
+              return r.readLine();
+          }
+          ```
+
+          Bonnes pratiques : ne jamais avaler une exception (`catch (Exception e) {}`), attraper au bon niveau, conserver la cause (`new MonException("…", e)`), utiliser les exceptions pour les cas exceptionnels.
+    exercises:
+      - id: java-exc-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              static int f(String s) {
+                  try {
+                      return Integer.parseInt(s) * 2;
+                  } catch (NumberFormatException e) {
+                      return -1;
+                  } finally {
+                      System.out.print("[f] ");
+                  }
+              }
+              public static void main(String[] args) {
+                  System.out.println(f("21") + " " + f("x"));
+              }
+          }
+        output: '[f] [f] 42 -1'
+        explanation: Le bloc finally s’exécute avant que la valeur de retour soit utilisée par l’appelant.
+      - id: java-exc-q1
+        type: mcq
+        prompt: Laquelle est une exception vérifiée (checked) ?
+        choices: ['IOException', 'NullPointerException', 'IllegalArgumentException', 'ArithmeticException']
+        answer: 0
+      - id: java-exc-fill
+        type: fill
+        prompt: Complète la déclaration de l’exception vérifiée.
+        code: |
+          import java.io.IOException;
+          public class Main {
+              static void verifier(int x) {{?}} IOException {
+                  if (x < 0) {{?}} new IOException("négatif");
+              }
+              public static void main(String[] args) {
+                  try { verifier(-1); } catch (IOException e) { System.out.println(e.getMessage()); }
+              }
+          }
+        blanks: [[throws], [throw]]
+        tests:
+          - { input: '', output: négatif }
+      - id: java-exc-code
+        type: code
+        title: Conversion robuste
+        prompt: 'Pour chaque mot lu, convertis-le en int et affiche son double (en long), `invalide : mot` ou `trop grand : mot` (un nombre valide hors des bornes d’int : distingue-le avec une regex `-?\d+`).'
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNext()) {
+                      String mot = sc.next();
+                  }
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNext()) {
+                      String mot = sc.next();
+                      try {
+                          System.out.println(2L * Integer.parseInt(mot));
+                      } catch (NumberFormatException e) {
+                          System.out.println((mot.matches("-?\\d+") ? "trop grand : " : "invalide : ") + mot);
+                      }
+                  }
+              }
+          }
+        tests:
+          - { input: 21 abc 99999999999 12abc -4, output: "42\ninvalide : abc\ntrop grand : 99999999999\ninvalide : 12abc\n-8" }
+          - { input: '0', output: '0', hidden: true }
+        concepts: [erreurs]
+    project:
+      id: java-exc-projet
+      type: code
+      title: Banque avec exceptions
+      difficulty: 3
+      prompt: |
+        Crée `SoldeInsuffisantException extends Exception` (stocke le manque) et une classe `Compte` dont `retirer` lève cette exception et `deposer` lève `IllegalArgumentException` pour un montant ≤ 0.
+
+        Commandes `depot X` / `retrait X`. Affiche le solde après chaque opération réussie, `erreur : montant invalide` ou `erreur : solde insuffisant (manque M)`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        class SoldeInsuffisantException extends Exception {
+            private final long manque;
+            SoldeInsuffisantException(long manque) { super("solde insuffisant"); this.manque = manque; }
+            long getManque() { return manque; }
+        }
+
+        class Compte {
+            private long solde;
+            void deposer(long m) {
+                if (m <= 0) throw new IllegalArgumentException("montant invalide");
+                solde += m;
+            }
+            void retirer(long m) throws SoldeInsuffisantException {
+                if (m <= 0) throw new IllegalArgumentException("montant invalide");
+                if (m > solde) throw new SoldeInsuffisantException(m - solde);
+                solde -= m;
+            }
+            long getSolde() { return solde; }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Compte c = new Compte();
+                while (sc.hasNext()) {
+                    String op = sc.next();
+                    long x = sc.nextLong();
+                    try {
+                        if (op.equals("depot")) c.deposer(x); else c.retirer(x);
+                        System.out.println(c.getSolde());
+                    } catch (SoldeInsuffisantException e) {
+                        System.out.println("erreur : " + e.getMessage() + " (manque " + e.getManque() + ")");
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("erreur : " + e.getMessage());
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "depot 100\nretrait 30\nretrait 100\ndepot -5", output: "100\n70\nerreur : solde insuffisant (manque 30)\nerreur : montant invalide" }
+        - { input: retrait 1, output: 'erreur : solde insuffisant (manque 1)', hidden: true }
+      require:
+        - { pattern: 'extends\s+Exception', message: Créer une exception vérifiée }
+    exam:
+      pass: 70
+      questions:
+        - id: java-exc-ex1
+          type: mcq
+          prompt: Quand le bloc finally s’exécute-t-il ?
+          choices: ['Toujours, qu’une exception soit levée ou non', 'Seulement en cas d’exception', 'Seulement sans exception', 'Jamais avec return']
+          answer: 0
+        - id: java-exc-ex2
+          type: mcq
+          prompt: Que garantit try-with-resources ?
+          choices: ['La fermeture automatique des ressources AutoCloseable', 'L’absence d’exception', 'La relance automatique', 'Un traitement parallèle']
+          answer: 0
+        - id: java-exc-ex3
+          type: mcq
+          prompt: Pourquoi ne pas écrire catch (Exception e) {} ?
+          choices: ['On masque silencieusement des erreurs', 'C’est une erreur de compilation', 'C’est trop lent', 'Ce n’est pas un problème']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-fichiers
+    title: Fichiers
+    summary: Lire et écrire des fichiers avec java.nio.file (Path, Files), lecture ligne par ligne, CSV et gestion des erreurs d’E/S.
+    minutes: 30
+    concepts: [fichiers]
+    sections:
+      - title: java.nio.file
+        body: |
+          ```java
+          import java.nio.file.*;
+          import java.io.*;
+
+          Path p = Path.of("donnees", "notes.txt");
+          Files.createDirectories(p.getParent());
+          Files.writeString(p, "Ada 18\nBob 12\n");                 // écrire
+          String tout = Files.readString(p);                         // lire tout
+          List<String> lignes = Files.readAllLines(p);               // toutes les lignes
+          Files.write(p, List.of("Kiri 20"), StandardOpenOption.APPEND);
+
+          try (BufferedReader r = Files.newBufferedReader(p)) {      // gros fichiers : en flux
+              String l;
+              while ((l = r.readLine()) != null) { … }
+          }
+          try (var lignesFlux = Files.lines(p)) { long n = lignesFlux.count(); }
+
+          Files.exists(p); Files.size(p); Files.delete(p);
+          ```
+
+          Les méthodes de `Files` lèvent des `IOException` (vérifiées) qu’il faut traiter.
+      - title: Bonnes pratiques
+        body: |
+          - Toujours préciser l’encodage si besoin (UTF-8 est le défaut depuis Java 18).
+          - Fermer les flux : `try-with-resources`.
+          - Écriture sûre : écrire dans un fichier temporaire puis `Files.move(tmp, cible, StandardCopyOption.ATOMIC_MOVE)`.
+          - `Files.walk(dossier)` parcourt une arborescence ; `Files.createTempFile` crée un fichier temporaire.
+          - Pour les CSV réels (guillemets, virgules dans les champs), utilise une bibliothèque (OpenCSV, Jackson CSV).
+    exercises:
+      - id: java-file-q1
+        type: mcq
+        prompt: Quelle méthode lit tout un fichier dans une String ?
+        choices: ['Files.readString(path)', 'File.read(path)', 'Path.read()', 'new String(path)']
+        answer: 0
+      - id: java-file-q2
+        type: mcq
+        prompt: Pourquoi utiliser try-with-resources avec un BufferedReader ?
+        choices: ['Pour fermer le fichier même en cas d’exception', 'Pour lire plus vite', 'Pour le trier', 'C’est obligatoire syntaxiquement']
+        answer: 0
+      - id: java-file-code
+        type: code
+        title: Journal sur disque
+        prompt: 'Écris chaque ligne lue dans un fichier temporaire (`Files.createTempFile`) préfixée par son numéro (`1: …`). Relis-le avec un `BufferedReader`, affiche les lignes contenant `ERREUR`, puis `total : N`. Supprime le fichier.'
+        starter: |
+          import java.io.*;
+          import java.nio.file.*;
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) throws IOException {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.io.*;
+          import java.nio.file.*;
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) throws IOException {
+                  Scanner sc = new Scanner(System.in);
+                  Path p = Files.createTempFile("codemori", ".log");
+                  int n = 0;
+                  try (BufferedWriter w = Files.newBufferedWriter(p)) {
+                      while (sc.hasNextLine()) {
+                          w.write(++n + ": " + sc.nextLine());
+                          w.newLine();
+                      }
+                  }
+                  try (BufferedReader r = Files.newBufferedReader(p)) {
+                      String l;
+                      while ((l = r.readLine()) != null) if (l.contains("ERREUR")) System.out.println(l);
+                  }
+                  System.out.println("total : " + n);
+                  Files.delete(p);
+              }
+          }
+        tests:
+          - { input: "démarrage\nERREUR disque\nok\nERREUR réseau", output: "2: ERREUR disque\n4: ERREUR réseau\ntotal : 4" }
+          - { input: tout va bien, output: 'total : 1', hidden: true }
+    project:
+      id: java-file-projet
+      type: code
+      title: Analyse de ventes CSV
+      difficulty: 3
+      prompt: |
+        L’entrée est un CSV (`;`) avec l’en-tête `produit;quantite;prix`. Écris-le dans un fichier temporaire, relis-le avec `Files.lines`, et calcule le chiffre d’affaires par produit (`TreeMap`). Les lignes mal formées sont ignorées et comptées.
+
+        Affiche `produit : X.XX` (trié), `Total : X.XX`, `lignes ignorées : N` (Locale.US).
+      starter: |
+        import java.io.*;
+        import java.nio.file.*;
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws IOException {
+            }
+        }
+      solution: |
+        import java.io.*;
+        import java.nio.file.*;
+        import java.util.*;
+        import java.util.stream.*;
+
+        public class Main {
+            public static void main(String[] args) throws IOException {
+                Scanner sc = new Scanner(System.in);
+                List<String> entree = new ArrayList<>();
+                while (sc.hasNextLine()) entree.add(sc.nextLine());
+                Path p = Files.createTempFile("ventes", ".csv");
+                Files.write(p, entree);
+                Map<String, Double> ca = new TreeMap<>();
+                int ignorees = 0;
+                List<String> lignes;
+                try (Stream<String> s = Files.lines(p)) { lignes = s.skip(1).collect(Collectors.toList()); }
+                for (String l : lignes) {
+                    String[] c = l.split(";");
+                    try {
+                        if (c.length != 3 || c[0].isBlank()) throw new IllegalArgumentException();
+                        ca.merge(c[0], Integer.parseInt(c[1]) * Double.parseDouble(c[2]), Double::sum);
+                    } catch (IllegalArgumentException e) {
+                        ignorees++;
+                    }
+                }
+                double total = 0;
+                for (var e : ca.entrySet()) {
+                    System.out.println(String.format(Locale.US, "%s : %.2f", e.getKey(), e.getValue()));
+                    total += e.getValue();
+                }
+                System.out.println(String.format(Locale.US, "Total : %.2f", total));
+                System.out.println("lignes ignorées : " + ignorees);
+                Files.delete(p);
+            }
+        }
+      tests:
+        - { input: "produit;quantite;prix\nstylo;10;1.5\ncahier;2;3.2\nstylo;4;1.5\ngomme;x;1\nrègle", output: "cahier : 6.40\nstylo : 21.00\nTotal : 27.40\nlignes ignorées : 2" }
+        - { input: produit;quantite;prix, output: "Total : 0.00\nlignes ignorées : 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-file-ex1
+          type: mcq
+          prompt: Quelle méthode lit un fichier sous forme de Stream de lignes (à fermer) ?
+          choices: ['Files.lines', 'Files.readString', 'Path.stream', 'File.list']
+          answer: 0
+        - id: java-file-ex2
+          type: mcq
+          prompt: Quelle exception vérifiée signale une erreur d’E/S ?
+          choices: ['IOException', 'FileError', 'NullPointerException', 'IllegalStateException']
+          answer: 0
+        - id: java-file-ex3
+          type: mcq
+          prompt: Comment ajouter des lignes à la fin d’un fichier avec Files.write ?
+          choices: ['StandardOpenOption.APPEND', 'Files.append', 'true en dernier paramètre', 'C’est impossible']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-streams
+    title: Streams
+    summary: L’API Stream — filter, map, sorted, distinct, reduce, collect, groupingBy, flux de primitifs et évaluation paresseuse.
+    minutes: 35
+    concepts: [iterateurs]
+    sections:
+      - title: Pipeline de traitement
+        body: |
+          Un **stream** décrit un traitement de données en trois temps : **source** → opérations **intermédiaires** (paresseuses) → opération **terminale**.
+
+          ```java
+          List<String> noms = List.of("kiri", "ada", "linus", "bob", "anna");
+          List<String> r = noms.stream()
+              .filter(n -> n.length() > 3)       // intermédiaire
+              .map(String::toUpperCase)          // intermédiaire
+              .sorted()                          // intermédiaire
+              .toList();                         // terminale (Java 16)
+          // [ANNA, KIRI, LINUS]
+
+          int total = IntStream.rangeClosed(1, 10).sum();
+          double moyenne = noms.stream().mapToInt(String::length).average().orElse(0);
+          boolean ok = noms.stream().allMatch(n -> !n.isEmpty());
+          Optional<String> premier = noms.stream().filter(n -> n.startsWith("l")).findFirst();
+          ```
+
+          Un stream ne peut être consommé **qu’une fois**.
+      - title: Collecteurs
+        body: |
+          ```java
+          import static java.util.stream.Collectors.*;
+
+          Map<Integer, List<String>> parLongueur = noms.stream().collect(groupingBy(String::length));
+          Map<Character, Long> compte = noms.stream().collect(groupingBy(n -> n.charAt(0), TreeMap::new, counting()));
+          String joint = noms.stream().collect(joining(", ", "[", "]"));
+          Map<Boolean, List<String>> parts = noms.stream().collect(partitioningBy(n -> n.length() > 3));
+          Map<String, Integer> longueurs = noms.stream().collect(toMap(n -> n, String::length));
+          int somme = notes.stream().reduce(0, Integer::sum);
+          ```
+
+          `flatMap` aplatit des collections imbriquées ; `parallelStream()` parallélise (à mesurer : souvent inutile pour de petits volumes).
+    exercises:
+      - id: java-str2-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          import java.util.stream.*;
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> v = List.of(3, 8, 1, 6, 4, 8);
+                  System.out.println(v.stream().filter(x -> x > 3).distinct().map(x -> x * 10).sorted().toList());
+                  System.out.println(v.stream().collect(Collectors.partitioningBy(x -> x % 2 == 0, Collectors.counting())));
+                  System.out.println(IntStream.rangeClosed(1, 5).reduce(1, (a, b) -> a * b));
+              }
+          }
+        output: "[40, 60, 80]\n{false=2, true=4}\n120"
+        concepts: [iterateurs]
+      - id: java-str2-q1
+        type: mcq
+        prompt: Quand les opérations intermédiaires d’un stream s’exécutent-elles ?
+        choices: ['Quand une opération terminale est appelée (évaluation paresseuse)', 'Immédiatement', 'Dans un thread séparé', 'Jamais']
+        answer: 0
+      - id: java-str2-fill
+        type: fill
+        prompt: Complète pour regrouper les mots par longueur.
+        code: |
+          import java.util.*;
+          import java.util.stream.*;
+          public class Main {
+              public static void main(String[] args) {
+                  Map<Integer, List<String>> m = Stream.of("a", "bb", "cc", "d")
+                      .collect(Collectors.{{?}}(String::length));
+                  System.out.println(m);
+              }
+          }
+        blanks: [[groupingBy]]
+        tests:
+          - { input: '', output: '{1=[a, d], 2=[bb, cc]}' }
+      - id: java-str2-code
+        type: code
+        title: Sans boucle !
+        prompt: Lis des entiers. **Sans boucle** (for/while interdits, sauf pour la lecture qui est fournie), affiche la somme des carrés des pairs, le nombre de négatifs, et `true` si tous sont non nuls.
+        starter: |
+          import java.util.*;
+          import java.util.stream.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  List<Long> v = new Scanner(System.in).tokens().map(Long::parseLong).toList();
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.stream.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  List<Long> v = new Scanner(System.in).tokens().map(Long::parseLong).toList();
+                  System.out.println(v.stream().filter(x -> x % 2 == 0).mapToLong(x -> x * x).sum());
+                  System.out.println(v.stream().filter(x -> x < 0).count());
+                  System.out.println(v.stream().allMatch(x -> x != 0));
+              }
+          }
+        tests:
+          - { input: 1 2 -3 4 -6, output: "56\n2\ntrue" }
+          - { input: 0 5 7, output: "0\n0\nfalse", hidden: true }
+        forbid:
+          - { pattern: '\b(for|while)\s*\(', message: 'Pas de boucle for/while' }
+        concepts: [iterateurs]
+    project:
+      id: java-str2-projet
+      type: code
+      title: Statistiques de ventes
+      difficulty: 3
+      prompt: |
+        Chaque ligne : `vendeur region montant`. Avec les streams uniquement, affiche :
+
+        1. `total : T` ;
+        2. le CA par région trié par région (`region=CA`, séparés par des espaces) ;
+        3. `meilleur : vendeur` (plus gros total cumulé, premier par ordre alphabétique en cas d’égalité) ;
+        4. les vendeurs ayant au moins une vente > 1000, triés, séparés par des virgules (ou `aucun`).
+      starter: |
+        import java.util.*;
+        import java.util.stream.*;
+
+        public class Main {
+            record Vente(String vendeur, String region, long montant) {}
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<Vente> ventes = new ArrayList<>();
+                while (sc.hasNext()) ventes.add(new Vente(sc.next(), sc.next(), sc.nextLong()));
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.stream.*;
+
+        public class Main {
+            record Vente(String vendeur, String region, long montant) {}
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<Vente> ventes = new ArrayList<>();
+                while (sc.hasNext()) ventes.add(new Vente(sc.next(), sc.next(), sc.nextLong()));
+                System.out.println("total : " + ventes.stream().mapToLong(Vente::montant).sum());
+                System.out.println(ventes.stream()
+                        .collect(Collectors.groupingBy(Vente::region, TreeMap::new, Collectors.summingLong(Vente::montant)))
+                        .entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining(" ")));
+                ventes.stream()
+                        .collect(Collectors.groupingBy(Vente::vendeur, TreeMap::new, Collectors.summingLong(Vente::montant)))
+                        .entrySet().stream()
+                        .max(Map.Entry.<String, Long>comparingByValue().thenComparing(Map.Entry.<String, Long>comparingByKey().reversed()))
+                        .ifPresent(e -> System.out.println("meilleur : " + e.getKey()));
+                String gros = ventes.stream().filter(v -> v.montant() > 1000).map(Vente::vendeur).distinct().sorted().collect(Collectors.joining(","));
+                System.out.println(gros.isEmpty() ? "aucun" : gros);
+            }
+        }
+      tests:
+        - { input: "ada nord 500\nbob sud 1500\nada sud 1200\nzoe nord 300\nbob nord 200", output: "total : 3700\nnord=1000 sud=2700\nmeilleur : ada\nada,bob" }
+        - { input: x est 10, output: "total : 10\nest=10\nmeilleur : x\naucun", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-str2-ex1
+          type: mcq
+          prompt: Peut-on réutiliser un stream après une opération terminale ?
+          choices: ['Non, IllegalStateException', 'Oui', 'Seulement en parallèle', 'Seulement avec peek']
+          answer: 0
+        - id: java-str2-ex2
+          type: mcq
+          prompt: Que fait flatMap ?
+          choices: ['Transforme chaque élément en stream et aplatit le résultat', 'Trie le stream', 'Supprime les doublons', 'Parallélise']
+          answer: 0
+        - id: java-str2-ex3
+          type: mcq
+          prompt: Quel collecteur concatène des chaînes avec un séparateur ?
+          choices: ['Collectors.joining', 'Collectors.concat', 'Collectors.reduce', 'String.join uniquement']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-lambdas
+    title: Lambdas
+    summary: Expressions lambda, références de méthodes, interfaces fonctionnelles standard, capture de variables et composition de fonctions.
+    minutes: 30
+    concepts: [closures]
+    sections:
+      - title: Syntaxe
+        body: |
+          ```java
+          Function<Integer, Integer> carre = x -> x * x;
+          BiFunction<Integer, Integer, Integer> somme = (a, b) -> a + b;
+          Supplier<String> salut = () -> "bonjour";
+          Consumer<String> afficher = s -> System.out.println(s);
+          Predicate<String> vide = String::isEmpty;              // référence de méthode
+          Comparator<String> parLongueur = Comparator.comparingInt(String::length);
+          Runnable tache = () -> { System.out.println("a"); System.out.println("b"); };
+          ```
+
+          Références de méthodes : `Classe::methodeStatique`, `objet::methode`, `Classe::methodeInstance`, `Classe::new`.
+
+          Une lambda implémente une **interface fonctionnelle** (une seule méthode abstraite), qu’on peut annoter `@FunctionalInterface`.
+      - title: Capture et composition
+        body: |
+          Une lambda peut lire les variables locales **effectivement finales** (jamais réaffectées) :
+
+          ```java
+          int seuil = 10;
+          Predicate<Integer> grand = x -> x > seuil;   // OK
+          // seuil++;                                  // ❌ seuil ne serait plus effectivement finale
+          ```
+
+          Composition :
+
+          ```java
+          Function<Integer, Integer> plus1 = x -> x + 1;
+          Function<Integer, Integer> f = carre.andThen(plus1);   // x² + 1
+          Function<Integer, Integer> g = carre.compose(plus1);   // (x + 1)²
+          Predicate<String> court = s -> s.length() < 5;
+          Predicate<String> courtEtNonVide = court.and(vide.negate());
+          ```
+    exercises:
+      - id: java-lam-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.function.*;
+          public class Main {
+              public static void main(String[] args) {
+                  Function<Integer, Integer> carre = x -> x * x;
+                  Function<Integer, Integer> plus1 = x -> x + 1;
+                  Predicate<String> court = s -> s.length() < 4;
+                  BinaryOperator<Integer> max = BinaryOperator.maxBy(Integer::compare);
+                  System.out.println(carre.andThen(plus1).apply(3) + " " + carre.compose(plus1).apply(3) + " " + court.negate().test("kiri") + " " + max.apply(4, 9));
+              }
+          }
+        output: 10 16 true 9
+        concepts: [closures]
+      - id: java-lam-q1
+        type: mcq
+        prompt: Quelles variables locales une lambda peut-elle capturer ?
+        choices: ['Les variables effectivement finales', 'Toutes, même modifiées ensuite', 'Aucune', 'Seulement les attributs static']
+        answer: 0
+      - id: java-lam-fill
+        type: fill
+        prompt: Complète avec une référence de méthode qui convertit en majuscules.
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  List<String> l = new ArrayList<>(List.of("a", "b"));
+                  l.replaceAll(String{{?}}toUpperCase);
+                  System.out.println(l);
+              }
+          }
+        blanks: [['::']]
+        tests:
+          - { input: '', output: '[A, B]' }
+      - id: java-lam-code
+        type: code
+        title: Pipeline de fonctions
+        prompt: 'Chaque ligne : une valeur `x` puis des opérations `+N`, `*N`, `^2`. Construis une `Function<Long, Long>` par opération et compose-les avec `andThen`, puis applique le résultat à `x`.'
+        starter: |
+          import java.util.*;
+          import java.util.function.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String[] p = sc.nextLine().trim().split("\\s+");
+                  }
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.function.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String[] p = sc.nextLine().trim().split("\\s+");
+                      long x = Long.parseLong(p[0]);
+                      Function<Long, Long> f = Function.identity();
+                      for (int i = 1; i < p.length; i++) {
+                          String op = p[i];
+                          Function<Long, Long> g;
+                          if (op.equals("^2")) g = v -> v * v;
+                          else {
+                              long n = Long.parseLong(op.substring(1));
+                              g = op.charAt(0) == '+' ? v -> v + n : v -> v * n;
+                          }
+                          f = f.andThen(g);
+                      }
+                      System.out.println(f.apply(x));
+                  }
+              }
+          }
+        tests:
+          - { input: "2 +3 ^2 *2\n5", output: "50\n5" }
+          - { input: -1 *-3 +1 ^2, output: '16', hidden: true }
+        require:
+          - { pattern: 'andThen', message: Composer avec andThen }
+    project:
+      id: java-lam-projet
+      type: code
+      title: Système d’événements
+      difficulty: 3
+      prompt: |
+        Écris une classe `Bus` (`Map<String, List<Consumer<String>>>`) avec `abonner(evt, Consumer<String>)` et `publier(evt, donnee)`.
+
+        Première ligne : abonnements `evenement action` (`afficher`, `compter`, `majuscules`). `compter` incrémente un compteur (`int[]` ou `AtomicInteger` capturé). Lignes suivantes : publications `evenement donnee`. Termine par `compteur : N`.
+      starter: |
+        import java.util.*;
+        import java.util.function.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.concurrent.atomic.AtomicInteger;
+        import java.util.function.*;
+
+        class Bus {
+            private final Map<String, List<Consumer<String>>> abonnes = new HashMap<>();
+            void abonner(String evt, Consumer<String> c) { abonnes.computeIfAbsent(evt, k -> new ArrayList<>()).add(c); }
+            void publier(String evt, String d) { abonnes.getOrDefault(evt, List.of()).forEach(c -> c.accept(d)); }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Bus bus = new Bus();
+                AtomicInteger compteur = new AtomicInteger();
+                String[] ab = sc.nextLine().trim().split("\\s+");
+                for (int i = 0; i + 1 < ab.length; i += 2) {
+                    String evt = ab[i];
+                    switch (ab[i + 1]) {
+                        case "afficher" -> bus.abonner(evt, d -> System.out.println("[" + evt + "] " + d));
+                        case "compter" -> bus.abonner(evt, d -> compteur.incrementAndGet());
+                        default -> bus.abonner(evt, d -> System.out.println(d.toUpperCase()));
+                    }
+                }
+                while (sc.hasNext()) bus.publier(sc.next(), sc.next());
+                System.out.println("compteur : " + compteur.get());
+            }
+        }
+      tests:
+        - { input: "login afficher login compter achat majuscules achat compter\nlogin kiri\nachat livre\nlogout bob", output: "[login] kiri\nLIVRE\ncompteur : 2" }
+        - { input: "x compter\nx a\nx b\ny c", output: 'compteur : 2', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-lam-ex1
+          type: mcq
+          prompt: Quelle interface fonctionnelle représente une fonction T → boolean ?
+          choices: ['Predicate<T>', 'Function<T, R>', 'Supplier<T>', 'Consumer<T>']
+          answer: 0
+        - id: java-lam-ex2
+          type: mcq
+          prompt: Que fait f.compose(g) ?
+          choices: ['Applique g puis f', 'Applique f puis g', 'Applique f deux fois', 'Combine deux prédicats']
+          answer: 0
+        - id: java-lam-ex3
+          type: mcq
+          prompt: Que représente String::length ?
+          choices: ['Une référence de méthode (équivalente à s -> s.length())', 'Un attribut statique', 'Un constructeur', 'Un cast']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-optional
+    title: Optional
+    summary: Représenter l’absence de valeur sans null — création, orElse, map, flatMap, filter, ifPresent et bonnes pratiques.
+    minutes: 25
+    concepts: [option]
+    sections:
+      - title: Un conteneur de 0 ou 1 valeur
+        body: |
+          ```java
+          Optional<String> plein = Optional.of("Kiri");
+          Optional<String> vide = Optional.empty();
+          Optional<String> peutEtre = Optional.ofNullable(valeurPossiblementNull);
+
+          plein.isPresent(); vide.isEmpty();
+          plein.orElse("inconnu");                     // valeur ou défaut
+          plein.orElseGet(() -> calculCouteux());      // défaut calculé paresseusement
+          plein.orElseThrow();                         // NoSuchElementException si vide
+          plein.ifPresent(System.out::println);
+          plein.ifPresentOrElse(v -> …, () -> …);
+          ```
+
+          De nombreuses API renvoient des `Optional` : `stream().findFirst()`, `max()`, `min()`.
+      - title: Transformer
+        body: |
+          ```java
+          Optional<Integer> longueur = plein.map(String::length);           // Optional[4]
+          Optional<String> grand = plein.filter(s -> s.length() > 10);      // empty
+          Optional<Adresse> a = trouverUtilisateur(id).flatMap(Utilisateur::adresse);
+          ```
+
+          Bonnes pratiques :
+
+          - `Optional` sert de **type de retour** ; pas comme attribut ni paramètre ;
+          - ne jamais appeler `get()` sans vérification (préférer `orElse…`) ;
+          - ne jamais renvoyer `null` à la place d’un `Optional` !
+          - pour les primitifs : `OptionalInt`, `OptionalDouble`.
+    exercises:
+      - id: java-opt-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.*;
+          public class Main {
+              public static void main(String[] args) {
+                  Optional<String> a = Optional.of("kiri");
+                  Optional<String> b = Optional.empty();
+                  System.out.println(a.map(String::length).orElse(-1) + " " + b.map(String::length).orElse(-1) + " " + a.filter(s -> s.startsWith("z")).isPresent() + " " + b.or(() -> Optional.of("défaut")).get());
+              }
+          }
+        output: 4 -1 false défaut
+        concepts: [option]
+      - id: java-opt-q1
+        type: mcq
+        prompt: Quelle différence entre orElse et orElseGet ?
+        choices: ['orElseGet ne calcule la valeur par défaut que si l’Optional est vide', 'Aucune', 'orElse lève une exception', 'orElseGet renvoie un Optional']
+        answer: 0
+      - id: java-opt-q2
+        type: mcq
+        prompt: Où utiliser Optional de préférence ?
+        choices: ['Comme type de retour', 'Comme attribut de classe', 'Comme paramètre de méthode', 'Dans les collections']
+        answer: 0
+      - id: java-opt-code
+        type: code
+        title: Annuaire
+        prompt: 'Première ligne : `n`, puis `n` lignes `nom telephone`. Lignes suivantes : des noms recherchés. Écris `Optional<String> chercher(String nom)` et affiche `nom : tel` ou `nom : inconnu` (avec `map`/`orElse`, sans `get()`).'
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static Map<String, String> annuaire = new HashMap<>();
+              static Optional<String> chercher(String nom) { return Optional.ofNullable(annuaire.get(nom)); }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int n = sc.nextInt();
+                  for (int i = 0; i < n; i++) annuaire.put(sc.next(), sc.next());
+                  while (sc.hasNext()) {
+                      String nom = sc.next();
+                      System.out.println(chercher(nom).map(t -> nom + " : " + t).orElse(nom + " : inconnu"));
+                  }
+              }
+          }
+        tests:
+          - { input: "2\nAda 0601\nLinus 0702\nLinus\nGrace", output: "Linus : 0702\nGrace : inconnu" }
+          - { input: "0\nX", output: 'X : inconnu', hidden: true }
+        forbid:
+          - { pattern: '\.get\(\)', message: 'Ne pas utiliser Optional.get()' }
+    project:
+      id: java-opt-projet
+      type: code
+      title: Recherche chaînée
+      difficulty: 3
+      prompt: |
+        Données : des utilisateurs (`U id nom idAdresse` — `idAdresse` vaut `-` s’il n’y en a pas) et des adresses (`A idAdresse ville`), puis des requêtes `? id`.
+
+        Écris `Optional<Utilisateur> trouverUtilisateur(int)`, `Optional<String> ville(Utilisateur)` et, avec `flatMap`, affiche pour chaque requête `id : ville` ou `id : ville inconnue` (utilisateur inexistant, sans adresse, ou adresse introuvable).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            record Utilisateur(int id, String nom, Optional<Integer> adresse) {}
+            static Map<Integer, Utilisateur> users = new HashMap<>();
+            static Map<Integer, String> adresses = new HashMap<>();
+            static Optional<Utilisateur> trouverUtilisateur(int id) { return Optional.ofNullable(users.get(id)); }
+            static Optional<String> ville(Utilisateur u) { return u.adresse().flatMap(a -> Optional.ofNullable(adresses.get(a))); }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "U" -> {
+                            int id = sc.nextInt();
+                            String nom = sc.next(), a = sc.next();
+                            users.put(id, new Utilisateur(id, nom, a.equals("-") ? Optional.empty() : Optional.of(Integer.parseInt(a))));
+                        }
+                        case "A" -> adresses.put(sc.nextInt(), sc.next());
+                        default -> {
+                            int id = sc.nextInt();
+                            System.out.println(id + " : " + trouverUtilisateur(id).flatMap(Main::ville).orElse("ville inconnue"));
+                        }
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "U 1 Ada 10\nU 2 Bob -\nU 3 Zoe 99\nA 10 Paris\n? 1\n? 2\n? 3\n? 4", output: "1 : Paris\n2 : ville inconnue\n3 : ville inconnue\n4 : ville inconnue" }
+        - { input: "A 5 Lyon\nU 7 Kiri 5\n? 7", output: '7 : Lyon', hidden: true }
+      require:
+        - { pattern: 'flatMap', message: Utiliser flatMap }
+    exam:
+      pass: 70
+      questions:
+        - id: java-opt-ex1
+          type: mcq
+          prompt: Que fait Optional.ofNullable(null) ?
+          choices: ['Renvoie Optional.empty()', 'Lève une NullPointerException', 'Renvoie Optional[null]', 'Ne compile pas']
+          answer: 0
+        - id: java-opt-ex2
+          type: mcq
+          prompt: Pourquoi flatMap plutôt que map quand la fonction renvoie déjà un Optional ?
+          choices: ['Pour éviter un Optional<Optional<T>>', 'Pour la performance', 'Parce que map est déprécié', 'Pour filtrer']
+          answer: 0
+        - id: java-opt-ex3
+          type: mcq
+          prompt: Quelle variante utiliser pour un int optionnel sans boxing ?
+          choices: ['OptionalInt', 'Optional<int>', 'IntOptional', 'Optional.ofInt']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-maven
+    title: Maven
+    summary: Gérer un projet Java avec Maven — pom.xml, coordonnées, dépendances et scopes, cycle de vie, plugins et dépôts.
+    minutes: 25
+    concepts: [build]
+    sections:
+      - title: Le pom.xml
+        body: |
+          ```xml
+          <project>
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>fr.codemori</groupId>          <!-- coordonnées GAV -->
+            <artifactId>banque</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+
+            <properties>
+              <maven.compiler.release>21</maven.compiler.release>
+            </properties>
+
+            <dependencies>
+              <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>5.11.0</version>
+                <scope>test</scope>                 <!-- compile, test, provided, runtime -->
+              </dependency>
+            </dependencies>
+          </project>
+          ```
+
+          Structure standard : `src/main/java`, `src/main/resources`, `src/test/java`, sortie dans `target/`.
+      - title: Cycle de vie
+        body: |
+          ```bash
+          mvn compile      # compile
+          mvn test         # compile + tests
+          mvn package      # crée le .jar dans target/
+          mvn install      # copie dans le dépôt local ~/.m2
+          mvn clean        # supprime target/
+          mvn dependency:tree
+          ```
+
+          Les phases s’enchaînent : `validate → compile → test → package → verify → install → deploy`. Exécuter une phase exécute toutes les précédentes.
+
+          Les dépendances sont téléchargées depuis **Maven Central** et mises en cache dans `~/.m2/repository`. Les dépendances **transitives** (dépendances des dépendances) sont résolues automatiquement.
+    exercises:
+      - id: java-mvn-q1
+        type: mcq
+        prompt: Que signifient les coordonnées GAV ?
+        choices: ['groupId, artifactId, version', 'Git, Ant, Version', 'Global Artifact Value', 'Gradle And Version']
+        answer: 0
+      - id: java-mvn-q2
+        type: mcq
+        prompt: Quel scope pour une dépendance utilisée seulement par les tests ?
+        choices: ['test', 'compile', 'provided', 'runtime']
+        answer: 0
+      - id: java-mvn-order
+        type: order
+        prompt: Remets dans l’ordre ces phases du cycle de vie Maven.
+        lines:
+          - validate
+          - compile
+          - test
+          - package
+          - install
+      - id: java-mvn-fill
+        type: fill
+        prompt: Complète la dépendance.
+        code: |
+          <dependency>
+            <{{?}}>com.google.code.gson</{{?}}>
+            <artifactId>gson</artifactId>
+            <{{?}}>2.11.0</{{?}}>
+          </dependency>
+        blanks: [[groupId], [groupId], [version], [version]]
+      - id: java-mvn-code
+        type: code
+        title: Analyseur de pom.xml
+        prompt: |
+          Lis un pom.xml simplifié et affiche `projet : groupId:artifactId:version`, puis chaque dépendance au format `groupId:artifactId:version (scope)` (scope `compile` par défaut), dans l’ordre.
+
+          Analyse le texte avec des expressions régulières (`Pattern`/`Matcher`) : les balises de dépendances sont dans des blocs `<dependency>…</dependency>`, et les coordonnées du projet sont les premières balises `groupId`/`artifactId`/`version` **hors** de ces blocs.
+        starter: |
+          import java.util.*;
+          import java.util.regex.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  String xml = new Scanner(System.in).useDelimiter("\\A").next();
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.regex.*;
+
+          public class Main {
+              static String balise(String texte, String nom, String defaut) {
+                  Matcher m = Pattern.compile("<" + nom + ">\\s*(.*?)\\s*</" + nom + ">", Pattern.DOTALL).matcher(texte);
+                  return m.find() ? m.group(1) : defaut;
+              }
+              public static void main(String[] args) {
+                  String xml = new Scanner(System.in).useDelimiter("\\A").next();
+                  Pattern dep = Pattern.compile("<dependency>(.*?)</dependency>", Pattern.DOTALL);
+                  String horsDeps = dep.matcher(xml).replaceAll("");
+                  System.out.println("projet : " + balise(horsDeps, "groupId", "?") + ":" + balise(horsDeps, "artifactId", "?") + ":" + balise(horsDeps, "version", "?"));
+                  Matcher m = dep.matcher(xml);
+                  while (m.find()) {
+                      String d = m.group(1);
+                      System.out.println(balise(d, "groupId", "?") + ":" + balise(d, "artifactId", "?") + ":" + balise(d, "version", "?") + " (" + balise(d, "scope", "compile") + ")");
+                  }
+              }
+          }
+        tests:
+          - { input: "<project>\n<groupId>fr.codemori</groupId>\n<artifactId>banque</artifactId>\n<version>1.0</version>\n<dependencies>\n<dependency><groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>2.11.0</version></dependency>\n<dependency>\n<groupId>org.junit.jupiter</groupId>\n<artifactId>junit-jupiter</artifactId>\n<version>5.11.0</version>\n<scope>test</scope>\n</dependency>\n</dependencies>\n</project>", output: "projet : fr.codemori:banque:1.0\ncom.google.code.gson:gson:2.11.0 (compile)\norg.junit.jupiter:junit-jupiter:5.11.0 (test)" }
+          - { input: "<project><groupId>a</groupId><artifactId>b</artifactId><version>2</version></project>", output: 'projet : a:b:2', hidden: true }
+    project:
+      id: java-mvn-projet
+      type: code
+      title: Comparateur de versions
+      difficulty: 3
+      prompt: |
+        Maven compare les versions composant par composant. Écris un comparateur simplifié : les versions sont de la forme `X.Y.Z` (1 à 3 nombres, les composants manquants valent 0), éventuellement suivies de `-SNAPSHOT` (une version SNAPSHOT est **inférieure** à la même version finale).
+
+        Chaque ligne : `v1 v2`. Affiche `v1 < v2`, `v1 > v2` ou `v1 = v2`. Puis, toutes versions confondues (sans doublon), affiche la liste triée séparée par des espaces.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            static int comparer(String a, String b) {
+                boolean sa = a.endsWith("-SNAPSHOT"), sb = b.endsWith("-SNAPSHOT");
+                String[] pa = a.replace("-SNAPSHOT", "").split("\\."), pb = b.replace("-SNAPSHOT", "").split("\\.");
+                for (int i = 0; i < 3; i++) {
+                    int x = i < pa.length ? Integer.parseInt(pa[i]) : 0;
+                    int y = i < pb.length ? Integer.parseInt(pb[i]) : 0;
+                    if (x != y) return Integer.compare(x, y);
+                }
+                if (sa != sb) return sa ? -1 : 1;
+                return 0;
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<String> toutes = new ArrayList<>();
+                while (sc.hasNext()) {
+                    String a = sc.next(), b = sc.next();
+                    int c = comparer(a, b);
+                    System.out.println(a + (c < 0 ? " < " : c > 0 ? " > " : " = ") + b);
+                    if (!toutes.contains(a)) toutes.add(a);
+                    if (!toutes.contains(b)) toutes.add(b);
+                }
+                toutes.sort(Main::comparer);
+                System.out.println(String.join(" ", toutes));
+            }
+        }
+      tests:
+        - { input: "1.10.0 1.9.3\n2.0 2.0.0\n1.0.0-SNAPSHOT 1.0.0\n3 2.99.99", output: "1.10.0 > 1.9.3\n2.0 = 2.0.0\n1.0.0-SNAPSHOT < 1.0.0\n3 > 2.99.99\n1.0.0-SNAPSHOT 1.0.0 1.9.3 1.10.0 2.0 2.0.0 2.99.99 3" }
+        - { input: 0.1 0.1, output: "0.1 = 0.1\n0.1", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-mvn-ex1
+          type: mcq
+          prompt: Où Maven met-il en cache les dépendances téléchargées ?
+          choices: ['~/.m2/repository', 'target/', 'src/lib', '/usr/java']
+          answer: 0
+        - id: java-mvn-ex2
+          type: mcq
+          prompt: Quelle commande crée le fichier .jar ?
+          choices: ['mvn package', 'mvn compile', 'mvn clean', 'mvn jar']
+          answer: 0
+        - id: java-mvn-ex3
+          type: mcq
+          prompt: Que signifie le suffixe -SNAPSHOT ?
+          choices: ['Une version de développement, non finale', 'Une version stable', 'Une version de test unitaire', 'Une version obsolète']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-gradle
+    title: Gradle
+    summary: Construire avec Gradle — build.gradle.kts, plugins, configurations de dépendances, tâches, wrapper et comparaison avec Maven.
+    minutes: 25
+    concepts: [build]
+    sections:
+      - title: build.gradle.kts
+        body: |
+          ```kotlin
+          plugins {
+              java
+              application
+          }
+
+          group = "fr.codemori"
+          version = "1.0.0"
+
+          java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+
+          repositories { mavenCentral() }
+
+          dependencies {
+              implementation("com.google.code.gson:gson:2.11.0")       // compile + exécution
+              testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
+              testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+          }
+
+          application { mainClass = "fr.codemori.Main" }
+          tasks.test { useJUnitPlatform() }
+          ```
+      - title: Tâches et wrapper
+        body: |
+          ```bash
+          ./gradlew build        # compile, teste, assemble
+          ./gradlew test
+          ./gradlew run          # avec le plugin application
+          ./gradlew dependencies
+          ./gradlew tasks        # liste des tâches
+          ```
+
+          Le **wrapper** (`gradlew`) télécharge la bonne version de Gradle : tout le monde compile avec la même version, sans installation préalable.
+
+          | | Maven | Gradle |
+          |---|---|---|
+          | Configuration | XML déclaratif | Kotlin/Groovy (programmable) |
+          | Performance | correcte | cache de build, compilation incrémentale |
+          | Écosystème | très mature | Android, projets multi-modules |
+
+          `implementation` cache une dépendance aux consommateurs de ta bibliothèque ; `api` (plugin `java-library`) l’expose.
+    exercises:
+      - id: java-gradle-q1
+        type: mcq
+        prompt: Quel est l’intérêt du Gradle Wrapper (gradlew) ?
+        choices: ['Utiliser la même version de Gradle partout sans installation préalable', 'Accélérer la JVM', 'Remplacer Maven Central', 'Compiler en C++']
+        answer: 0
+      - id: java-gradle-q2
+        type: mcq
+        prompt: Quelle configuration utiliser pour une dépendance de test ?
+        choices: ['testImplementation', 'implementation', 'api', 'compileOnly']
+        answer: 0
+      - id: java-gradle-fill
+        type: fill
+        prompt: Complète le bloc de dépendances.
+        code: |
+          dependencies {
+              {{?}}("com.google.guava:guava:33.0.0-jre")
+              {{?}}("org.junit.jupiter:junit-jupiter:5.11.0")
+          }
+        blanks: [[implementation], [testImplementation]]
+      - id: java-gradle-code
+        type: code
+        title: Graphe de tâches
+        prompt: |
+          Gradle exécute les tâches selon leurs dépendances. Chaque ligne déclare `tache : dep1 dep2…` (éventuellement aucune dépendance). La dernière ligne est `executer cible`.
+
+          Affiche l’ordre d’exécution (tri topologique **en profondeur** : on exécute d’abord les dépendances dans l’ordre déclaré, chaque tâche une seule fois), séparé par ` -> `. Si un cycle est détecté, affiche `cycle détecté`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static Map<String, List<String>> deps = new LinkedHashMap<>();
+              static List<String> ordre = new ArrayList<>();
+              static Set<String> fait = new HashSet<>(), enCours = new HashSet<>();
+
+              static boolean visiter(String t) {
+                  if (fait.contains(t)) return true;
+                  if (!enCours.add(t)) return false;
+                  for (String d : deps.getOrDefault(t, List.of())) if (!visiter(d)) return false;
+                  enCours.remove(t);
+                  fait.add(t);
+                  ordre.add(t);
+                  return true;
+              }
+
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  String cible = null;
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine().trim();
+                      if (l.isEmpty()) continue;
+                      if (l.startsWith("executer ")) { cible = l.substring(9).trim(); continue; }
+                      String[] p = l.split(":");
+                      List<String> d = new ArrayList<>();
+                      if (p.length > 1) for (String x : p[1].trim().split("\\s+")) if (!x.isEmpty()) d.add(x);
+                      deps.put(p[0].trim(), d);
+                  }
+                  System.out.println(visiter(cible) ? String.join(" -> ", ordre) : "cycle détecté");
+              }
+          }
+        tests:
+          - { input: "compileJava :\nprocessResources :\nclasses : compileJava processResources\njar : classes\ntest : classes\nbuild : jar test\nexecuter build", output: compileJava -> processResources -> classes -> jar -> test -> build }
+          - { input: "a : b\nb : a\nexecuter a", output: cycle détecté, hidden: true }
+    project:
+      id: java-gradle-projet
+      type: code
+      title: Résolution de conflits de versions
+      difficulty: 3
+      prompt: |
+        Gradle résout par défaut les conflits de versions en prenant la **plus récente**. Chaque ligne déclare une dépendance demandée par un module : `module -> groupe:artefact:version`.
+
+        Pour chaque artefact (trié par `groupe:artefact`), affiche `groupe:artefact:versionRetenue` et, s’il y a eu conflit, ` (conflit : v1, v2…)` avec les versions demandées distinctes triées. Les versions sont de la forme `X.Y.Z` (comparaison numérique).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            static int cmp(String a, String b) {
+                String[] x = a.split("\\."), y = b.split("\\.");
+                for (int i = 0; i < Math.max(x.length, y.length); i++) {
+                    int u = i < x.length ? Integer.parseInt(x[i]) : 0, v = i < y.length ? Integer.parseInt(y[i]) : 0;
+                    if (u != v) return Integer.compare(u, v);
+                }
+                return 0;
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Map<String, TreeSet<String>> versions = new TreeMap<>();
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine().trim();
+                    if (l.isEmpty()) continue;
+                    String coord = l.split("->")[1].trim();
+                    int i = coord.lastIndexOf(':');
+                    versions.computeIfAbsent(coord.substring(0, i), k -> new TreeSet<>(Main::cmp)).add(coord.substring(i + 1));
+                }
+                versions.forEach((art, vs) -> {
+                    String s = art + ":" + vs.last();
+                    if (vs.size() > 1) s += " (conflit : " + String.join(", ", vs) + ")";
+                    System.out.println(s);
+                });
+            }
+        }
+      tests:
+        - { input: "app -> com.google.code.gson:gson:2.10.1\nlib -> com.google.code.gson:gson:2.11.0\napp -> org.slf4j:slf4j-api:2.0.9\ncore -> com.google.code.gson:gson:2.9.0", output: "com.google.code.gson:gson:2.11.0 (conflit : 2.9.0, 2.10.1, 2.11.0)\norg.slf4j:slf4j-api:2.0.9" }
+        - { input: "a -> x:y:1.0.0\nb -> x:y:1.0.0", output: 'x:y:1.0.0', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-gradle-ex1
+          type: mcq
+          prompt: En quels langages s’écrivent les scripts Gradle ?
+          choices: ['Kotlin ou Groovy', 'XML', 'YAML', 'JSON']
+          answer: 0
+        - id: java-gradle-ex2
+          type: mcq
+          prompt: Quelle tâche lance l’application avec le plugin application ?
+          choices: ['run', 'start', 'exec', 'launch']
+          answer: 0
+        - id: java-gradle-ex3
+          type: mcq
+          prompt: Quelle stratégie Gradle applique-t-il par défaut en cas de conflit de versions ?
+          choices: ['La version la plus récente', 'La plus ancienne', 'Une erreur systématique', 'La première déclarée']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-junit
+    title: Tests JUnit
+    summary: Tests unitaires avec JUnit 5 — @Test, assertions, cycle de vie, tests paramétrés, exceptions attendues et bonnes pratiques.
+    minutes: 30
+    concepts: [tests]
+    sections:
+      - title: Un premier test JUnit 5
+        body: |
+          ```java
+          import org.junit.jupiter.api.*;
+          import static org.junit.jupiter.api.Assertions.*;
+
+          class CalculatriceTest {
+              private Calculatrice calc;
+
+              @BeforeEach
+              void setUp() { calc = new Calculatrice(); }     // avant chaque test
+
+              @Test
+              @DisplayName("2 + 3 = 5")
+              void addition() { assertEquals(5, calc.ajouter(2, 3)); }
+
+              @Test
+              void divisionParZero() {
+                  var e = assertThrows(ArithmeticException.class, () -> calc.diviser(1, 0));
+                  assertEquals("division par zéro", e.getMessage());
+              }
+
+              @ParameterizedTest
+              @CsvSource({"1, 1, 2", "2, 3, 5", "-1, 1, 0"})
+              void additions(int a, int b, int attendu) { assertEquals(attendu, calc.ajouter(a, b)); }
+          }
+          ```
+
+          Assertions : `assertEquals`, `assertTrue`, `assertNull`, `assertThrows`, `assertAll` (plusieurs vérifications groupées), `assertTimeout`.
+      - title: Bonnes pratiques
+        body: |
+          - Un test = un comportement, nommé clairement (`retraitRefuseSiSoldeInsuffisant`).
+          - Structure **Arrange / Act / Assert**.
+          - Tests rapides, indépendants, reproductibles (pas d’ordre implicite, pas d’horloge réelle).
+          - **Mocks** (Mockito) pour isoler une classe de ses dépendances.
+          - Mesurer la **couverture** (JaCoCo) sans en faire un objectif absolu.
+
+          Les tests vivent dans `src/test/java` et sont lancés par `mvn test` ou `./gradlew test`.
+
+          > 💡 Dans le bac à sable Codemori, JUnit n’est pas disponible : les exercices te font écrire **ton propre mini-framework** de tests, ce qui t’aide à comprendre comment JUnit fonctionne.
+    exercises:
+      - id: java-junit-q1
+        type: mcq
+        prompt: Quelle annotation exécute une méthode avant chaque test ?
+        choices: ['@BeforeEach', '@BeforeAll', '@Setup', '@Init']
+        answer: 0
+      - id: java-junit-q2
+        type: mcq
+        prompt: Comment vérifier qu’un appel lève une exception avec JUnit 5 ?
+        choices: ['assertThrows(Type.class, () -> appel())', 'try/catch vide', '@Test(expected = …) uniquement', 'assertException()']
+        answer: 0
+      - id: java-junit-order
+        type: order
+        prompt: Remets dans l’ordre les étapes d’un test unitaire (motif AAA).
+        lines:
+          - 'Arrange : préparer les objets et les données'
+          - 'Act : appeler la méthode testée'
+          - 'Assert : vérifier le résultat'
+      - id: java-junit-code
+        type: code
+        title: Mini framework de test
+        prompt: |
+          Écris une classe `Verif` avec `static void egal(Object attendu, Object obtenu)` qui lève une `AssertionError("attendu X mais obtenu Y")`, et une méthode `static void tester(String nom, Runnable test)` qui exécute le test, affiche `✔ nom` ou `✘ nom : message`, et compte les réussites.
+
+          Le programme teste ta fonction `static boolean estBissextile(int)` (à écrire) avec les années lues sous la forme `annee attendu` (`true`/`false`), puis affiche `R/N réussis`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int n = 0;
+                  while (sc.hasNext()) {
+                      int annee = sc.nextInt();
+                      boolean attendu = sc.nextBoolean();
+                      n++;
+                      Verif.tester("année " + annee, () -> Verif.egal(attendu, estBissextile(annee)));
+                  }
+                  System.out.println(Verif.reussis + "/" + n + " réussis");
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          class Verif {
+              static int reussis = 0;
+              static void egal(Object attendu, Object obtenu) {
+                  if (!Objects.equals(attendu, obtenu)) throw new AssertionError("attendu " + attendu + " mais obtenu " + obtenu);
+              }
+              static void tester(String nom, Runnable test) {
+                  try {
+                      test.run();
+                      reussis++;
+                      System.out.println("✔ " + nom);
+                  } catch (AssertionError e) {
+                      System.out.println("✘ " + nom + " : " + e.getMessage());
+                  }
+              }
+          }
+
+          public class Main {
+              static boolean estBissextile(int a) { return (a % 4 == 0 && a % 100 != 0) || a % 400 == 0; }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int n = 0;
+                  while (sc.hasNext()) {
+                      int annee = sc.nextInt();
+                      boolean attendu = sc.nextBoolean();
+                      n++;
+                      Verif.tester("année " + annee, () -> Verif.egal(attendu, estBissextile(annee)));
+                  }
+                  System.out.println(Verif.reussis + "/" + n + " réussis");
+              }
+          }
+        tests:
+          - { input: "2024 true\n1900 true\n2000 true", output: "✔ année 2024\n✘ année 1900 : attendu true mais obtenu false\n✔ année 2000\n2/3 réussis" }
+          - { input: 2023 false, output: "✔ année 2023\n1/1 réussis", hidden: true }
+        concepts: [tests]
+    project:
+      id: java-junit-projet
+      type: code
+      title: Runner d’annotations
+      difficulty: 3
+      prompt: |
+        Recrée le cœur de JUnit : définis une annotation `@Test` (rétention RUNTIME) et une classe `TestsPanier` avec plusieurs méthodes annotées qui testent une classe `Panier` (à écrire : `ajouter(String, double prix, int qte)`, `double total()`, `retirer(String)` qui lève `NoSuchElementException` si absent).
+
+        Ton runner découvre par **réflexion** les méthodes `@Test` (triées par nom), instancie la classe de test pour chacune (comme `@BeforeEach`), les invoque, et affiche `✔ nom` ou `✘ nom` (si l’invocation lève une exception), puis `R/N`.
+
+        Les tests à écrire : `ajoutSimple` (total 3 × 2.5 = 7.5), `ajoutCumule` (même article ajouté deux fois), `retraitAbsentLeve` (vérifie que retirer un article absent lève l’exception), `totalVide` (0) et `bugVolontaire` (affirme que le total d’un panier vide vaut 1 : doit échouer). L’entrée est ignorée.
+      starter: |
+        import java.lang.annotation.*;
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+            }
+        }
+      solution: |
+        import java.lang.annotation.*;
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        @Retention(RetentionPolicy.RUNTIME)
+        @Target(ElementType.METHOD)
+        @interface Test {}
+
+        class Panier {
+            private final Map<String, double[]> lignes = new LinkedHashMap<>();
+            void ajouter(String a, double prix, int qte) {
+                lignes.merge(a, new double[]{prix, qte}, (o, n) -> new double[]{o[0], o[1] + n[1]});
+            }
+            double total() { return lignes.values().stream().mapToDouble(l -> l[0] * l[1]).sum(); }
+            void retirer(String a) { if (lignes.remove(a) == null) throw new NoSuchElementException(a); }
+        }
+
+        class TestsPanier {
+            private final Panier p = new Panier();
+            static void verifier(boolean c) { if (!c) throw new AssertionError(); }
+            @Test void ajoutSimple() { p.ajouter("cafe", 2.5, 3); verifier(p.total() == 7.5); }
+            @Test void ajoutCumule() { p.ajouter("the", 2, 1); p.ajouter("the", 2, 2); verifier(p.total() == 6); }
+            @Test void retraitAbsentLeve() {
+                try { p.retirer("x"); throw new AssertionError("pas d’exception"); } catch (NoSuchElementException e) { }
+            }
+            @Test void totalVide() { verifier(p.total() == 0); }
+            @Test void bugVolontaire() { verifier(p.total() == 1); }
+        }
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                List<Method> tests = new ArrayList<>();
+                for (Method m : TestsPanier.class.getDeclaredMethods()) if (m.isAnnotationPresent(Test.class)) tests.add(m);
+                tests.sort(Comparator.comparing(Method::getName));
+                int ok = 0;
+                for (Method m : tests) {
+                    Object instance = TestsPanier.class.getDeclaredConstructor().newInstance();
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(instance);
+                        ok++;
+                        System.out.println("✔ " + m.getName());
+                    } catch (InvocationTargetException e) {
+                        System.out.println("✘ " + m.getName());
+                    }
+                }
+                System.out.println(ok + "/" + tests.size());
+            }
+        }
+      tests:
+        - { input: '', output: "✔ ajoutCumule\n✔ ajoutSimple\n✘ bugVolontaire\n✔ retraitAbsentLeve\n✔ totalVide\n4/5" }
+        - { input: x, output: "✔ ajoutCumule\n✔ ajoutSimple\n✘ bugVolontaire\n✔ retraitAbsentLeve\n✔ totalVide\n4/5", hidden: true }
+      require:
+        - { pattern: '@interface\s+Test', message: Définir l’annotation @Test }
+        - { pattern: 'getDeclaredMethods', message: Découvrir les tests par réflexion }
+    exam:
+      pass: 70
+      questions:
+        - id: java-junit-ex1
+          type: mcq
+          prompt: Quelle annotation permet d’exécuter un test avec plusieurs jeux de données ?
+          choices: ['@ParameterizedTest', '@RepeatedData', '@MultiTest', '@Test(values)']
+          answer: 0
+        - id: java-junit-ex2
+          type: mcq
+          prompt: Quelle bibliothèque sert à créer des objets simulés (mocks) ?
+          choices: ['Mockito', 'Gson', 'Lombok', 'Log4j']
+          answer: 0
+        - id: java-junit-ex3
+          type: mcq
+          prompt: Où placer les tests dans un projet Maven ?
+          choices: ['src/test/java', 'src/main/java', 'test/', 'target/test']
+          answer: 0
