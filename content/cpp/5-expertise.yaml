@@ -1,0 +1,1856 @@
+language: cpp
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: cpp-architecture
+    title: Architecture C++
+    summary: Structurer un projet C++ — séparation interface/implémentation, PImpl, inversion de dépendances, valeur vs entité et gestion des dépendances de compilation.
+    minutes: 40
+    concepts: [architecture, classes]
+    sections:
+      - title: Interfaces et dépendances
+        body: |
+          Un grand projet C++ souffre vite de **temps de compilation** élevés et de couplage. Principes :
+
+          - **En-têtes minimaux** : déclarer (`class Moteur;`) plutôt qu’inclure quand un pointeur/référence suffit ;
+          - **Inversion de dépendances** : le cœur métier dépend d’interfaces abstraites (classes virtuelles pures ou concepts), pas des détails (base de données, réseau) ;
+          - **Composition** plutôt qu’héritage profond ;
+          - **Types valeur** (copiables, comparables : `Date`, `Argent`) vs **entités** (identité, non copiables : `Session`, `Connexion`).
+
+          ```cpp
+          class Depot {                       // port (interface)
+          public:
+              virtual ~Depot() = default;
+              virtual std::optional<Compte> charger(int id) const = 0;
+              virtual void sauver(const Compte&) = 0;
+          };
+          class ServiceVirement {             // métier, testable avec un dépôt en mémoire
+          public:
+              explicit ServiceVirement(Depot& d) : depot_(d) {}
+          private:
+              Depot& depot_;
+          };
+          ```
+      - title: L’idiome PImpl
+        body: |
+          **PImpl** (*Pointer to Implementation*) cache les détails privés derrière un pointeur, pour stabiliser l’ABI et réduire les recompilations :
+
+          ```cpp
+          // widget.hpp — ne change jamais quand l’implémentation évolue
+          class Widget {
+          public:
+              Widget();
+              ~Widget();                         // défini dans le .cpp (Impl y est complet)
+              Widget(Widget&&) noexcept;
+              Widget& operator=(Widget&&) noexcept;
+              void dessiner();
+          private:
+              struct Impl;
+              std::unique_ptr<Impl> impl_;
+          };
+
+          // widget.cpp
+          struct Widget::Impl { std::vector<Point> points; Texture texture; };
+          Widget::Widget() : impl_(std::make_unique<Impl>()) {}
+          Widget::~Widget() = default;
+          ```
+
+          Coût : une indirection et une allocation. Les **modules C++20** (`export module`) réduisent aussi les temps de compilation.
+    exercises:
+      - id: cpp-arch-q1
+        type: mcq
+        prompt: Pourquoi le destructeur d’une classe PImpl doit-il être défini dans le .cpp ?
+        choices: ['unique_ptr<Impl> a besoin du type Impl complet pour le détruire', 'Pour la performance', 'C’est une convention sans effet', 'Pour l’héritage']
+        answer: 0
+      - id: cpp-arch-q2
+        type: mcq
+        prompt: Quel est l’intérêt d’une déclaration anticipée (class Moteur;) dans un en-tête ?
+        choices: ['Réduire les dépendances et les temps de compilation', 'Définir la classe', 'Allouer la classe', 'Rendre la classe privée']
+        answer: 0
+      - id: cpp-arch-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <memory>
+          #include <string>
+          class Journal { public: virtual ~Journal() = default; virtual void ecrire(const std::string&) = 0; };
+          class JournalConsole : public Journal { public: void ecrire(const std::string& m) override { std::cout << "[log] " << m << "\n"; } };
+          class JournalMuet : public Journal { public: int n = 0; void ecrire(const std::string&) override { ++n; } };
+          class Service {
+          public:
+              explicit Service(Journal& j) : j_(j) {}
+              int calculer(int x) { j_.ecrire("calcul " + std::to_string(x)); return x * 2; }
+          private:
+              Journal& j_;
+          };
+          int main() {
+              JournalConsole c; JournalMuet m;
+              Service a(c), b(m);
+              int r = a.calculer(3) + b.calculer(4) + b.calculer(5);
+              std::cout << r << " " << m.n << "\n";
+          }
+        output: "[log] calcul 3\n24 2"
+      - id: cpp-arch-code
+        type: code
+        title: Service testable
+        prompt: |
+          Écris une interface `Depot` (`virtual std::optional<long long> solde(const std::string&) const`, `virtual void definir(const std::string&, long long)`), une implémentation `DepotMemoire` (`std::map`) et une fonction `std::string virer(Depot&, de, vers, montant)` qui renvoie `ok`, `compte inconnu`, `solde insuffisant` ou `montant invalide` (montant ≤ 0). Un virement d’un compte vers lui-même valide ne change rien et renvoie `ok`.
+
+          Commandes : `ouvrir id solde`, `virer de vers montant`. Termine par les soldes triés (`id=solde`).
+        starter: |
+          #include <iostream>
+          #include <map>
+          #include <optional>
+          #include <string>
+
+          int main() {
+          }
+        solution: |
+          #include <iostream>
+          #include <map>
+          #include <optional>
+          #include <string>
+
+          class Depot {
+          public:
+              virtual ~Depot() = default;
+              virtual std::optional<long long> solde(const std::string& id) const = 0;
+              virtual void definir(const std::string& id, long long s) = 0;
+          };
+
+          class DepotMemoire : public Depot {
+          public:
+              std::optional<long long> solde(const std::string& id) const override {
+                  auto it = m_.find(id);
+                  if (it == m_.end()) return std::nullopt;
+                  return it->second;
+              }
+              void definir(const std::string& id, long long s) override { m_[id] = s; }
+              const std::map<std::string, long long>& tous() const { return m_; }
+          private:
+              std::map<std::string, long long> m_;
+          };
+
+          std::string virer(Depot& d, const std::string& de, const std::string& vers, long long montant) {
+              if (montant <= 0) return "montant invalide";
+              auto s1 = d.solde(de), s2 = d.solde(vers);
+              if (!s1 || !s2) return "compte inconnu";
+              if (*s1 < montant) return "solde insuffisant";
+              if (de == vers) return "ok";
+              d.definir(de, *s1 - montant);
+              d.definir(vers, *s2 + montant);
+              return "ok";
+          }
+
+          int main() {
+              DepotMemoire depot;
+              std::string cmd;
+              while (std::cin >> cmd) {
+                  if (cmd == "ouvrir") {
+                      std::string id; long long s;
+                      std::cin >> id >> s;
+                      depot.definir(id, s);
+                  } else {
+                      std::string a, b; long long m;
+                      std::cin >> a >> b >> m;
+                      std::cout << virer(depot, a, b, m) << "\n";
+                  }
+              }
+              bool premier = true;
+              for (const auto& [id, s] : depot.tous()) { std::cout << (premier ? "" : " ") << id << "=" << s; premier = false; }
+              std::cout << "\n";
+          }
+        tests:
+          - { input: "ouvrir a 100\nouvrir b 0\nvirer a b 30\nvirer b a 50\nvirer a z 1\nvirer a b -5", output: "ok\nsolde insuffisant\ncompte inconnu\nmontant invalide\na=70 b=30" }
+          - { input: "ouvrir x 5\nvirer x x 5", output: "ok\nx=5", hidden: true }
+        require:
+          - { pattern: 'class\s+Depot', message: Définir l’interface Depot }
+          - { pattern: 'virtual', message: Utiliser des méthodes virtuelles }
+    project:
+      id: cpp-arch-projet
+      type: code
+      title: Moteur de règles de promotion
+      difficulty: 3
+      prompt: |
+        Conçois un moteur de promotions extensible : une interface `Regle` (`virtual std::optional<long long> remise(const Panier&) const` en centimes, `virtual std::string nom() const`), et trois règles :
+
+        - `PourcentageDes(seuil, pct)` : `pct` % du total si le total ≥ `seuil` ;
+        - `TroisPourDeux(article)` : un article offert (le prix unitaire) pour chaque lot de 3 du même article ;
+        - `CodePromo(code, montant)` : remise fixe si le code saisi correspond.
+
+        Le moteur applique **la meilleure** règle (la plus grosse remise ; la première en cas d’égalité).
+
+        Entrée : lignes `article prix_centimes quantite`, puis une ligne `code XYZ`. Règles fixes : `PourcentageDes(5000, 10)`, `TroisPourDeux("cafe")`, `CodePromo("KIRI", 700)`. Affiche `total : T`, `règle : nom` (ou `aucune`), `à payer : P`.
+      starter: |
+        #include <iostream>
+        #include <memory>
+        #include <optional>
+        #include <string>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <memory>
+        #include <optional>
+        #include <string>
+        #include <vector>
+
+        struct Ligne { std::string article; long long prix; int quantite; };
+        struct Panier { std::vector<Ligne> lignes; std::string code; long long total() const { long long t = 0; for (auto& l : lignes) t += l.prix * l.quantite; return t; } };
+
+        class Regle {
+        public:
+            virtual ~Regle() = default;
+            virtual std::optional<long long> remise(const Panier&) const = 0;
+            virtual std::string nom() const = 0;
+        };
+
+        class PourcentageDes : public Regle {
+        public:
+            PourcentageDes(long long seuil, int pct) : seuil_(seuil), pct_(pct) {}
+            std::optional<long long> remise(const Panier& p) const override {
+                if (p.total() < seuil_) return std::nullopt;
+                return p.total() * pct_ / 100;
+            }
+            std::string nom() const override { return std::to_string(pct_) + " % dès " + std::to_string(seuil_); }
+        private:
+            long long seuil_;
+            int pct_;
+        };
+
+        class TroisPourDeux : public Regle {
+        public:
+            explicit TroisPourDeux(std::string a) : article_(std::move(a)) {}
+            std::optional<long long> remise(const Panier& p) const override {
+                long long r = 0;
+                for (const auto& l : p.lignes) if (l.article == article_) r += (l.quantite / 3) * l.prix;
+                if (r == 0) return std::nullopt;
+                return r;
+            }
+            std::string nom() const override { return "3 pour 2 sur " + article_; }
+        private:
+            std::string article_;
+        };
+
+        class CodePromo : public Regle {
+        public:
+            CodePromo(std::string c, long long m) : code_(std::move(c)), montant_(m) {}
+            std::optional<long long> remise(const Panier& p) const override {
+                if (p.code != code_) return std::nullopt;
+                return std::min(montant_, p.total());
+            }
+            std::string nom() const override { return "code " + code_; }
+        private:
+            std::string code_;
+            long long montant_;
+        };
+
+        int main() {
+            Panier p;
+            std::string mot;
+            while (std::cin >> mot) {
+                if (mot == "code") { std::cin >> p.code; break; }
+                Ligne l{mot, 0, 0};
+                std::cin >> l.prix >> l.quantite;
+                p.lignes.push_back(l);
+            }
+            std::vector<std::unique_ptr<Regle>> regles;
+            regles.push_back(std::make_unique<PourcentageDes>(5000, 10));
+            regles.push_back(std::make_unique<TroisPourDeux>("cafe"));
+            regles.push_back(std::make_unique<CodePromo>("KIRI", 700));
+            const Regle* meilleure = nullptr;
+            long long best = 0;
+            for (const auto& r : regles) {
+                auto v = r->remise(p);
+                if (v && *v > best) { best = *v; meilleure = r.get(); }
+            }
+            std::cout << "total : " << p.total() << "\n";
+            std::cout << "règle : " << (meilleure ? meilleure->nom() : "aucune") << "\n";
+            std::cout << "à payer : " << p.total() - best << "\n";
+        }
+      tests:
+        - { input: "cafe 450 6\nlivre 2000 1\ncode NON", output: "total : 4700\nrègle : 3 pour 2 sur cafe\nà payer : 3800" }
+        - { input: "tv 60000 1\ncode KIRI", output: "total : 60000\nrègle : 10 % dès 5000\nà payer : 54000", hidden: true }
+        - { input: "stylo 100 2\ncode KIRI", output: "total : 200\nrègle : code KIRI\nà payer : 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-arch-ex1
+          type: mcq
+          prompt: Que permet le principe d’inversion des dépendances ?
+          choices: ['Le métier dépend d’abstractions, les détails techniques sont interchangeables', 'Inverser l’ordre des includes', 'Supprimer les dépendances', 'Accélérer l’exécution']
+          answer: 0
+        - id: cpp-arch-ex2
+          type: mcq
+          prompt: Quel est le coût de PImpl ?
+          choices: ['Une allocation et une indirection supplémentaires', 'Aucun', 'Des fuites mémoire', 'L’impossibilité de copier']
+          answer: 0
+        - id: cpp-arch-ex3
+          type: mcq
+          prompt: Une Date est plutôt…
+          choices: ['Un type valeur (copiable, comparable)', 'Une entité avec identité', 'Une interface', 'Un singleton']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-optimisation
+    title: Optimisation
+    summary: Écrire du C++ rapide — complexité, cache, allocations, déplacement, inlining, vectorisation et options de compilation.
+    minutes: 35
+    concepts: [performance]
+    sections:
+      - title: Les leviers, dans l’ordre
+        body: |
+          1. **Algorithme et structure** : O(n log n) plutôt que O(n²) ; `unordered_map` pour les recherches ; trier une fois plutôt que chercher n fois.
+          2. **Mémoire contiguë et cache** : `std::vector` plutôt que `std::list` ; parcours séquentiels ; structure de tableaux pour les calculs massifs.
+          3. **Allocations** : `reserve`, réutiliser les tampons, éviter les copies (références `const&`, `std::move`, `string_view`).
+          4. **E/S** : `std::ios::sync_with_stdio(false); std::cin.tie(nullptr);`, `'\n'` plutôt que `std::endl`.
+          5. **Compilateur** : `-O2`/`-O3`, `-march=native`, LTO (`-flto`), PGO (`-fprofile-generate` puis `-fprofile-use`).
+          6. **Micro** : branches prévisibles, `[[likely]]`, éviter les appels virtuels dans les boucles chaudes.
+
+          Toujours **mesurer** (benchmark, profileur) avant et après.
+      - title: Exemples concrets
+        body: |
+          ```cpp
+          // ❌ O(n²) : erase en tête de vector dans une boucle
+          while (!v.empty()) { traiter(v.front()); v.erase(v.begin()); }
+          // ✅ O(n)
+          for (auto& x : v) traiter(x); v.clear();
+
+          // ❌ copie à chaque itération
+          for (auto s : chaines) total += s.size();
+          // ✅
+          for (const auto& s : chaines) total += s.size();
+
+          // ❌ endl vide le tampon à chaque ligne
+          for (int i = 0; i < n; ++i) std::cout << i << std::endl;
+          // ✅
+          for (int i = 0; i < n; ++i) std::cout << i << '\n';
+          ```
+    exercises:
+      - id: cpp-optim-q1
+        type: mcq
+        prompt: Quelles lignes accélèrent fortement les E/S avec cin/cout ?
+        choices: ['std::ios::sync_with_stdio(false); std::cin.tie(nullptr);', 'std::cout.flush() partout', '#pragma fast', 'Utiliser std::endl']
+        answer: 0
+      - id: cpp-optim-q2
+        type: mcq
+        prompt: Qu’est-ce que la PGO ?
+        choices: ['Une optimisation guidée par un profil d’exécution réel', 'Un garbage collector', 'Un format de fichier', 'Un type de pointeur']
+        answer: 0
+      - id: cpp-optim-code
+        type: code
+        title: Paires de somme cible
+        prompt: |
+          Première ligne : `n cible`. Seconde ligne : `n` entiers distincts. Compte les paires (i < j) de somme `cible`.
+
+          ⚠️ Les tests cachés vont jusqu’à 200 000 nombres : une solution O(n²) est trop lente. Utilise un `std::unordered_set` (avec `reserve`) et des E/S rapides.
+        starter: |
+          #include <iostream>
+          #include <unordered_set>
+
+          int main() {
+              std::ios::sync_with_stdio(false);
+              std::cin.tie(nullptr);
+          }
+        solution: |
+          #include <iostream>
+          #include <unordered_set>
+
+          int main() {
+              std::ios::sync_with_stdio(false);
+              std::cin.tie(nullptr);
+              std::size_t n;
+              long long cible;
+              std::cin >> n >> cible;
+              std::unordered_set<long long> vus;
+              vus.reserve(n * 2);
+              long long paires = 0;
+              for (std::size_t i = 0; i < n; ++i) {
+                  long long x;
+                  std::cin >> x;
+                  if (vus.count(cible - x)) ++paires;
+                  vus.insert(x);
+              }
+              std::cout << paires << "\n";
+          }
+        tests:
+          - { input: "5 10\n1 9 3 7 5", output: '2' }
+          - { input: "4 0\n-2 2 -5 5", output: '2', hidden: true }
+        concepts: [performance]
+    project:
+      id: cpp-optim-projet
+      type: code
+      title: Requêtes de sommes sur intervalles
+      difficulty: 3
+      prompt: |
+        Première ligne : `n q`. Seconde ligne : `n` entiers. Puis `q` requêtes `g d` (indices 1-indexés, g ≤ d) : affiche la somme des éléments de `g` à `d`.
+
+        Avec n, q jusqu’à 200 000, un calcul naïf O(n·q) est trop lent : utilise des **sommes préfixes** (O(n + q)) et des E/S rapides.
+      starter: |
+        #include <iostream>
+        #include <vector>
+
+        int main() {
+            std::ios::sync_with_stdio(false);
+            std::cin.tie(nullptr);
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+
+        int main() {
+            std::ios::sync_with_stdio(false);
+            std::cin.tie(nullptr);
+            std::size_t n, q;
+            std::cin >> n >> q;
+            std::vector<long long> prefixe(n + 1, 0);
+            for (std::size_t i = 1; i <= n; ++i) {
+                long long x;
+                std::cin >> x;
+                prefixe[i] = prefixe[i - 1] + x;
+            }
+            while (q--) {
+                std::size_t g, d;
+                std::cin >> g >> d;
+                std::cout << prefixe[d] - prefixe[g - 1] << '\n';
+            }
+        }
+      tests:
+        - { input: "5 3\n1 2 3 4 5\n1 5\n2 3\n4 4", output: "15\n5\n4" }
+        - { input: "3 2\n-1 -2 10\n1 2\n1 3", output: "-3\n7", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-optim-ex1
+          type: mcq
+          prompt: 'Pourquoi `for (auto s : chaines)` est-il coûteux ?'
+          choices: ['Chaque chaîne est copiée', 'Il ne compile pas', 'Il trie les chaînes', 'Il est équivalent à const auto&']
+          answer: 0
+        - id: cpp-optim-ex2
+          type: mcq
+          prompt: Que fait l’option -flto ?
+          choices: ['Optimise au moment de l’édition de liens, à travers les fichiers', 'Active les exceptions', 'Désactive les optimisations', 'Ajoute le débogage']
+          answer: 0
+        - id: cpp-optim-ex3
+          type: mcq
+          prompt: Quelle est la première chose à faire avant d’optimiser ?
+          choices: ['Mesurer et profiler', 'Passer en -O3', 'Réécrire en assembleur', 'Supprimer les classes']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-multithreading
+    title: Multithreading en production
+    summary: Pools de threads, files de tâches, parallélisme des algorithmes standard, conception lock-free et patrons de concurrence.
+    minutes: 40
+    concepts: [concurrence, performance]
+    sections:
+      - title: Pool de threads et algorithmes parallèles
+        body: |
+          Créer un thread par tâche coûte cher : un **pool** garde N threads qui consomment une **file de tâches** (mutex + variable de condition).
+
+          C++17 parallélise les algorithmes standard avec les **politiques d’exécution** :
+
+          ```cpp
+          #include <execution>
+          std::sort(std::execution::par, v.begin(), v.end());
+          auto s = std::reduce(std::execution::par_unseq, v.begin(), v.end(), 0LL);
+          std::transform(std::execution::par, a.begin(), a.end(), b.begin(), f);
+          ```
+
+          (Avec GCC, `par` repose sur Intel TBB : il faut lier `-ltbb`.)
+      - title: Patrons et pièges
+        body: |
+          - **Producteur/consommateur** avec file bornée (contre-pression) ;
+          - **Fork/join** : découper, traiter en parallèle, assembler (`std::async`, `std::reduce`) ;
+          - **Données immuables partagées** : aucune synchronisation nécessaire en lecture ;
+          - **Lock-free** (`std::atomic`, `compare_exchange`) : très délicat (problème ABA, ordre mémoire) — à réserver aux experts et à mesurer ;
+          - Éviter le **faux partage** (`alignas(std::hardware_destructive_interference_size)`) ;
+          - Granularité : des tâches trop petites passent plus de temps à se synchroniser qu’à calculer.
+    exercises:
+      - id: cpp-mt-q1
+        type: mcq
+        prompt: Quel est l’avantage d’un pool de threads ?
+        choices: ['Réutiliser des threads existants au lieu d’en créer un par tâche', 'Éviter les mutex', 'Supprimer les data races', 'Rendre le code séquentiel']
+        answer: 0
+      - id: cpp-mt-q2
+        type: mcq
+        prompt: Qu’est-ce que le problème ABA en programmation lock-free ?
+        choices: ['Une valeur repasse à son état initial et trompe un compare_exchange', 'Un deadlock entre deux threads', 'Une fuite mémoire', 'Une erreur de compilation']
+        answer: 0
+      - id: cpp-mt-code
+        type: code
+        title: Pool de threads
+        prompt: |
+          Implémente une classe `PoolThreads(int n)` avec une file de `std::function<void()>`, un mutex, une variable de condition et `n` threads travailleurs ; `void soumettre(std::function<void()>)` ; le destructeur termine proprement (traite les tâches restantes puis joint les threads).
+
+          Pour chaque entier `k` lu, soumets une tâche qui calcule la somme des diviseurs propres de `k` et la stocke dans un vecteur de résultats (indice = position). Après destruction du pool (fin de portée), affiche `k : somme` dans l’ordre d’entrée.
+        starter: |
+          #include <condition_variable>
+          #include <functional>
+          #include <iostream>
+          #include <mutex>
+          #include <queue>
+          #include <thread>
+          #include <vector>
+
+          int main() {
+              std::vector<long long> ks;
+              long long k;
+              while (std::cin >> k) ks.push_back(k);
+              std::vector<long long> res(ks.size());
+          }
+        solution: |
+          #include <condition_variable>
+          #include <functional>
+          #include <iostream>
+          #include <mutex>
+          #include <queue>
+          #include <thread>
+          #include <vector>
+
+          class PoolThreads {
+          public:
+              explicit PoolThreads(int n) {
+                  for (int i = 0; i < n; ++i) {
+                      ts_.emplace_back([this] {
+                          while (true) {
+                              std::function<void()> t;
+                              {
+                                  std::unique_lock<std::mutex> lk(m_);
+                                  cv_.wait(lk, [this] { return arret_ || !file_.empty(); });
+                                  if (arret_ && file_.empty()) return;
+                                  t = std::move(file_.front());
+                                  file_.pop();
+                              }
+                              t();
+                          }
+                      });
+                  }
+              }
+              void soumettre(std::function<void()> t) {
+                  { std::lock_guard<std::mutex> g(m_); file_.push(std::move(t)); }
+                  cv_.notify_one();
+              }
+              ~PoolThreads() {
+                  { std::lock_guard<std::mutex> g(m_); arret_ = true; }
+                  cv_.notify_all();
+                  for (auto& t : ts_) t.join();
+              }
+          private:
+              std::vector<std::thread> ts_;
+              std::queue<std::function<void()>> file_;
+              std::mutex m_;
+              std::condition_variable cv_;
+              bool arret_ = false;
+          };
+
+          int main() {
+              std::vector<long long> ks;
+              long long k;
+              while (std::cin >> k) ks.push_back(k);
+              std::vector<long long> res(ks.size());
+              {
+                  PoolThreads pool(3);
+                  for (std::size_t i = 0; i < ks.size(); ++i) {
+                      pool.soumettre([&res, &ks, i] {
+                          long long s = 0;
+                          for (long long d = 1; d < ks[i]; ++d) if (ks[i] % d == 0) s += d;
+                          res[i] = s;
+                      });
+                  }
+              }
+              for (std::size_t i = 0; i < ks.size(); ++i) std::cout << ks[i] << " : " << res[i] << "\n";
+          }
+        tests:
+          - { input: 6 12 7 28, output: "6 : 6\n12 : 16\n7 : 1\n28 : 28" }
+          - { input: '1', output: '1 : 0', hidden: true }
+    project:
+      id: cpp-mt-projet
+      type: code
+      title: Map-reduce de fréquences
+      difficulty: 3
+      prompt: |
+        Implémente un mini **map-reduce** : le texte (toutes les lignes de l’entrée) est découpé en 4 morceaux de lignes contiguës ; chaque morceau est traité par une tâche `std::async` qui renvoie une `std::unordered_map<std::string, int>` de fréquences de mots (en minuscules ASCII) — phase *map* ; puis les 4 maps sont fusionnées — phase *reduce*.
+
+        Affiche les 5 mots les plus fréquents (`mot n`), par fréquence décroissante puis ordre alphabétique, et `distincts : D`.
+      starter: |
+        #include <algorithm>
+        #include <cctype>
+        #include <future>
+        #include <iostream>
+        #include <sstream>
+        #include <string>
+        #include <unordered_map>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <algorithm>
+        #include <cctype>
+        #include <future>
+        #include <iostream>
+        #include <sstream>
+        #include <string>
+        #include <unordered_map>
+        #include <vector>
+
+        using Freq = std::unordered_map<std::string, int>;
+
+        Freq compter(const std::vector<std::string>& lignes, std::size_t d, std::size_t f) {
+            Freq m;
+            for (std::size_t i = d; i < f; ++i) {
+                std::istringstream is(lignes[i]);
+                std::string mot;
+                while (is >> mot) {
+                    for (char& c : mot) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    ++m[mot];
+                }
+            }
+            return m;
+        }
+
+        int main() {
+            std::vector<std::string> lignes;
+            std::string l;
+            while (std::getline(std::cin, l)) lignes.push_back(l);
+            std::size_t n = lignes.size(), taille = (n + 3) / 4;
+            std::vector<std::future<Freq>> fs;
+            for (std::size_t k = 0; k < 4; ++k) {
+                std::size_t d = std::min(n, k * taille), f = std::min(n, d + taille);
+                fs.push_back(std::async(std::launch::async, compter, std::cref(lignes), d, f));
+            }
+            Freq total;
+            for (auto& f : fs) for (const auto& [m, c] : f.get()) total[m] += c;
+            std::vector<std::pair<std::string, int>> v(total.begin(), total.end());
+            std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.second != b.second ? a.second > b.second : a.first < b.first; });
+            for (std::size_t i = 0; i < v.size() && i < 5; ++i) std::cout << v[i].first << " " << v[i].second << "\n";
+            std::cout << "distincts : " << v.size() << "\n";
+        }
+      tests:
+        - { input: "Le chat\nle chien et le chat\nUn oiseau\nle chat dort", output: "le 4\nchat 3\nchien 1\ndort 1\net 1\ndistincts : 7" }
+        - { input: a, output: "a 1\ndistincts : 1", hidden: true }
+      require:
+        - { pattern: 'std::async', message: Utiliser std::async pour la phase map }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-mt-ex1
+          type: mcq
+          prompt: Quelle politique d’exécution autorise parallélisme et vectorisation ?
+          choices: ['std::execution::par_unseq', 'std::execution::seq', 'std::launch::deferred', 'std::execution::single']
+          answer: 0
+        - id: cpp-mt-ex2
+          type: mcq
+          prompt: Pourquoi des tâches trop petites nuisent-elles au parallélisme ?
+          choices: ['Le coût de synchronisation dépasse le gain de calcul', 'Elles provoquent des data races', 'Elles sont interdites', 'Elles consomment trop de mémoire']
+          answer: 0
+        - id: cpp-mt-ex3
+          type: mcq
+          prompt: Les données immuables partagées entre threads nécessitent-elles un mutex pour être lues ?
+          choices: ['Non', 'Oui, toujours', 'Seulement en release', 'Seulement pour les vector']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-systeme
+    title: Programmation système
+    summary: Dialoguer avec le système — fichiers et répertoires, processus, variables d’environnement, codes de sortie, signaux et API POSIX.
+    minutes: 35
+    concepts: [systeme]
+    sections:
+      - title: Les briques du système
+        body: |
+          ```cpp
+          #include <cstdlib>
+          #include <filesystem>
+          namespace fs = std::filesystem;
+
+          int main(int argc, char* argv[]) {          // arguments de la ligne de commande
+              if (argc < 2) { std::cerr << "usage : " << argv[0] << " <dossier>\n"; return 2; }
+              const char* home = std::getenv("HOME");   // variable d’environnement (peut être nullptr)
+              for (const auto& e : fs::recursive_directory_iterator(argv[1]))
+                  if (e.is_regular_file()) std::cout << e.path() << " " << e.file_size() << "\n";
+              return EXIT_SUCCESS;                       // 0
+          }
+          ```
+
+          Bas niveau POSIX (`<unistd.h>`, `<fcntl.h>`) : `open`, `read`, `write`, `close`, `fork`, `execvp`, `pipe`, `waitpid`. Les signaux (`SIGINT`, `SIGTERM`) se gèrent avec `sigaction` ; dans un gestionnaire, on ne fait presque rien (positionner un `std::atomic<bool>`).
+      - title: Robustesse
+        body: |
+          - Vérifier **chaque** appel système (valeur de retour, `errno`, exceptions de `std::filesystem` ou surcharges avec `std::error_code`).
+          - Encapsuler les descripteurs de fichiers dans des classes RAII.
+          - Écritures atomiques : fichier temporaire + `fs::rename`.
+          - Ne jamais construire une commande shell avec des données non fiables (injection) : utiliser `execvp` avec un tableau d’arguments.
+          - Résultats sur `stdout`, diagnostics sur `stderr`, code de sortie significatif.
+    exercises:
+      - id: cpp-sys-q1
+        type: mcq
+        prompt: Que contient argv[0] ?
+        choices: ['Le nom (chemin) du programme', 'Le premier argument utilisateur', 'Le nombre d’arguments', 'Rien']
+        answer: 0
+      - id: cpp-sys-q2
+        type: mcq
+        prompt: Que doit faire un gestionnaire de signal ?
+        choices: ['Le minimum, par exemple positionner un drapeau atomique', 'Des affichages complexes', 'Allouer de la mémoire', 'Appeler exit après un long traitement']
+        answer: 0
+      - id: cpp-sys-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <filesystem>
+          #include <iostream>
+          namespace fs = std::filesystem;
+          int main() {
+              fs::path p = "/home/kiri/projets/rapport.final.pdf";
+              std::cout << p.extension() << " " << p.stem() << " " << (p.parent_path() / "images").string() << "\n";
+          }
+        output: '".pdf" "rapport.final" /home/kiri/projets/images'
+      - id: cpp-sys-code
+        type: code
+        title: Arborescence temporaire
+        prompt: |
+          Crée sous `/tmp/codemori-sys-<pid>` (pid via `getpid()` de `<unistd.h>`) l’arborescence décrite par l’entrée : chaque ligne `chemin taille` crée un fichier (et ses dossiers parents) contenant `taille` octets `x`.
+
+          Parcours ensuite le dossier récursivement et affiche, triés par chemin relatif, `chemin : taille`, puis `total : T octets`. Supprime tout avec `remove_all`.
+        starter: |
+          #include <filesystem>
+          #include <fstream>
+          #include <iostream>
+          #include <string>
+          #include <unistd.h>
+
+          int main() {
+          }
+        solution: |
+          #include <algorithm>
+          #include <filesystem>
+          #include <fstream>
+          #include <iostream>
+          #include <string>
+          #include <vector>
+          #include <unistd.h>
+
+          namespace fs = std::filesystem;
+
+          int main() {
+              fs::path racine = fs::path("/tmp") / ("codemori-sys-" + std::to_string(getpid()));
+              std::string chemin;
+              std::size_t taille;
+              while (std::cin >> chemin >> taille) {
+                  fs::path p = racine / chemin;
+                  fs::create_directories(p.parent_path());
+                  std::ofstream(p) << std::string(taille, 'x');
+              }
+              std::vector<std::pair<std::string, std::uintmax_t>> fichiers;
+              if (fs::exists(racine))
+                  for (const auto& e : fs::recursive_directory_iterator(racine))
+                      if (e.is_regular_file()) fichiers.emplace_back(fs::relative(e.path(), racine).string(), e.file_size());
+              std::sort(fichiers.begin(), fichiers.end());
+              std::uintmax_t total = 0;
+              for (const auto& [c, t] : fichiers) { std::cout << c << " : " << t << "\n"; total += t; }
+              std::cout << "total : " << total << " octets\n";
+              fs::remove_all(racine);
+          }
+        tests:
+          - { input: "src/main.cpp 120\nREADME.md 40\nsrc/lib/util.cpp 15", output: "README.md : 40\nsrc/lib/util.cpp : 15\nsrc/main.cpp : 120\ntotal : 175 octets" }
+          - { input: '', output: 'total : 0 octets', hidden: true }
+    project:
+      id: cpp-sys-projet
+      type: code
+      title: Mini shell (analyse de commandes)
+      difficulty: 3
+      prompt: |
+        Écris l’analyseur d’un mini shell. Chaque ligne est une commande pouvant contenir des **guillemets** (`"…"` regroupe des mots, sans les guillemets), des redirections `> fichier` / `< fichier` et des tubes `|`.
+
+        Pour chaque ligne, affiche chaque commande du pipeline sur une ligne : `[i] programme args=[a1, a2] in=… out=…` (`in=-`/`out=-` sans redirection), ou `erreur : guillemet non fermé` / `erreur : commande vide` (tube sans commande).
+      starter: |
+        #include <iostream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+            std::string ligne;
+            while (std::getline(std::cin, ligne)) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <optional>
+        #include <string>
+        #include <vector>
+
+        struct Commande {
+            std::vector<std::string> args;
+            std::string in = "-", out = "-";
+        };
+
+        std::optional<std::vector<std::string>> jetons(const std::string& l) {
+            std::vector<std::string> r;
+            std::string cur;
+            bool dans = false, a = false;
+            for (char c : l) {
+                if (dans) {
+                    if (c == '"') dans = false; else cur += c;
+                } else if (c == '"') { dans = true; a = true; }
+                else if (c == ' ') { if (a || !cur.empty()) r.push_back(cur); cur.clear(); a = false; }
+                else if (c == '|' || c == '<' || c == '>') {
+                    if (a || !cur.empty()) r.push_back(cur);
+                    cur.clear(); a = false;
+                    r.push_back(std::string(1, c));
+                } else cur += c;
+            }
+            if (dans) return std::nullopt;
+            if (a || !cur.empty()) r.push_back(cur);
+            return r;
+        }
+
+        int main() {
+            std::string ligne;
+            while (std::getline(std::cin, ligne)) {
+                auto j = jetons(ligne);
+                if (!j) { std::cout << "erreur : guillemet non fermé\n"; continue; }
+                std::vector<Commande> pipeline(1);
+                bool erreur = false;
+                for (std::size_t i = 0; i < j->size(); ++i) {
+                    const std::string& t = (*j)[i];
+                    if (t == "|") { pipeline.emplace_back(); }
+                    else if ((t == "<" || t == ">") && i + 1 < j->size()) { (t == "<" ? pipeline.back().in : pipeline.back().out) = (*j)[++i]; }
+                    else pipeline.back().args.push_back(t);
+                }
+                for (const auto& c : pipeline) if (c.args.empty()) erreur = true;
+                if (erreur) { std::cout << "erreur : commande vide\n"; continue; }
+                for (std::size_t i = 0; i < pipeline.size(); ++i) {
+                    const auto& c = pipeline[i];
+                    std::cout << "[" << i << "] " << c.args[0] << " args=[";
+                    for (std::size_t k = 1; k < c.args.size(); ++k) std::cout << (k > 1 ? ", " : "") << c.args[k];
+                    std::cout << "] in=" << c.in << " out=" << c.out << "\n";
+                }
+            }
+        }
+      tests:
+        - { input: "grep \"bonjour le monde\" < notes.txt | sort | uniq -c > res.txt\necho \"oups\nls |", output: "[0] grep args=[bonjour le monde] in=notes.txt out=-\n[1] sort args=[] in=- out=-\n[2] uniq args=[-c] in=- out=res.txt\nerreur : guillemet non fermé\nerreur : commande vide" }
+        - { input: ls -la, output: '[0] ls args=[-la] in=- out=-', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-sys-ex1
+          type: mcq
+          prompt: Pourquoi éviter system() avec des données utilisateur ?
+          choices: ['Risque d’injection de commandes', 'C’est trop lent', 'Ça ne compile pas', 'Ça ne fonctionne que sous Windows']
+          answer: 0
+        - id: cpp-sys-ex2
+          type: mcq
+          prompt: Quel appel POSIX crée un processus fils ?
+          choices: ['fork', 'pipe', 'open', 'signal']
+          answer: 0
+        - id: cpp-sys-ex3
+          type: mcq
+          prompt: Que renvoie std::getenv pour une variable inexistante ?
+          choices: ['nullptr', 'Une chaîne vide', 'Une exception', '0']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-cmake
+    title: CMake
+    summary: Construire des projets C++ avec CMake moderne — cibles, dépendances, options, tests avec CTest et gestion de paquets.
+    minutes: 30
+    concepts: [build]
+    sections:
+      - title: CMake moderne, orienté cibles
+        body: |
+          ```cmake
+          cmake_minimum_required(VERSION 3.25)
+          project(Codemori VERSION 1.0 LANGUAGES CXX)
+
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+          add_library(noyau src/compte.cpp src/banque.cpp)          # bibliothèque
+          target_include_directories(noyau PUBLIC include)
+          target_compile_options(noyau PRIVATE -Wall -Wextra -Wpedantic)
+
+          add_executable(app src/main.cpp)                           # exécutable
+          target_link_libraries(app PRIVATE noyau)
+
+          find_package(fmt REQUIRED)                                 # dépendance externe
+          target_link_libraries(app PRIVATE fmt::fmt)
+          ```
+
+          ```bash
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+          ctest --test-dir build
+          ```
+      - title: PUBLIC, PRIVATE, INTERFACE
+        body: |
+          La visibilité des propriétés d’une cible se **propage** aux cibles qui la lient :
+
+          | Mot-clé | Utilisé par la cible | Propagé aux dépendants |
+          |---|---|---|
+          | `PRIVATE` | ✅ | ❌ |
+          | `PUBLIC` | ✅ | ✅ |
+          | `INTERFACE` | ❌ | ✅ (bibliothèques header-only) |
+
+          Tests : `enable_testing()` + `add_test(NAME unitaires COMMAND tests_unitaires)`. Dépendances : `FetchContent` (télécharge à la configuration), **vcpkg** ou **Conan**. Éviter l’ancien style global (`include_directories`, `CMAKE_CXX_FLAGS`) au profit des commandes `target_*`.
+    exercises:
+      - id: cpp-cmake-q1
+        type: mcq
+        prompt: Quel mot-clé utiliser pour un répertoire d’en-têtes nécessaire aux utilisateurs d’une bibliothèque ?
+        choices: ['PUBLIC', 'PRIVATE', 'STATIC', 'GLOBAL']
+        answer: 0
+      - id: cpp-cmake-order
+        type: order
+        prompt: Remets dans l’ordre les commandes pour configurer, compiler et tester un projet CMake.
+        lines:
+          - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          - cmake --build build -j
+          - ctest --test-dir build
+      - id: cpp-cmake-fill
+        type: fill
+        prompt: Complète le CMakeLists.txt qui lie l’exécutable à la bibliothèque.
+        code: |
+          add_library(maths src/maths.cpp)
+          add_{{?}}(calculatrice src/main.cpp)
+          target_link_libraries(calculatrice {{?}} maths)
+        blanks: [[executable], [PRIVATE, PUBLIC]]
+      - id: cpp-cmake-q2
+        type: mcq
+        prompt: Quand utiliser INTERFACE pour une bibliothèque ?
+        choices: ['Pour une bibliothèque header-only', 'Pour un exécutable', 'Pour les tests', 'Jamais']
+        answer: 0
+      - id: cpp-cmake-code
+        type: code
+        title: Analyseur de CMakeLists
+        prompt: |
+          Écris un petit analyseur de fichiers CMake. Pour chaque appel `add_library(nom …)` et `add_executable(nom …)`, enregistre une cible ; pour chaque `target_link_libraries(cible [PRIVATE|PUBLIC|INTERFACE] dep…)`, enregistre les dépendances (on ignore les mots-clés).
+
+          Affiche chaque cible dans l’ordre de déclaration au format `nom (bibliothèque|exécutable) -> dep1, dep2` (ou `-> aucune`), puis l’**ordre de compilation** (tri topologique : une cible après ses dépendances, à égalité l’ordre de déclaration), les dépendances externes (non déclarées) étant ignorées.
+        starter: |
+          #include <iostream>
+          #include <map>
+          #include <sstream>
+          #include <string>
+          #include <vector>
+
+          int main() {
+          }
+        solution: |
+          #include <algorithm>
+          #include <iostream>
+          #include <map>
+          #include <set>
+          #include <sstream>
+          #include <string>
+          #include <vector>
+
+          int main() {
+              std::string texte, l;
+              while (std::getline(std::cin, l)) texte += l + " ";
+              std::vector<std::string> ordre;
+              std::map<std::string, std::string> type;
+              std::map<std::string, std::vector<std::string>> deps;
+              std::size_t pos = 0;
+              while ((pos = texte.find('(', pos)) != std::string::npos) {
+                  std::size_t debut = texte.rfind(' ', pos);
+                  std::string cmd = texte.substr(debut == std::string::npos ? 0 : debut + 1, pos - (debut == std::string::npos ? 0 : debut + 1));
+                  std::size_t fin = texte.find(')', pos);
+                  std::istringstream is(texte.substr(pos + 1, fin - pos - 1));
+                  std::vector<std::string> args;
+                  std::string a;
+                  while (is >> a) args.push_back(a);
+                  if ((cmd == "add_library" || cmd == "add_executable") && !args.empty()) {
+                      ordre.push_back(args[0]);
+                      type[args[0]] = cmd == "add_library" ? "bibliothèque" : "exécutable";
+                  } else if (cmd == "target_link_libraries" && !args.empty()) {
+                      for (std::size_t i = 1; i < args.size(); ++i)
+                          if (args[i] != "PRIVATE" && args[i] != "PUBLIC" && args[i] != "INTERFACE") deps[args[0]].push_back(args[i]);
+                  }
+                  pos = fin;
+              }
+              for (const auto& c : ordre) {
+                  std::cout << c << " (" << type[c] << ") -> ";
+                  if (deps[c].empty()) std::cout << "aucune";
+                  for (std::size_t i = 0; i < deps[c].size(); ++i) std::cout << (i ? ", " : "") << deps[c][i];
+                  std::cout << "\n";
+              }
+              std::set<std::string> fait;
+              std::vector<std::string> res;
+              while (res.size() < ordre.size()) {
+                  bool progres = false;
+                  for (const auto& c : ordre) {
+                      if (fait.count(c)) continue;
+                      bool pret = std::all_of(deps[c].begin(), deps[c].end(), [&](const std::string& d) { return !type.count(d) || fait.count(d); });
+                      if (pret) { fait.insert(c); res.push_back(c); progres = true; break; }
+                  }
+                  if (!progres) break;
+              }
+              std::cout << "ordre :";
+              for (const auto& c : res) std::cout << " " << c;
+              std::cout << "\n";
+          }
+        tests:
+          - { input: "project(Demo)\nadd_executable(app main.cpp)\nadd_library(reseau reseau.cpp)\nadd_library(noyau noyau.cpp)\ntarget_link_libraries(app PRIVATE reseau noyau fmt::fmt)\ntarget_link_libraries(reseau PUBLIC noyau)", output: "app (exécutable) -> reseau, noyau, fmt::fmt\nreseau (bibliothèque) -> noyau\nnoyau (bibliothèque) -> aucune\nordre : noyau reseau app" }
+          - { input: "add_library(a a.cpp)", output: "a (bibliothèque) -> aucune\nordre : a", hidden: true }
+    project:
+      id: cpp-cmake-projet
+      type: code
+      title: Générateur de CMakeLists
+      difficulty: 3
+      prompt: |
+        Génère un `CMakeLists.txt` moderne à partir d’une description. Première ligne : `projet NOM STANDARD` (ex. `projet Jeu 23`). Lignes suivantes : `lib NOM fichiers…`, `exe NOM fichiers…`, `lien CIBLE DEP…`.
+
+        Sortie attendue (respecte exactement le format) :
+
+        ```
+        cmake_minimum_required(VERSION 3.25)
+        project(NOM LANGUAGES CXX)
+        set(CMAKE_CXX_STANDARD STANDARD)
+        set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+        add_library(NOM fichiers…)
+        target_compile_options(NOM PRIVATE -Wall -Wextra)
+        …
+        target_link_libraries(CIBLE PRIVATE DEP…)
+        ```
+
+        Les cibles dans l’ordre de déclaration (chacune suivie de sa ligne `target_compile_options`), puis une ligne vide, puis les liens dans l’ordre.
+      starter: |
+        #include <iostream>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+            std::string mot, nom, standard;
+            std::cin >> mot >> nom >> standard;
+            std::string ligne;
+            std::getline(std::cin, ligne);
+            std::vector<std::string> cibles, liens;
+            while (std::getline(std::cin, ligne)) {
+                std::istringstream is(ligne);
+                std::string type, cible, x, reste;
+                is >> type >> cible;
+                while (is >> x) reste += " " + x;
+                if (type == "lib" || type == "exe") {
+                    cibles.push_back(std::string(type == "lib" ? "add_library(" : "add_executable(") + cible + reste + ")\ntarget_compile_options(" + cible + " PRIVATE -Wall -Wextra)");
+                } else if (type == "lien") {
+                    liens.push_back("target_link_libraries(" + cible + " PRIVATE" + reste + ")");
+                }
+            }
+            std::cout << "cmake_minimum_required(VERSION 3.25)\n";
+            std::cout << "project(" << nom << " LANGUAGES CXX)\n";
+            std::cout << "set(CMAKE_CXX_STANDARD " << standard << ")\n";
+            std::cout << "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n\n";
+            for (const auto& c : cibles) std::cout << c << "\n";
+            std::cout << "\n";
+            for (const auto& l : liens) std::cout << l << "\n";
+        }
+      tests:
+        - { input: "projet Jeu 23\nlib moteur moteur.cpp rendu.cpp\nexe jeu main.cpp\nlien jeu moteur", output: "cmake_minimum_required(VERSION 3.25)\nproject(Jeu LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 23)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n\nadd_library(moteur moteur.cpp rendu.cpp)\ntarget_compile_options(moteur PRIVATE -Wall -Wextra)\nadd_executable(jeu main.cpp)\ntarget_compile_options(jeu PRIVATE -Wall -Wextra)\n\ntarget_link_libraries(jeu PRIVATE moteur)" }
+        - { input: "projet Outil 20\nexe outil a.cpp", output: "cmake_minimum_required(VERSION 3.25)\nproject(Outil LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n\nadd_executable(outil a.cpp)\ntarget_compile_options(outil PRIVATE -Wall -Wextra)", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-cmake-ex1
+          type: mcq
+          prompt: Pourquoi préférer target_include_directories à include_directories ?
+          choices: ['Les propriétés sont attachées à une cible et se propagent proprement', 'C’est plus court', 'include_directories n’existe plus', 'Pour la vitesse de compilation']
+          answer: 0
+        - id: cpp-cmake-ex2
+          type: mcq
+          prompt: Quel outil exécute les tests déclarés avec add_test ?
+          choices: ['ctest', 'cpack', 'make install', 'gdb']
+          answer: 0
+        - id: cpp-cmake-ex3
+          type: mcq
+          prompt: Lequel est un gestionnaire de paquets C++ ?
+          choices: ['vcpkg', 'npm', 'pip', 'cargo']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-debugging
+    title: Debugging
+    summary: Trouver les bugs méthodiquement — GDB, points d’arrêt, sanitizers, assertions, journaux et reproduction minimale.
+    minutes: 30
+    concepts: [debug]
+    sections:
+      - title: GDB et sanitizers
+        body: |
+          Compiler avec `-g -O0` pour déboguer confortablement, puis :
+
+          ```bash
+          gdb ./programme
+          (gdb) break main.cpp:42        # point d’arrêt
+          (gdb) run < entree.txt
+          (gdb) next / step / finish     # pas à pas
+          (gdb) print v.size()           # inspecter
+          (gdb) backtrace                # pile d’appels (après un crash)
+          (gdb) watch compteur           # s’arrêter quand la variable change
+          ```
+
+          Les **sanitizers** instrumentent le programme et signalent l’erreur exactement où elle se produit :
+
+          | Option | Détecte |
+          |---|---|
+          | `-fsanitize=address` | dépassements, use-after-free, fuites |
+          | `-fsanitize=undefined` | dépassements signés, divisions par zéro, décalages invalides… |
+          | `-fsanitize=thread` | data races |
+      - title: Une méthode
+        body: |
+          1. **Reproduire** de façon fiable (entrée minimale).
+          2. **Isoler** : réduire le programme/l’entrée jusqu’au cas minimal (bisection, `git bisect` pour une régression).
+          3. **Formuler une hypothèse** et la tester (assertion, point d’arrêt, journal).
+          4. **Corriger la cause**, pas le symptôme.
+          5. **Ajouter un test** de non-régression.
+
+          `assert(condition)` (`<cassert>`) vérifie les invariants en mode debug (désactivé avec `-DNDEBUG`). Les journaux (`std::clog`, bibliothèques comme spdlog) aident en production.
+    exercises:
+      - id: cpp-dbg-q1
+        type: mcq
+        prompt: Quelle commande GDB affiche la pile d’appels après un plantage ?
+        choices: ['backtrace', 'print', 'next', 'list']
+        answer: 0
+      - id: cpp-dbg-q2
+        type: mcq
+        prompt: Quel sanitizer détecte un use-after-free ?
+        choices: ['AddressSanitizer', 'ThreadSanitizer', 'UndefinedBehaviorSanitizer', 'Aucun']
+        answer: 0
+      - id: cpp-dbg-bug
+        type: bugfix
+        prompt: Ce programme calcule la moyenne des notes mais affiche un résultat faux pour certaines entrées. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> notes;
+              int n;
+              while (std::cin >> n) notes.push_back(n);
+              int somme = 0;
+              for (std::size_t i = 1; i < notes.size(); ++i) somme += notes[i];
+              std::cout << (notes.empty() ? 0.0 : static_cast<double>(somme) / notes.size()) << "\n";
+          }
+        bugLines: [8]
+        choices:
+          - La boucle commence à 1 et ignore la première note
+          - La division doit être entière
+          - Le vecteur doit être réservé
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> notes;
+              int n;
+              while (std::cin >> n) notes.push_back(n);
+              int somme = 0;
+              for (std::size_t i = 0; i < notes.size(); ++i) somme += notes[i];
+              std::cout << (notes.empty() ? 0.0 : static_cast<double>(somme) / notes.size()) << "\n";
+          }
+        tests:
+          - { input: 10 20, output: '15' }
+          - { input: 8 12 16, output: '12', hidden: true }
+      - id: cpp-dbg-bug2
+        type: bugfix
+        prompt: Cette fonction de recherche dichotomique boucle à l’infini (délai dépassé) sur certaines entrées. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          #include <vector>
+          int chercher(const std::vector<int>& v, int x) {
+              int g = 0, d = static_cast<int>(v.size()) - 1;
+              while (g <= d) {
+                  int m = g + (d - g) / 2;
+                  if (v[m] == x) return m;
+                  if (v[m] < x) g = m;
+                  else d = m - 1;
+              }
+              return -1;
+          }
+          int main() {
+              std::vector<int> v{1, 3, 5, 7, 9};
+              std::cout << chercher(v, 9) << " " << chercher(v, 4) << "\n";
+          }
+        bugLines: [8]
+        choices:
+          - Quand v[m] < x, il faut g = m + 1, sinon l’intervalle ne rétrécit pas toujours
+          - m doit être calculé avec (g + d) * 2
+          - La condition doit être g < d
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <vector>
+          int chercher(const std::vector<int>& v, int x) {
+              int g = 0, d = static_cast<int>(v.size()) - 1;
+              while (g <= d) {
+                  int m = g + (d - g) / 2;
+                  if (v[m] == x) return m;
+                  if (v[m] < x) g = m + 1;
+                  else d = m - 1;
+              }
+              return -1;
+          }
+          int main() {
+              std::vector<int> v{1, 3, 5, 7, 9};
+              std::cout << chercher(v, 9) << " " << chercher(v, 4) << "\n";
+          }
+        tests:
+          - { input: '', output: 4 -1 }
+    project:
+      id: cpp-dbg-projet
+      type: code
+      title: Réduction de cas d’échec
+      difficulty: 3
+      prompt: |
+        Implémente un mini **delta debugging** : on te donne une fonction « boguée » `bool plante(const std::vector<int>& v)` qui renvoie vrai si la liste contient **à la fois** un nombre négatif **et** un multiple de 7 (non nul).
+
+        À partir d’une entrée qui plante, trouve une sous-liste **minimale** qui plante encore, en retirant les éléments **un par un de gauche à droite** : on retire un élément si la liste plante toujours sans lui, sinon on le garde ; on recommence tant qu’on arrive à retirer quelque chose.
+
+        Affiche `plante : oui|non` pour l’entrée, puis (si oui) `minimal : a b …` et `retirés : N`.
+      starter: |
+        #include <iostream>
+        #include <vector>
+
+        bool plante(const std::vector<int>& v) {
+            bool negatif = false, sept = false;
+            for (int x : v) {
+                if (x < 0) negatif = true;
+                if (x != 0 && x % 7 == 0) sept = true;
+            }
+            return negatif && sept;
+        }
+
+        int main() {
+            std::vector<int> v;
+            int x;
+            while (std::cin >> x) v.push_back(x);
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+
+        bool plante(const std::vector<int>& v) {
+            bool negatif = false, sept = false;
+            for (int x : v) {
+                if (x < 0) negatif = true;
+                if (x != 0 && x % 7 == 0) sept = true;
+            }
+            return negatif && sept;
+        }
+
+        int main() {
+            std::vector<int> v;
+            int x;
+            while (std::cin >> x) v.push_back(x);
+            bool p = plante(v);
+            std::cout << "plante : " << (p ? "oui" : "non") << "\n";
+            if (!p) return 0;
+            std::size_t initial = v.size();
+            bool change = true;
+            while (change) {
+                change = false;
+                for (std::size_t i = 0; i < v.size();) {
+                    std::vector<int> essai = v;
+                    essai.erase(essai.begin() + i);
+                    if (plante(essai)) { v = essai; change = true; }
+                    else ++i;
+                }
+            }
+            std::cout << "minimal :";
+            for (int y : v) std::cout << " " << y;
+            std::cout << "\nretirés : " << initial - v.size() << "\n";
+        }
+      tests:
+        - { input: 3 14 -2 8 21 -5, output: "plante : oui\nminimal : 21 -5\nretirés : 4" }
+        - { input: 1 2 3, output: 'plante : non', hidden: true }
+        - { input: -7, output: "plante : oui\nminimal : -7\nretirés : 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-dbg-ex1
+          type: mcq
+          prompt: Que fait git bisect ?
+          choices: ['Recherche dichotomique du commit qui a introduit une régression', 'Fusionne deux branches', 'Supprime un commit', 'Compile le projet']
+          answer: 0
+        - id: cpp-dbg-ex2
+          type: mcq
+          prompt: Que devient assert() quand NDEBUG est défini ?
+          choices: ['Elle est désactivée', 'Elle lève une exception', 'Elle affiche un avertissement', 'Elle devient plus stricte']
+          answer: 0
+        - id: cpp-dbg-ex3
+          type: mcq
+          prompt: Quelle est la première étape pour corriger un bug ?
+          choices: ['Le reproduire de façon fiable', 'Réécrire la fonction', 'Ajouter des commentaires', 'Passer en -O3']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-profiling
+    title: Profiling
+    summary: Mesurer les performances — chronométrage avec chrono, benchmarks, perf, gprof, flamegraphs et interprétation des résultats.
+    minutes: 30
+    concepts: [performance]
+    sections:
+      - title: Mesurer correctement
+        body: |
+          ```cpp
+          #include <chrono>
+          auto t0 = std::chrono::steady_clock::now();     // horloge monotone
+          travail();
+          auto t1 = std::chrono::steady_clock::now();
+          auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+          ```
+
+          Pièges : mesurer en **Release**, répéter (variance), chauffer les caches, empêcher le compilateur d’éliminer le calcul (utiliser le résultat), isoler la machine. **Google Benchmark** gère tout cela :
+
+          ```cpp
+          static void BM_Tri(benchmark::State& s) {
+              for (auto _ : s) { auto v = donnees; std::sort(v.begin(), v.end()); benchmark::DoNotOptimize(v); }
+          }
+          BENCHMARK(BM_Tri);
+          ```
+      - title: Profileurs
+        body: |
+          - **perf** (Linux) : `perf stat ./prog` (cycles, cache-misses, branch-misses), `perf record -g ./prog` puis `perf report` ;
+          - **Flamegraphs** (Brendan Gregg) : visualiser où le temps est passé ;
+          - **gprof** (`-pg`), **Valgrind/Callgrind** + KCachegrind, **Intel VTune**, **Tracy** (jeux vidéo) ;
+          - Mémoire : **heaptrack**, **Massif**.
+
+          Lire un profil : chercher les fonctions au **temps inclusif** élevé, puis descendre ; la règle des 90/10 (90 % du temps dans 10 % du code).
+    exercises:
+      - id: cpp-prof-q1
+        type: mcq
+        prompt: Quelle horloge utiliser pour mesurer une durée ?
+        choices: ['std::chrono::steady_clock', 'std::chrono::system_clock', 'time(nullptr)', 'rand()']
+        answer: 0
+      - id: cpp-prof-q2
+        type: mcq
+        prompt: Pourquoi utiliser benchmark::DoNotOptimize ?
+        choices: ['Empêcher le compilateur d’éliminer un calcul dont le résultat n’est pas utilisé', 'Désactiver les optimisations globales', 'Accélérer le benchmark', 'Afficher les résultats']
+        answer: 0
+      - id: cpp-prof-code
+        type: code
+        title: Profileur d’appels maison
+        prompt: |
+          Écris une classe RAII `Sonde(const std::string& nom)` qui, à sa destruction, ajoute 1 au **compteur d’appels** de `nom` dans une `std::map` statique (on n’affichera pas les durées, non déterministes).
+
+          Instrumente une fonction récursive `long long fib(int n)` (une `Sonde s("fib")` au début) et une fonction `long long fibMemo(int n, std::vector<long long>& memo)` (sonde `"fibMemo"`). Pour chaque `n` lu, appelle les deux, affiche `fib(n) = valeur`, puis à la fin le rapport `nom : appels` trié par nom.
+        starter: |
+          #include <iostream>
+          #include <map>
+          #include <string>
+          #include <vector>
+
+          int main() {
+          }
+        solution: |
+          #include <iostream>
+          #include <map>
+          #include <string>
+          #include <vector>
+
+          class Sonde {
+          public:
+              explicit Sonde(std::string nom) : nom_(std::move(nom)) {}
+              ~Sonde() { ++compteurs()[nom_]; }
+              static std::map<std::string, long long>& compteurs() { static std::map<std::string, long long> m; return m; }
+          private:
+              std::string nom_;
+          };
+
+          long long fib(int n) {
+              Sonde s("fib");
+              return n < 2 ? n : fib(n - 1) + fib(n - 2);
+          }
+
+          long long fibMemo(int n, std::vector<long long>& memo) {
+              Sonde s("fibMemo");
+              if (n < 2) return n;
+              if (memo[n] >= 0) return memo[n];
+              return memo[n] = fibMemo(n - 1, memo) + fibMemo(n - 2, memo);
+          }
+
+          int main() {
+              int n;
+              while (std::cin >> n) {
+                  long long a = fib(n);
+                  std::vector<long long> memo(n + 1, -1);
+                  long long b = fibMemo(n, memo);
+                  std::cout << "fib(" << n << ") = " << a << (a == b ? "" : " ?!") << "\n";
+              }
+              for (const auto& [nom, c] : Sonde::compteurs()) std::cout << nom << " : " << c << "\n";
+          }
+        tests:
+          - { input: '10', output: "fib(10) = 55\nfib : 177\nfibMemo : 19" }
+          - { input: "1\n5", output: "fib(1) = 1\nfib(5) = 5\nfib : 16\nfibMemo : 10", hidden: true }
+    project:
+      id: cpp-prof-projet
+      type: code
+      title: Comparaison d’algorithmes de tri
+      difficulty: 3
+      prompt: |
+        Compte le nombre de **comparaisons** effectuées par trois tris sur la même entrée (mesure déterministe de leur coût) : tri par insertion, tri fusion (fusion classique, comparaisons comptées dans la fusion) et `std::sort` (avec un comparateur qui incrémente un compteur — la valeur dépend de l’implémentation : n’affiche pour lui que `ok` si le résultat est trié).
+
+        Entrée : des entiers. Affiche `insertion : C1`, `fusion : C2`, `std::sort : ok`, puis la liste triée.
+      starter: |
+        #include <algorithm>
+        #include <iostream>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <algorithm>
+        #include <iostream>
+        #include <vector>
+
+        long long compInsertion = 0, compFusion = 0;
+
+        void insertion(std::vector<int> v) {
+            for (std::size_t i = 1; i < v.size(); ++i) {
+                int x = v[i];
+                std::size_t j = i;
+                while (j > 0) {
+                    ++compInsertion;
+                    if (v[j - 1] > x) { v[j] = v[j - 1]; --j; } else break;
+                }
+                v[j] = x;
+            }
+        }
+
+        void fusion(std::vector<int>& v, std::size_t g, std::size_t d) {
+            if (d - g < 2) return;
+            std::size_t m = (g + d) / 2;
+            fusion(v, g, m);
+            fusion(v, m, d);
+            std::vector<int> r;
+            std::size_t i = g, j = m;
+            while (i < m && j < d) {
+                ++compFusion;
+                r.push_back(v[i] <= v[j] ? v[i++] : v[j++]);
+            }
+            while (i < m) r.push_back(v[i++]);
+            while (j < d) r.push_back(v[j++]);
+            std::copy(r.begin(), r.end(), v.begin() + g);
+        }
+
+        int main() {
+            std::vector<int> v;
+            int x;
+            while (std::cin >> x) v.push_back(x);
+            insertion(v);
+            std::vector<int> f = v;
+            fusion(f, 0, f.size());
+            std::vector<int> s = v;
+            long long c = 0;
+            std::sort(s.begin(), s.end(), [&c](int a, int b) { ++c; return a < b; });
+            std::cout << "insertion : " << compInsertion << "\n";
+            std::cout << "fusion : " << compFusion << "\n";
+            std::cout << "std::sort : " << (std::is_sorted(s.begin(), s.end()) && s == f ? "ok" : "erreur") << "\n";
+            for (std::size_t i = 0; i < f.size(); ++i) std::cout << (i ? " " : "") << f[i];
+            std::cout << "\n";
+        }
+      tests:
+        - { input: 5 2 4 6 1 3, output: "insertion : 12\nfusion : 11\nstd::sort : ok\n1 2 3 4 5 6" }
+        - { input: 1 2 3 4, output: "insertion : 3\nfusion : 4\nstd::sort : ok\n1 2 3 4", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-prof-ex1
+          type: mcq
+          prompt: Quelle commande donne un résumé des compteurs matériels (cycles, défauts de cache) ?
+          choices: ['perf stat', 'gdb', 'ls', 'cmake']
+          answer: 0
+        - id: cpp-prof-ex2
+          type: mcq
+          prompt: Que représente une flamegraph ?
+          choices: ['La répartition du temps CPU par pile d’appels', 'La mémoire libre', 'Le graphe des includes', 'Les tests réussis']
+          answer: 0
+        - id: cpp-prof-ex3
+          type: mcq
+          prompt: Pourquoi profiler en mode Release ?
+          choices: ['Le profil d’un build non optimisé ne reflète pas le comportement réel', 'Le debug ne compile pas', 'Pour avoir les symboles', 'C’est plus lent']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-bibliotheques
+    title: Développement de bibliothèques
+    summary: Concevoir une bibliothèque C++ — API, ABI, header-only vs compilée, versionnement, documentation, tests et distribution.
+    minutes: 35
+    concepts: [build, architecture]
+    sections:
+      - title: API et ABI
+        body: |
+          - **API** : ce que le code source utilise (noms, signatures). Un changement d’API casse la **compilation** des utilisateurs.
+          - **ABI** : la forme binaire (disposition des classes, noms décorés, conventions d’appel). Un changement d’ABI casse les programmes déjà **compilés** contre l’ancienne version (bibliothèques partagées `.so`/`.dll`).
+
+          Ajouter un membre privé à une classe change sa taille → **rupture d’ABI**. Protections : PImpl, interfaces abstraites, `inline namespace v2 { … }` pour versionner.
+
+          Formes de distribution :
+
+          | | Header-only | Compilée (statique/partagée) |
+          |---|---|---|
+          | Intégration | triviale | nécessite build/liens |
+          | Temps de compilation | plus long | plus court |
+          | Templates | naturels | doivent être dans les en-têtes |
+      - title: Une bonne bibliothèque
+        body: |
+          - Un **espace de noms** dédié, des en-têtes autonomes (s’incluent seuls), pas de `using namespace` dans les en-têtes.
+          - Une API **difficile à mal utiliser** : types forts, `[[nodiscard]]`, `explicit`, `noexcept`, erreurs explicites (`std::expected`/exceptions documentées).
+          - **SemVer** et changelog ; tests unitaires (GoogleTest, Catch2), CI multi-compilateurs, sanitizers.
+          - Documentation (Doxygen), exemples, `README`.
+          - Packaging CMake (`install(TARGETS …)`, `find_package` côté utilisateur), vcpkg/Conan.
+    exercises:
+      - id: cpp-lib-q1
+        type: mcq
+        prompt: Ajouter un membre de données privé à une classe exportée par une bibliothèque partagée…
+        choices: ['Casse l’ABI (taille et disposition changent)', 'Ne change rien', 'Casse seulement l’API', 'Accélère le programme']
+        answer: 0
+      - id: cpp-lib-q2
+        type: mcq
+        prompt: Que signale [[nodiscard]] ?
+        choices: ['Ignorer la valeur de retour provoque un avertissement', 'La fonction ne renvoie rien', 'La fonction est obsolète', 'La fonction est inline']
+        answer: 0
+      - id: cpp-lib-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          namespace bib {
+              inline namespace v2 { int version() { return 2; } }
+              namespace v1 { int version() { return 1; } }
+          }
+          int main() {
+              std::cout << bib::version() << bib::v1::version() << bib::v2::version() << "\n";
+          }
+        output: '212'
+        explanation: Un inline namespace rend sa version accessible directement — c’est la version « par défaut ».
+      - id: cpp-lib-code
+        type: code
+        title: API difficile à mal utiliser
+        prompt: |
+          Conçois une petite API de durée : `class Duree` (constructeur **privé**, fabriques statiques `secondes(long long)`, `minutes(long long)`, `heures(long long)`), `[[nodiscard]] long long enSecondes() const`, `operator+`, comparaison par défaut (`<=>`), et un `operator<<` qui affiche `HhMMmSSs` (ex. `1h02m05s`).
+
+          Chaque ligne : une suite de termes `5s`, `3m`, `2h`. Affiche leur somme formatée, puis `max : …` (la plus grande somme parmi toutes les lignes).
+        starter: |
+          #include <compare>
+          #include <iomanip>
+          #include <iostream>
+          #include <sstream>
+          #include <string>
+
+          int main() {
+          }
+        solution: |
+          #include <compare>
+          #include <iomanip>
+          #include <iostream>
+          #include <optional>
+          #include <sstream>
+          #include <string>
+
+          class Duree {
+          public:
+              static Duree secondes(long long s) { return Duree(s); }
+              static Duree minutes(long long m) { return Duree(m * 60); }
+              static Duree heures(long long h) { return Duree(h * 3600); }
+              [[nodiscard]] long long enSecondes() const { return s_; }
+              Duree operator+(const Duree& o) const { return Duree(s_ + o.s_); }
+              auto operator<=>(const Duree&) const = default;
+          private:
+              explicit Duree(long long s) : s_(s) {}
+              long long s_;
+          };
+
+          std::ostream& operator<<(std::ostream& o, const Duree& d) {
+              long long s = d.enSecondes();
+              return o << s / 3600 << "h" << std::setw(2) << std::setfill('0') << (s % 3600) / 60 << "m" << std::setw(2) << s % 60 << "s" << std::setfill(' ');
+          }
+
+          int main() {
+              std::string ligne;
+              std::optional<Duree> max;
+              while (std::getline(std::cin, ligne)) {
+                  std::istringstream is(ligne);
+                  std::string t;
+                  Duree total = Duree::secondes(0);
+                  while (is >> t) {
+                      long long v = std::stoll(t.substr(0, t.size() - 1));
+                      char u = t.back();
+                      total = total + (u == 'h' ? Duree::heures(v) : u == 'm' ? Duree::minutes(v) : Duree::secondes(v));
+                  }
+                  std::cout << total << "\n";
+                  if (!max || total > *max) max = total;
+              }
+              if (max) std::cout << "max : " << *max << "\n";
+          }
+        tests:
+          - { input: "1h 2m 5s\n90s\n3m 30s", output: "1h02m05s\n0h01m30s\n0h03m30s\nmax : 1h02m05s" }
+          - { input: 59m 61s, output: "1h00m01s\nmax : 1h00m01s", hidden: true }
+        require:
+          - { pattern: 'nodiscard', message: 'Utiliser [[nodiscard]]' }
+    project:
+      id: cpp-lib-projet
+      type: code
+      title: Bibliothèque de validation versionnée
+      difficulty: 3
+      prompt: |
+        Écris une bibliothèque `valide` (espace de noms) en deux versions : `valide::v1::email(std::string_view)` (contient un `@`) et `valide::v2::email` (version par défaut via `inline namespace`) : exactement un `@`, au moins un caractère avant, et un domaine contenant un `.` qui n’est ni en premier ni en dernier.
+
+        Les deux renvoient `[[nodiscard]] bool`. Pour chaque ligne, affiche `v1=oui|non v2=oui|non` (en appelant `valide::v1::email` et `valide::email`).
+      starter: |
+        #include <iostream>
+        #include <string>
+        #include <string_view>
+
+        int main() {
+        }
+      solution: |
+        #include <algorithm>
+        #include <iostream>
+        #include <string>
+        #include <string_view>
+
+        namespace valide {
+            namespace v1 {
+                [[nodiscard]] inline bool email(std::string_view s) { return s.find('@') != std::string_view::npos; }
+            }
+            inline namespace v2 {
+                [[nodiscard]] inline bool email(std::string_view s) {
+                    if (std::count(s.begin(), s.end(), '@') != 1) return false;
+                    auto at = s.find('@');
+                    if (at == 0) return false;
+                    auto domaine = s.substr(at + 1);
+                    auto point = domaine.find('.');
+                    return point != std::string_view::npos && point != 0 && domaine.back() != '.';
+                }
+            }
+        }
+
+        int main() {
+            std::string l;
+            while (std::getline(std::cin, l)) {
+                std::cout << "v1=" << (valide::v1::email(l) ? "oui" : "non") << " v2=" << (valide::email(l) ? "oui" : "non") << "\n";
+            }
+        }
+      tests:
+        - { input: "kiri@codemori.fr\n@x.fr\na@b\nsans-arobase", output: "v1=oui v2=oui\nv1=oui v2=non\nv1=oui v2=non\nv1=non v2=non" }
+        - { input: "a@@b.fr\nx@.fr\ny@z.", output: "v1=oui v2=non\nv1=oui v2=non\nv1=oui v2=non", hidden: true }
+      require:
+        - { pattern: 'inline\s+namespace', message: Versionner avec un inline namespace }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-lib-ex1
+          type: mcq
+          prompt: Quel est l’inconvénient principal d’une bibliothèque header-only ?
+          choices: ['Des temps de compilation plus longs pour les utilisateurs', 'Elle est impossible à utiliser', 'Elle casse l’ABI à chaque appel', 'Elle ne supporte pas les templates']
+          answer: 0
+        - id: cpp-lib-ex2
+          type: mcq
+          prompt: Quel outil génère une documentation à partir des commentaires du code C++ ?
+          choices: ['Doxygen', 'GDB', 'perf', 'CTest']
+          answer: 0
+        - id: cpp-lib-ex3
+          type: mcq
+          prompt: Que faut-il éviter dans un en-tête public ?
+          choices: ['using namespace …;', 'Les déclarations de fonctions', 'Les espaces de noms', 'Les commentaires']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-moderne
+    title: C++ moderne (C++20 et C++23)
+    summary: Tour d’horizon des nouveautés — ranges, std::format, std::span, std::expected, designated initializers, three-way comparison, modules et std::print.
+    minutes: 35
+    concepts: [cpp20]
+    sections:
+      - title: C++20
+        body: |
+          ```cpp
+          #include <format>
+          #include <ranges>
+          #include <span>
+
+          std::string s = std::format("{} a {} ans, π ≈ {:.2f}", "Kiri", 16, 3.14159);
+
+          auto pairs = std::views::iota(1, 20)
+                     | std::views::filter([](int x) { return x % 2 == 0; })
+                     | std::views::transform([](int x) { return x * x; });
+
+          void traiter(std::span<const int> donnees);      // vue sur tableau, vector, array…
+
+          struct Config { int port = 80; bool tls = false; };
+          Config c{.port = 8443, .tls = true};             // designated initializers
+
+          auto operator<=>(const Point&) const = default;  // comparaisons générées
+          if (s.starts_with("Kiri") && s.contains('a')) {} // contains : C++23
+          ```
+
+          Plus : concepts, coroutines, modules, `consteval`, `std::jthread`, `std::bit_cast`, `[[likely]]`…
+      - title: C++23
+        body: |
+          ```cpp
+          #include <expected>
+          std::expected<int, std::string> lire(std::string_view s) {
+              int v{};
+              auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+              if (ec != std::errc{}) return std::unexpected("pas un nombre");
+              return v;
+          }
+
+          #include <print>
+          std::println("Bonjour {} !", nom);     // C++23 (GCC 14+)
+          ```
+
+          Aussi : `std::mdspan` (tableaux multidimensionnels), `std::flat_map`, `std::generator`, *deducing this*, `std::ranges::to<std::vector>()`, `import std;`.
+
+          > La compatibilité dépend du compilateur : vérifie le tableau de support sur cppreference avant d’adopter une fonctionnalité.
+    exercises:
+      - id: cpp-mod-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <format>
+          #include <iostream>
+          #include <ranges>
+          #include <vector>
+          int main() {
+              auto v = std::views::iota(1, 10) | std::views::filter([](int x) { return x % 3 == 0; }) | std::views::transform([](int x) { return x * 10; });
+              int s = 0;
+              for (int x : v) s += x;
+              std::cout << std::format("somme={} hex={:x} pad=[{:>5}]", s, 255, "ab") << "\n";
+          }
+        output: somme=180 hex=ff pad=[   ab]
+      - id: cpp-mod-q1
+        type: mcq
+        prompt: Que représente std::span<const int> ?
+        choices: ['Une vue non propriétaire sur une suite contiguë d’int', 'Un nouveau conteneur', 'Un pointeur intelligent', 'Une chaîne']
+        answer: 0
+      - id: cpp-mod-q2
+        type: mcq
+        prompt: À quoi sert std::expected<T, E> ?
+        choices: ['Renvoyer soit une valeur, soit une erreur, sans exception', 'Attendre un thread', 'Déclarer une constante', 'Comparer deux valeurs']
+        answer: 0
+      - id: cpp-mod-code
+        type: code
+        title: Rapport formaté
+        prompt: |
+          Chaque ligne : `nom quantite prix`. Avec `std::format`, affiche un tableau aligné : nom aligné à gauche sur 12 caractères, quantité alignée à droite sur 5, prix (2 décimales) à droite sur 9, total (quantité × prix, 2 décimales) à droite sur 10, colonnes séparées par ` | `.
+
+          Termine par une ligne `TOTAL` formatée de la même façon (quantité totale, prix vide, total général).
+        starter: |
+          #include <format>
+          #include <iostream>
+          #include <string>
+
+          int main() {
+          }
+        solution: |
+          #include <format>
+          #include <iostream>
+          #include <string>
+
+          int main() {
+              std::string nom;
+              int q;
+              double p;
+              int qt = 0;
+              double total = 0;
+              while (std::cin >> nom >> q >> p) {
+                  std::cout << std::format("{:<12} | {:>5} | {:>9.2f} | {:>10.2f}", nom, q, p, q * p) << "\n";
+                  qt += q;
+                  total += q * p;
+              }
+              std::cout << std::format("{:<12} | {:>5} | {:>9} | {:>10.2f}", "TOTAL", qt, "", total) << "\n";
+          }
+        tests:
+          - { input: "stylo 10 1.5\ncahier 2 3.25", output: "stylo        |    10 |      1.50 |      15.00\ncahier       |     2 |      3.25 |       6.50\nTOTAL        |    12 |           |      21.50" }
+          - { input: '', output: 'TOTAL        |     0 |           |       0.00', hidden: true }
+        require:
+          - { pattern: 'std::format', message: Utiliser std::format }
+    project:
+      id: cpp-mod-projet
+      type: code
+      title: Analyse avec expected et ranges
+      difficulty: 3
+      prompt: |
+        Écris `std::expected<int, std::string> lireEntier(std::string_view)` (avec `std::from_chars` ; erreurs `"vide"`, `"pas un nombre : X"` si la conversion échoue ou ne consomme pas tout le jeton).
+
+        L’entrée contient des jetons séparés par des espaces. Pour chaque jeton invalide, affiche l’erreur. Puis, avec les **ranges** sur les entiers valides : affiche les carrés des nombres pairs (séparés par des espaces, ou `-` si aucun) et la somme de tous les entiers valides (via `std::format("somme = {}", …)`).
+      starter: |
+        #include <charconv>
+        #include <expected>
+        #include <format>
+        #include <iostream>
+        #include <ranges>
+        #include <string>
+        #include <string_view>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <charconv>
+        #include <expected>
+        #include <format>
+        #include <iostream>
+        #include <numeric>
+        #include <ranges>
+        #include <string>
+        #include <string_view>
+        #include <vector>
+
+        std::expected<int, std::string> lireEntier(std::string_view s) {
+            if (s.empty()) return std::unexpected("vide");
+            int v{};
+            auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+            if (ec != std::errc{} || p != s.data() + s.size()) return std::unexpected("pas un nombre : " + std::string(s));
+            return v;
+        }
+
+        int main() {
+            std::vector<int> valides;
+            std::string jeton;
+            while (std::cin >> jeton) {
+                auto r = lireEntier(jeton);
+                if (r) valides.push_back(*r);
+                else std::cout << r.error() << "\n";
+            }
+            auto carres = valides | std::views::filter([](int x) { return x % 2 == 0; }) | std::views::transform([](int x) { return x * x; });
+            std::string sortie;
+            for (int x : carres) sortie += (sortie.empty() ? "" : " ") + std::to_string(x);
+            std::cout << (sortie.empty() ? "-" : sortie) << "\n";
+            std::cout << std::format("somme = {}", std::accumulate(valides.begin(), valides.end(), 0)) << "\n";
+        }
+      tests:
+        - { input: 3 4 abc -6 7x 10, output: "pas un nombre : abc\npas un nombre : 7x\n16 36 100\nsomme = 11" }
+        - { input: 1 3, output: "-\nsomme = 4", hidden: true }
+      require:
+        - { pattern: 'std::expected', message: Utiliser std::expected }
+        - { pattern: 'views::', message: Utiliser les ranges/views }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-mod-ex1
+          type: mcq
+          prompt: Quelle fonction C++23 affiche directement une chaîne formatée suivie d’un saut de ligne ?
+          choices: ['std::println', 'std::format', 'printf', 'std::cout_line']
+          answer: 0
+        - id: cpp-mod-ex2
+          type: mcq
+          prompt: Quelle syntaxe sont les designated initializers ?
+          choices: ['Config c{.port = 8443};', 'Config c(port: 8443);', 'Config c = {port => 8443};', 'Config c[port] = 8443;']
+          answer: 0
+        - id: cpp-mod-ex3
+          type: mcq
+          prompt: 'Quel avantage des modules C++20 sur les #include ?'
+          choices: ['Compilation plus rapide et isolation des macros', 'Exécution plus rapide', 'Gestion automatique de la mémoire', 'Aucun']
+          answer: 0
