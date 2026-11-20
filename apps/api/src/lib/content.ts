@@ -15,10 +15,13 @@ import { prisma } from '../db.js';
 
 const LANGS = ['rust', 'cpp', 'java'] as const;
 
+/** Chaîne tolérante : YAML transforme `42` ou `true` en nombre/booléen. */
+const str = z.preprocess((v) => (typeof v === 'number' || typeof v === 'boolean' ? String(v) : v), z.string());
+
 const testCase = z.object({
   name: z.string().optional(),
-  input: z.string().default(''),
-  output: z.string(),
+  input: str.default(''),
+  output: str,
   hidden: z.boolean().default(false),
   match: z.enum(['exact', 'trim', 'contains', 'regex']).default('trim'),
 });
@@ -41,7 +44,7 @@ const base = {
 const mcq = z.object({
   ...base,
   type: z.literal('mcq'),
-  choices: z.array(z.string()).min(2),
+  choices: z.array(str).min(2),
   answer: z.union([z.number().int(), z.array(z.number().int())]),
   code: z.string().optional(),
 });
@@ -49,28 +52,28 @@ const fill = z.object({
   ...base,
   type: z.literal('fill'),
   code: z.string().refine((c) => c.includes('{{?}}'), 'le code doit contenir au moins un trou {{?}}'),
-  blanks: z.array(z.array(z.string()).min(1)),
+  blanks: z.array(z.array(str).min(1)),
   tests: z.array(testCase).optional(),
 });
 const order = z.object({
   ...base,
   type: z.literal('order'),
-  lines: z.array(z.string()).min(2),
+  lines: z.array(str).min(2),
   alternatives: z.array(z.array(z.number().int())).optional(),
 });
 const predict = z.object({
   ...base,
   type: z.literal('predict'),
   code: z.string(),
-  input: z.string().optional(),
-  output: z.string(),
+  input: str.optional(),
+  output: str,
 });
 const bugfix = z.object({
   ...base,
   type: z.literal('bugfix'),
   code: z.string(),
   bugLines: z.array(z.number().int().min(1)).min(1),
-  choices: z.array(z.string()).min(2),
+  choices: z.array(str).min(2),
   answer: z.number().int(),
   solution: z.string(),
   tests: z.array(testCase).min(1),
