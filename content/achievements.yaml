@@ -1,0 +1,26 @@
+- { id: premier-pas, title: Premiers pas, description: Terminer l’évaluation de niveau ou choisir de commencer de zéro., icon: 🧭, xp: 10, condition: { type: placement_done, threshold: 1 } }
+- { id: premier-programme, title: Premier programme, description: Exécuter avec succès un premier programme dans l’IDE., icon: ▶️, xp: 15, condition: { type: ide_runs, threshold: 1 } }
+- { id: premier-compile, title: Premier programme compilé, description: Réussir un premier exercice compilé et testé automatiquement., icon: 🛠️, xp: 20, condition: { type: code_success, threshold: 1 } }
+- { id: dix-exercices, title: Échauffement, description: Réussir 10 exercices., icon: 🔟, xp: 25, condition: { type: exercises_solved, threshold: 10 } }
+- { id: cinquante-exercices, title: Persévérance, description: Réussir 50 exercices., icon: 💪, xp: 60, condition: { type: exercises_solved, threshold: 50 } }
+- { id: cent-exercices, title: Centurion du code, description: Réussir 100 exercices., icon: 💯, xp: 120, condition: { type: exercises_solved, threshold: 100 } }
+- { id: trois-cents-exercices, title: Infatigable, description: Réussir 300 exercices., icon: 🏔️, xp: 250, condition: { type: exercises_solved, threshold: 300 } }
+- { id: premiere-fonction, title: Première fonction, description: Réussir un exercice de code sur les fonctions., icon: 🧩, xp: 20, condition: { type: concept_solved, threshold: 1, concept: fonctions } }
+- { id: premiere-classe, title: Première classe, description: Réussir un exercice de code sur les classes ou les structures., icon: 🏛️, xp: 25, condition: { type: concept_solved, threshold: 1, concept: classes } }
+- { id: serie-3, title: Bonne habitude, description: Apprendre 3 jours consécutifs., icon: 🔥, xp: 15, condition: { type: streak, threshold: 3 } }
+- { id: serie-7, title: Une semaine de feu, description: Apprendre 7 jours consécutifs., icon: 🔥, xp: 50, condition: { type: streak, threshold: 7 } }
+- { id: serie-30, title: Inarrêtable, description: Apprendre 30 jours consécutifs., icon: 🌋, xp: 200, condition: { type: streak, threshold: 30 } }
+- { id: premier-chapitre, title: Diplômé, description: Terminer un premier chapitre (examen + mini-projet)., icon: 🎓, xp: 30, condition: { type: chapters_completed, threshold: 1 } }
+- { id: dix-chapitres, title: Bibliothécaire, description: Terminer 10 chapitres., icon: 📚, xp: 100, condition: { type: chapters_completed, threshold: 10 } }
+- { id: maitrise-chapitre, title: Maîtrise complète, description: Réussir tous les exercices et le mini-projet d’un chapitre terminé., icon: 👑, xp: 50, condition: { type: chapter_mastered, threshold: 1 } }
+- { id: examen-parfait, title: Sans faute, description: Obtenir 100 % à un examen., icon: 🎯, xp: 40, condition: { type: perfect_exam, threshold: 1 } }
+- { id: rustacean, title: Rustacé, description: Terminer 5 chapitres Rust., icon: 🦀, xp: 60, condition: { type: chapters_completed, threshold: 5, language: rust } }
+- { id: cpp-adept, title: Adepte du C++, description: Terminer 5 chapitres C++., icon: ⚙️, xp: 60, condition: { type: chapters_completed, threshold: 5, language: cpp } }
+- { id: java-barista, title: Barista Java, description: Terminer 5 chapitres Java., icon: ☕, xp: 60, condition: { type: chapters_completed, threshold: 5, language: java } }
+- { id: polyglotte, title: Polyglotte, description: Réussir des exercices dans les trois langages., icon: 🌍, xp: 50, condition: { type: languages_started, threshold: 3 } }
+- { id: premier-projet, title: Bâtisseur, description: Terminer un projet pratique., icon: 🚀, xp: 60, condition: { type: projects_completed, threshold: 1 } }
+- { id: cinq-projets, title: Architecte, description: Terminer 5 projets pratiques., icon: 🏗️, xp: 150, condition: { type: projects_completed, threshold: 5 } }
+- { id: revisions-20, title: Mémoire d’éléphant, description: Réussir 20 révisions., icon: 🐘, xp: 40, condition: { type: reviews_done, threshold: 20 } }
+- { id: xp-1000, title: Mille mercis, description: Cumuler 1 000 XP., icon: ⭐, xp: 50, condition: { type: xp_total, threshold: 1000 } }
+- { id: xp-5000, title: Étoile montante, description: Cumuler 5 000 XP., icon: 🌟, xp: 150, condition: { type: xp_total, threshold: 5000 } }
+- { id: compilateur-ami, title: Ami du compilateur, description: Réussir 50 exercices compilés., icon: 🤝, xp: 80, hidden: true, condition: { type: code_success, threshold: 50 } }

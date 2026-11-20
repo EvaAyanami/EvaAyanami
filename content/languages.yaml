@@ -1,0 +1,24 @@
+- id: rust
+  name: Rust
+  tagline: Performance et sécurité mémoire, sans ramasse-miettes.
+  description: Langage système moderne qui garantit l’absence d’erreurs mémoire dès la compilation grâce à l’ownership. Idéal pour les outils en ligne de commande, les serveurs, l’embarqué et WebAssembly.
+  color: '#f46623'
+  version: Rust stable (édition 2021)
+  fileName: main.rs
+  order: 1
+- id: cpp
+  name: C++
+  tagline: La puissance du bas niveau avec les abstractions du haut niveau.
+  description: Langage incontournable des jeux vidéo, des moteurs, de la finance et des systèmes embarqués. Tu apprendras le C++ moderne (C++20/23) — RAII, pointeurs intelligents, STL, templates et concepts.
+  color: '#3b82f6'
+  version: C++23 (GCC)
+  fileName: main.cpp
+  order: 2
+- id: java
+  name: Java
+  tagline: Robuste, portable et omniprésent en entreprise.
+  description: Langage orienté objet exécuté sur la JVM, pilier des applications d’entreprise, d’Android et des services backend. Tu apprendras le Java moderne (records, streams, lambdas, var).
+  color: '#e76f00'
+  version: Java 21 LTS (OpenJDK)
+  fileName: Main.java
+  order: 3

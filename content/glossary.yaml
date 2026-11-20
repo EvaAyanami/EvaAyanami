@@ -1,0 +1,239 @@
+# Notions transversales : utilisées par l'assistante (sans IA) pour expliquer et comparer les trois langages.
+- concept: variables
+  title: Variables et mutabilité
+  keywords: [variable, let, mut, const, final, mutable, immuable]
+  summary: Une variable associe un nom à une valeur stockée en mémoire. Les langages diffèrent surtout par leur choix par défaut — modifiable ou non.
+  rust: "`let x = 5;` est **immuable** par défaut ; `let mut x = 5;` est modifiable. Le type est inféré mais peut être précisé : `let x: i32 = 5;`."
+  cpp: "`int x = 5;` est **modifiable** par défaut ; `const int x = 5;` ne l’est pas. `auto x = 5;` laisse le compilateur déduire le type."
+  java: "`int x = 5;` est modifiable ; `final int x = 5;` ne l’est pas. Depuis Java 10, `var x = 5;` infère le type des variables locales."
+- concept: types
+  title: Types primitifs
+  keywords: [type, entier, flottant, booléen, char, i32, u8, int, double, float, bool, primitif]
+  summary: Les types primitifs (entiers, flottants, booléens, caractères) sont les briques de base. Leur taille et leurs conversions varient selon le langage.
+  rust: "Tailles explicites : `i8`…`i128`, `u8`…`u128`, `f32`, `f64`, `bool`, `char` (Unicode, 4 octets). Aucune conversion implicite : il faut écrire `x as f64`."
+  cpp: "`int`, `long`, `double`, `bool`, `char`… dont la taille dépend de la plateforme (`<cstdint>` fournit `int32_t`, `uint64_t`). Conversions implicites fréquentes (attention aux pertes !)."
+  java: "Tailles fixes : `byte`, `short`, `int` (32 bits), `long`, `float`, `double`, `boolean`, `char` (UTF-16). Les élargissements sont implicites, les rétrécissements exigent un cast `(int) x`."
+- concept: conditions
+  title: Conditions
+  keywords: [if, else, condition, switch, ternaire]
+  summary: Les conditions exécutent du code selon qu’une expression booléenne est vraie ou fausse.
+  rust: "`if` est une **expression** : `let s = if n > 0 { \"positif\" } else { \"négatif\" };`. Pas de parenthèses obligatoires, accolades obligatoires. `match` remplace avantageusement `switch`."
+  cpp: "`if (cond) { … } else { … }`, opérateur ternaire `cond ? a : b`, et `switch` sur les entiers/énumérations (attention au `break`)."
+  java: "`if (cond) { … }`, ternaire `cond ? a : b`, `switch` moderne avec flèches : `switch (x) { case 1 -> …; default -> …; }`."
+- concept: boucles
+  title: Boucles
+  keywords: [boucle, for, while, loop, itérer, répéter, break, continue]
+  summary: Les boucles répètent un bloc d’instructions tant qu’une condition est vraie ou pour chaque élément d’une collection.
+  rust: "`for i in 0..10 {}` (intervalle), `while cond {}`, `loop {}` (infinie, peut retourner une valeur avec `break valeur`)."
+  cpp: "`for (int i = 0; i < 10; ++i)`, boucle sur intervalle `for (auto& x : v)`, `while`, `do … while`."
+  java: "`for (int i = 0; i < 10; i++)`, for-each `for (int x : tab)`, `while`, `do … while`."
+- concept: fonctions
+  title: Fonctions
+  keywords: [fonction, méthode, paramètre, retour, return, fn]
+  summary: Une fonction regroupe des instructions réutilisables, reçoit des paramètres et peut renvoyer une valeur.
+  rust: "`fn carre(x: i32) -> i32 { x * x }` — la dernière expression sans `;` est la valeur de retour. Les types des paramètres sont obligatoires."
+  cpp: "`int carre(int x) { return x * x; }` — une fonction doit être déclarée avant usage (ou prototypée). Passage par valeur, référence (`int&`) ou pointeur."
+  java: "Tout est méthode dans une classe : `static int carre(int x) { return x * x; }`. Les objets sont passés par copie de la référence."
+- concept: ownership
+  title: Propriété (ownership)
+  keywords: [ownership, propriétaire, move, déplacement, drop, possession]
+  summary: Qui est responsable de libérer la mémoire ? Chaque langage répond différemment.
+  rust: "Chaque valeur a **un seul propriétaire** ; à sa sortie de portée, la valeur est libérée (`drop`). Une affectation `let b = a;` **déplace** la valeur : `a` devient inutilisable (sauf types `Copy`)."
+  cpp: "Le programmeur choisit : objets sur la pile (libérés automatiquement), `new`/`delete` manuels (à éviter), ou **RAII** et pointeurs intelligents (`unique_ptr` = propriétaire unique, comme en Rust)."
+  java: "Pas de propriété explicite : le **ramasse-miettes** (GC) libère les objets qui ne sont plus référencés. Simple, mais avec un coût à l’exécution."
+- concept: references
+  title: Références et emprunts
+  keywords: [référence, emprunt, borrow, borrowing, alias]
+  summary: Une référence permet d’accéder à une valeur sans en prendre la propriété ni la copier.
+  rust: "`&x` emprunt partagé (lecture), `&mut x` emprunt exclusif (écriture). Règle : **plusieurs `&` OU un seul `&mut`** à la fois. Le compilateur (borrow checker) garantit qu’une référence ne survit jamais à la valeur."
+  cpp: "`int& r = x;` est un alias de `x` (non nul, non réassignable). `const int&` pour la lecture seule. Aucune vérification de durée de vie : une référence vers une variable détruite est un comportement indéfini."
+  java: "Toutes les variables d’objet sont des références (pointeurs gérés). Pas de référence vers une variable primitive, et pas d’arithmétique."
+- concept: pointeurs
+  title: Pointeurs
+  keywords: [pointeur, adresse, nullptr, null, déréférencer]
+  summary: Un pointeur contient l’adresse mémoire d’une valeur.
+  rust: "Les pointeurs bruts `*const T` / `*mut T` n’existent qu’en code `unsafe`. On utilise plutôt les références et les pointeurs intelligents (`Box`, `Rc`, `Arc`)."
+  cpp: "`int* p = &x;` puis `*p` pour lire/écrire. Peut valoir `nullptr`, peut être réassigné, permet l’arithmétique. Puissant mais source de bugs (pointeurs pendants, fuites)."
+  java: "Pas de pointeurs explicites : les références d’objets jouent ce rôle, sans arithmétique. `null` existe et provoque des `NullPointerException`."
+- concept: memoire
+  title: Pile (stack) et tas (heap)
+  keywords: [stack, heap, pile, tas, allocation, mémoire, new, box]
+  summary: La pile stocke les variables locales de taille connue (rapide, libérée automatiquement) ; le tas stocke les données de taille dynamique ou de longue durée.
+  rust: "Les valeurs sont sur la pile par défaut ; `Box<T>`, `Vec<T>`, `String` allouent sur le tas et libèrent automatiquement grâce à l’ownership."
+  cpp: "Variables locales sur la pile ; `new`/`make_unique` sur le tas. Sans RAII, il faut libérer soi-même (`delete`)."
+  java: "Primitifs locaux et références sur la pile ; **tous les objets** (`new`) sur le tas, gérés par le GC."
+- concept: chaines
+  title: Chaînes de caractères
+  keywords: [string, chaîne, str, texte, caractère, slice]
+  summary: Les chaînes représentent du texte. Les langages distinguent souvent la chaîne possédée de la vue empruntée.
+  rust: "`String` (possédée, modifiable, sur le tas) et `&str` (tranche empruntée, souvent littérale). Encodage UTF-8 : on ne peut pas indexer `s[0]`, on itère avec `.chars()`."
+  cpp: "`std::string` (possédée) et `std::string_view` (vue, C++17). Les littéraux `\"...\"` sont des `const char*` hérités du C."
+  java: "`String` est **immuable** ; pour construire efficacement du texte, on utilise `StringBuilder`. Comparer avec `.equals()`, jamais `==`."
+- concept: structs
+  title: Structures et classes
+  keywords: [struct, classe, class, objet, attribut, champ, instance, constructeur]
+  summary: Regrouper des données (et des comportements) dans un type personnalisé.
+  rust: "`struct Point { x: i32, y: i32 }` + bloc `impl Point { fn new(...) -> Self {…} }`. Pas d’héritage : on compose et on utilise des traits."
+  cpp: "`class` (membres privés par défaut) ou `struct` (publics par défaut), constructeurs, destructeur, héritage multiple possible."
+  java: "`class` avec attributs, constructeurs et méthodes ; héritage simple (`extends`), `record` pour les données immuables (Java 16+)."
+- concept: classes
+  title: Classes et objets
+  keywords: [classe, objet, poo, orienté objet, encapsulation, méthode]
+  summary: La programmation orientée objet regroupe état et comportement, et protège l’état interne (encapsulation).
+  rust: "Rust n’a pas de classes : `struct` + `impl` + traits. La visibilité se contrôle avec `pub`."
+  cpp: "`class` avec sections `public:`/`private:`/`protected:`, constructeurs, destructeurs, méthodes `virtual`."
+  java: "Tout est classe. Modificateurs `private`/`protected`/`public`, getters/setters, `this`."
+- concept: enums
+  title: Énumérations
+  keywords: [enum, énumération, variante]
+  summary: Un type qui ne peut prendre qu’un ensemble fini de valeurs.
+  rust: "Les `enum` Rust sont des **types somme** : chaque variante peut porter des données (`enum Forme { Cercle(f64), Rect(f64, f64) }`), exploitées avec `match`."
+  cpp: "`enum class Couleur { Rouge, Vert };` (typée, C++11). Pour porter des données : `std::variant`."
+  java: "`enum` est une classe spéciale : variantes avec attributs et méthodes ; `sealed interface` + `record` pour des types somme."
+- concept: pattern-matching
+  title: Filtrage par motif
+  keywords: [match, pattern, motif, filtrage, switch]
+  summary: Tester la forme d’une valeur et en extraire des parties en une seule construction.
+  rust: "`match` est exhaustif : le compilateur vérifie que tous les cas sont couverts. Motifs : littéraux, intervalles `1..=5`, déstructuration, gardes `if`."
+  cpp: "Pas de vrai `match` : `switch` sur entiers, `std::visit` sur `std::variant`, déstructuration avec les *structured bindings* `auto [a, b] = paire;`."
+  java: "`switch` avec motifs (Java 21) : `case Cercle c -> …`, déconstruction des `record` et gardes `when`."
+- concept: option
+  title: Absence de valeur (Option, nullptr, null)
+  keywords: [option, none, some, null, nullptr, optional, absent]
+  summary: Comment représenter « pas de valeur » sans plantage.
+  rust: "`Option<T>` vaut `Some(v)` ou `None` ; il n’y a **pas de null**. Le compilateur oblige à traiter le cas `None`."
+  cpp: "`std::optional<T>` (C++17), ou `nullptr` pour les pointeurs (le déréférencer est un comportement indéfini)."
+  java: "`null` pour toute référence (risque de `NullPointerException`) ; `Optional<T>` pour les valeurs de retour."
+- concept: erreurs
+  title: Gestion des erreurs
+  keywords: [erreur, exception, result, try, catch, throw, panic]
+  summary: Signaler et traiter les situations anormales.
+  rust: "`Result<T, E>` (`Ok`/`Err`) pour les erreurs récupérables, propagées avec `?` ; `panic!` pour les bugs irrécupérables. Pas d’exceptions."
+  cpp: "Exceptions `throw` / `try` / `catch`, ou codes d’erreur, ou `std::expected` (C++23)."
+  java: "Exceptions `try`/`catch`/`finally`, distinction entre exceptions **vérifiées** (à déclarer) et non vérifiées (`RuntimeException`). `try-with-resources` pour fermer les ressources."
+- concept: collections
+  title: Collections
+  keywords: [collection, vec, vector, list, arraylist, liste, tableau dynamique]
+  summary: Structures de données pour stocker plusieurs éléments.
+  rust: "`Vec<T>`, `HashMap<K, V>`, `HashSet<T>`, `VecDeque<T>`, `BTreeMap<K, V>` dans `std::collections`."
+  cpp: "STL : `std::vector`, `std::map` (trié), `std::unordered_map`, `std::set`, `std::deque`, `std::array`."
+  java: "Framework Collections : `ArrayList`, `LinkedList`, `HashMap`, `TreeMap`, `HashSet`, `ArrayDeque` derrière les interfaces `List`, `Map`, `Set`."
+- concept: hashmap
+  title: Tables de hachage
+  keywords: [hashmap, map, dictionnaire, clé, valeur, unordered_map]
+  summary: Associer des clés à des valeurs avec un accès en temps moyen constant.
+  rust: "`let mut m = HashMap::new(); m.insert(\"a\", 1); *m.entry(\"a\").or_insert(0) += 1;`"
+  cpp: "`std::unordered_map<std::string, int> m; m[\"a\"]++;` (`operator[]` crée la clé si absente)."
+  java: "`Map<String, Integer> m = new HashMap<>(); m.merge(\"a\", 1, Integer::sum);`"
+- concept: iterateurs
+  title: Itérateurs
+  keywords: [itérateur, iterator, iter, map, filter, collect, stream, ranges]
+  summary: Parcourir une séquence et la transformer de façon déclarative.
+  rust: "`v.iter().filter(|x| **x > 0).map(|x| x * 2).collect::<Vec<_>>()` — paresseux et sans coût caché (zero-cost)."
+  cpp: "Itérateurs `begin()`/`end()` + `<algorithm>`, et les *ranges* C++20 : `v | std::views::filter(f) | std::views::transform(g)`."
+  java: "Streams : `liste.stream().filter(x -> x > 0).map(x -> x * 2).toList();`"
+- concept: closures
+  title: Fonctions anonymes (closures, lambdas)
+  keywords: [closure, lambda, fonction anonyme, capture]
+  summary: Des fonctions définies à la volée, capables de capturer leur environnement.
+  rust: "`let ajoute = |x| x + n;` — capture par emprunt, emprunt mutable ou déplacement (`move`). Traits `Fn`, `FnMut`, `FnOnce`."
+  cpp: "`auto ajoute = [n](int x) { return x + n; };` — capture explicite par valeur `[n]` ou référence `[&n]`."
+  java: "`Function<Integer, Integer> ajoute = x -> x + n;` — capture de variables *effectivement finales* uniquement."
+- concept: traits
+  title: Traits et interfaces
+  keywords: [trait, interface, abstrait, polymorphisme, implémenter, impl]
+  summary: Définir un contrat de comportement que plusieurs types peuvent respecter.
+  rust: "`trait Forme { fn aire(&self) -> f64; }` puis `impl Forme for Cercle`. Polymorphisme statique (génériques) ou dynamique (`dyn Forme`)."
+  cpp: "Classes abstraites avec méthodes `virtual … = 0`, ou *concepts* C++20 pour le polymorphisme statique."
+  java: "`interface Forme { double aire(); }` puis `class Cercle implements Forme`. Méthodes `default` possibles."
+- concept: generiques
+  title: Programmation générique
+  keywords: [générique, generic, template, paramètre de type]
+  summary: Écrire du code qui fonctionne pour plusieurs types.
+  rust: "`fn plus_grand<T: PartialOrd>(a: T, b: T) -> T` — contraintes par traits, monomorphisation (aucun coût à l’exécution)."
+  cpp: "`template <typename T> T plus_grand(T a, T b)` — très puissant (métaprogrammation), contraintes avec les *concepts* C++20."
+  java: "`static <T extends Comparable<T>> T plusGrand(T a, T b)` — effacement de type (*type erasure*) : les génériques n’existent qu’à la compilation."
+- concept: heritage
+  title: Héritage
+  keywords: [héritage, hériter, extends, classe mère, classe fille, super, dérivée]
+  summary: Une classe peut réutiliser et spécialiser une autre classe.
+  rust: "Pas d’héritage de structures : Rust privilégie la **composition** et les traits (un trait peut exiger un autre trait)."
+  cpp: "`class Chien : public Animal` ; héritage multiple autorisé ; méthodes `virtual` pour le polymorphisme, destructeur virtuel indispensable."
+  java: "`class Chien extends Animal` ; héritage simple de classes, multiple d’interfaces ; `super(...)` appelle le constructeur parent."
+- concept: polymorphisme
+  title: Polymorphisme
+  keywords: [polymorphisme, virtual, override, dyn, liaison dynamique]
+  summary: Manipuler des objets de types différents à travers une interface commune.
+  rust: "`Vec<Box<dyn Forme>>` pour la répartition dynamique, génériques `impl Forme` pour la répartition statique."
+  cpp: "Méthodes `virtual` + `override`, manipulées via pointeurs ou références de la classe de base."
+  java: "Toutes les méthodes d’instance sont virtuelles par défaut ; `@Override` documente la redéfinition."
+- concept: lifetimes
+  title: Durées de vie
+  keywords: [lifetime, durée de vie, dangling, pendant]
+  summary: Garantir qu’une référence ne survit jamais à la donnée qu’elle désigne.
+  rust: "Annotations `'a` qui relient les durées de vie des entrées et des sorties : `fn plus_long<'a>(a: &'a str, b: &'a str) -> &'a str`. Vérifiées à la compilation."
+  cpp: "Aucune vérification : retourner une référence vers une variable locale compile (avec avertissement) mais provoque un comportement indéfini."
+  java: "Problème inexistant : le GC garde vivant tout objet référencé."
+- concept: smart-pointers
+  title: Pointeurs intelligents
+  keywords: [smart pointer, box, rc, arc, unique_ptr, shared_ptr, weak]
+  summary: Des objets qui possèdent une allocation et la libèrent automatiquement.
+  rust: "`Box<T>` (propriétaire unique), `Rc<T>` (comptage de références, mono-thread), `Arc<T>` (atomique, multi-threads), `Weak<T>` contre les cycles, `RefCell<T>` pour la mutabilité intérieure."
+  cpp: "`std::unique_ptr<T>` (unique, déplaçable), `std::shared_ptr<T>` (comptage), `std::weak_ptr<T>` ; créés avec `make_unique` / `make_shared`."
+  java: "Inutile : toutes les références sont gérées par le GC. `WeakReference` existe pour les caches."
+- concept: concurrence
+  title: Concurrence et threads
+  keywords: [thread, concurrence, parallèle, mutex, verrou, synchronisation, atomic]
+  summary: Exécuter plusieurs tâches simultanément en partageant des données en toute sécurité.
+  rust: "`std::thread::spawn`, `Arc<Mutex<T>>`, canaux `mpsc`. Les traits `Send`/`Sync` empêchent les *data races* **à la compilation**."
+  cpp: "`std::thread`/`std::jthread`, `std::mutex` + `std::lock_guard`, `std::atomic`. Les data races sont un comportement indéfini, non détecté."
+  java: "`Thread`, `ExecutorService`, `synchronized`, `ReentrantLock`, `AtomicInteger`, collections concurrentes, threads virtuels (Java 21)."
+- concept: async
+  title: Programmation asynchrone
+  keywords: [async, await, future, promesse, completablefuture, coroutine, tokio]
+  summary: Attendre des opérations lentes (réseau, disque) sans bloquer un thread.
+  rust: "`async fn` retourne un `Future` paresseux, exécuté par un runtime comme **tokio** ; `.await` suspend la tâche."
+  cpp: "`std::async`/`std::future`, et les coroutines C++20 (`co_await`, `co_yield`, `co_return`)."
+  java: "`CompletableFuture` (`thenApply`, `thenCombine`…) et threads virtuels (Java 21) qui rendent le code bloquant bon marché."
+- concept: macros
+  title: Macros et métaprogrammation
+  keywords: [macro, macro_rules, préprocesseur, define, annotation, réflexion, constexpr]
+  summary: Générer ou analyser du code à la compilation (ou à l’exécution).
+  rust: "`macro_rules!` (macros déclaratives hygiéniques) et macros procédurales (`#[derive(...)]`)."
+  cpp: "Préprocesseur `#define` (textuel, à éviter), templates, `constexpr`/`consteval` pour calculer à la compilation."
+  java: "Annotations + traitement à la compilation (annotation processors) ou réflexion à l’exécution."
+- concept: tests
+  title: Tests automatisés
+  keywords: [test, unitaire, assert, junit, cargo test, gtest]
+  summary: Vérifier automatiquement que le code fait ce qu’il doit faire.
+  rust: "`#[test] fn ...() { assert_eq!(a, b); }` dans un module `#[cfg(test)]`, lancés par `cargo test`."
+  cpp: "Frameworks externes : GoogleTest, Catch2, doctest ; `assert` de `<cassert>` pour les vérifications simples."
+  java: "JUnit 5 : `@Test void ...() { assertEquals(a, b); }`, lancé par Maven ou Gradle."
+- concept: build
+  title: Outils de compilation
+  keywords: [cargo, cmake, maven, gradle, build, compilation, dépendances, crate]
+  summary: Compiler un projet, gérer ses dépendances et ses tests.
+  rust: "**Cargo** : `cargo new`, `cargo build`, `cargo run`, `cargo test` ; dépendances (crates) déclarées dans `Cargo.toml`."
+  cpp: "**CMake** génère les fichiers de build (`CMakeLists.txt`) ; gestionnaires de paquets vcpkg ou Conan."
+  java: "**Maven** (`pom.xml`) ou **Gradle** (`build.gradle.kts`) : compilation, dépendances, tests, packaging."
+- concept: modules
+  title: Modules et espaces de noms
+  keywords: [module, mod, namespace, package, import, use, visibilité, pub]
+  summary: Organiser le code en unités et contrôler ce qui est visible.
+  rust: "`mod nom { pub fn f() {} }`, `use crate::nom::f;` ; tout est privé par défaut."
+  cpp: "`namespace nom { … }`, `using`, et les *modules* C++20 (`export module`)."
+  java: "`package com.exemple;`, `import`, visibilités `public`/`protected`/package/`private`, modules JPMS."
+- concept: unsafe
+  title: Code non sûr
+  keywords: [unsafe, comportement indéfini, undefined behavior, ub]
+  summary: Ce qui échappe aux garanties du compilateur.
+  rust: "Le mot-clé `unsafe` délimite le code où l’on peut déréférencer des pointeurs bruts ou appeler du FFI ; le programmeur y garantit lui-même la sûreté."
+  cpp: "Tout le langage peut produire un **comportement indéfini** (UB) : débordements, pointeurs pendants, data races… Les sanitizers (ASan, UBSan) aident à les détecter."
+  java: "La JVM vérifie les accès (exceptions au lieu d’UB) ; `sun.misc.Unsafe` / l’API FFM existent pour le bas niveau."
+- concept: gc
+  title: Ramasse-miettes (GC)
+  keywords: [garbage collector, ramasse-miettes, gc, jvm, mémoire automatique]
+  summary: Un mécanisme qui libère automatiquement la mémoire des objets inaccessibles.
+  rust: "Pas de GC : la libération est déterministe (fin de portée, `Drop`)."
+  cpp: "Pas de GC : RAII et pointeurs intelligents."
+  java: "GC générationnel (G1 par défaut, ZGC pour de faibles pauses). Pratique, au prix de pauses et d’une empreinte mémoire plus grande."

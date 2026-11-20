@@ -1,0 +1,1374 @@
+language: rust
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-presentation
+    title: Présentation de Rust
+    summary: Découvre ce qu’est Rust, pourquoi il a été créé et ce qui le rend unique parmi les langages de programmation.
+    minutes: 15
+    concepts: [rust, compilation]
+    sections:
+      - title: Qu’est-ce qu’un langage de programmation ?
+        body: |
+          Un ordinateur n’exécute que des instructions très simples, écrites en **langage machine** (des suites de 0 et de 1). Écrire directement dans ce langage serait épuisant.
+
+          Un **langage de programmation** est une façon lisible par un humain de décrire ce que l’ordinateur doit faire. Un programme spécial — le **compilateur** — traduit ensuite ce texte en langage machine.
+
+          ```rust
+          fn main() {
+              println!("Bonjour !");
+          }
+          ```
+
+          Ce petit texte (le **code source**) devient, après compilation, un fichier exécutable que ton ordinateur sait lancer.
+
+          > 💡 Rust est un langage **compilé** : la traduction a lieu une fois, avant l’exécution. Le programme obtenu est donc très rapide.
+      - title: Pourquoi Rust ?
+        body: |
+          Rust est né chez Mozilla (première version stable en **2015**) pour résoudre un vieux dilemme :
+
+          | Langage | Rapide ? | Sûr pour la mémoire ? |
+          |---|---|---|
+          | C / C++ | ✅ très | ❌ erreurs mémoire possibles |
+          | Java, Python | moyen | ✅ grâce à un ramasse-miettes |
+          | **Rust** | ✅ très | ✅ vérifié **à la compilation** |
+
+          Rust garantit l’absence de toute une famille de bugs (accès à une mémoire libérée, accès concurrents incohérents…) **avant même que le programme ne s’exécute**, sans ramasse-miettes. Le secret : le système de **propriété** (*ownership*), que tu découvriras dans le parcours Fondamentaux.
+
+          Rust est utilisé par Microsoft, Amazon, Google, Discord, Cloudflare, et même dans le noyau Linux.
+      - title: Ce que tu vas apprendre
+        body: |
+          Le parcours Rust est organisé en cinq niveaux :
+
+          1. **Débutant absolu** — premiers programmes, variables, conditions, boucles, fonctions.
+          2. **Fondamentaux** — ownership, emprunts, structures, énumérations, `Option`, `Result`.
+          3. **Intermédiaire** — modules, collections, itérateurs, traits, génériques, durées de vie, tests.
+          4. **Avancé** — pointeurs intelligents, concurrence, `async`, macros, `unsafe`.
+          5. **Expertise** — architecture, bibliothèques, réseau, outils CLI, performance.
+
+          À chaque exercice de code, ton programme est **réellement compilé** avec `rustc` puis exécuté dans un bac à sable, et vérifié par des tests (dont certains sont cachés).
+
+          > 🦀 Les programmeurs Rust s’appellent les **Rustacés** (*Rustaceans*), d’où la mascotte officieuse : Ferris le crabe.
+    exercises:
+      - id: rust-pres-q1
+        type: mcq
+        prompt: Rust est un langage…
+        choices:
+          - interprété ligne par ligne, comme un script
+          - compilé en code machine avant l’exécution
+          - qui ne fonctionne que dans un navigateur web
+        answer: 1
+        concepts: [compilation]
+        explanation: Le compilateur `rustc` traduit le code source en un exécutable natif, ce qui rend les programmes Rust très rapides.
+      - id: rust-pres-q2
+        type: mcq
+        prompt: Quelle est la principale promesse de Rust ?
+        choices:
+          - Être le langage le plus simple à apprendre
+          - Allier performances et sécurité mémoire, sans ramasse-miettes
+          - Remplacer le HTML pour créer des pages web
+          - Ne jamais afficher d’erreur de compilation
+        answer: 1
+        explanation: Rust offre des performances comparables au C++ tout en vérifiant la sécurité mémoire à la compilation.
+      - id: rust-pres-q3
+        type: mcq
+        prompt: Que fait un **compilateur** ?
+        choices:
+          - Il traduit le code source en langage machine
+          - Il corrige automatiquement les fautes de logique
+          - Il dessine l’interface graphique du programme
+        answer: 0
+        hints: [Pense au mot « traduction ».]
+        explanation: Le compilateur traduit le code source (lisible par un humain) en code exécutable par la machine. Il signale aussi les erreurs qu’il détecte.
+      - id: rust-pres-order
+        type: order
+        prompt: Remets dans l’ordre les étapes de la vie d’un programme Rust.
+        lines:
+          - J’écris le code source dans main.rs
+          - Le compilateur rustc vérifie et traduit le code
+          - Un fichier exécutable est produit
+          - J’exécute le programme
+        explanation: On écrit, on compile, puis on exécute. Si la compilation échoue, aucun exécutable n’est produit.
+      - id: rust-pres-code
+        type: code
+        title: Ton tout premier programme
+        prompt: |
+          Le programme ci-dessous affiche déjà un message. Modifie-le pour qu’il affiche exactement :
+
+          ```
+          Bonjour, Rust !
+          ```
+        starter: |
+          fn main() {
+              println!("Hello, world!");
+          }
+        solution: |
+          fn main() {
+              println!("Bonjour, Rust !");
+          }
+        tests:
+          - { input: '', output: 'Bonjour, Rust !' }
+        require:
+          - { pattern: 'println!', message: Utiliser la macro println! }
+        hints: [Il suffit de changer le texte entre guillemets.]
+        concepts: [affichage]
+    project:
+      id: rust-pres-projet
+      type: code
+      title: Carte de visite
+      difficulty: 1
+      prompt: |
+        Le programme lit un **prénom** sur l’entrée standard (déjà fait pour toi). Affiche ensuite une carte de visite sur trois lignes :
+
+        ```
+        ==========
+        Bonjour, <prénom> !
+        ==========
+        ```
+
+        Par exemple, avec l’entrée `Kiri`, le programme affiche `Bonjour, Kiri !` entre deux lignes de dix `=`.
+      starter: |
+        use std::io;
+
+        fn main() {
+            let mut prenom = String::new();
+            io::stdin().read_line(&mut prenom).unwrap();
+            let prenom = prenom.trim();
+
+            // Affiche la carte ici (utilise {} pour insérer le prénom)
+        }
+      solution: |
+        use std::io;
+
+        fn main() {
+            let mut prenom = String::new();
+            io::stdin().read_line(&mut prenom).unwrap();
+            let prenom = prenom.trim();
+            println!("==========");
+            println!("Bonjour, {} !", prenom);
+            println!("==========");
+        }
+      tests:
+        - { input: 'Kiri', output: "==========\nBonjour, Kiri !\n==========" }
+        - { input: 'Ada', output: "==========\nBonjour, Ada !\n==========", hidden: true }
+        - { input: 'Linus', output: "==========\nBonjour, Linus !\n==========", hidden: true }
+      hints:
+        - 'Écris `println!("Bonjour, {} !", prenom);` : les accolades sont remplacées par la valeur de la variable.'
+      concepts: [affichage]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-pres-ex1
+          type: mcq
+          prompt: En quelle année est sortie la première version stable de Rust ?
+          choices: ['1995', '2008', '2015', '2022']
+          answer: 2
+          explanation: Rust 1.0 est sorti en mai 2015.
+        - id: rust-pres-ex2
+          type: mcq
+          prompt: Comment Rust garantit-il la sécurité mémoire ?
+          choices:
+            - Avec un ramasse-miettes qui tourne en permanence
+            - Grâce à des vérifications effectuées à la compilation (ownership)
+            - En interdisant l’utilisation de la mémoire
+          answer: 1
+          explanation: Le système d’ownership est vérifié par le compilateur ; il n’y a aucun coût à l’exécution.
+        - id: rust-pres-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                println!("Rust");
+                println!("est rapide");
+            }
+          output: "Rust\nest rapide"
+          explanation: Chaque `println!` affiche son texte puis passe à la ligne.
+        - id: rust-pres-ex4
+          type: mcq
+          prompt: Comment appelle-t-on les membres de la communauté Rust ?
+          choices: [Les Rustiques, Les Rustacés, Les Oxydés, Les Crabes]
+          answer: 1
+          explanation: En anglais *Rustaceans*, clin d’œil aux crustacés (crustaceans).
+
+  # ------------------------------------------------------------------
+  - slug: rust-installation
+    title: Installation et environnement
+    summary: Installe Rust avec rustup, découvre Cargo et prépare un environnement de développement confortable.
+    minutes: 20
+    concepts: [cargo, outils]
+    sections:
+      - title: Installer Rust avec rustup
+        body: |
+          La méthode officielle s’appelle **rustup**, un installateur qui gère les versions de Rust.
+
+          Sur Linux ou macOS, dans un terminal :
+
+          ```bash
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+          ```
+
+          Sur Windows, télécharge `rustup-init.exe` depuis *rust-lang.org*.
+
+          Vérifie ensuite l’installation :
+
+          ```bash
+          rustc --version   # le compilateur
+          cargo --version   # le gestionnaire de projets
+          rustup update     # mettre Rust à jour
+          ```
+
+          Rust publie une nouvelle version **toutes les six semaines**, sans casser le code existant.
+      - title: Cargo, ton meilleur ami
+        body: |
+          **Cargo** crée les projets, compile, exécute, teste et télécharge les bibliothèques (appelées **crates**).
+
+          ```bash
+          cargo new bonjour      # crée un projet
+          cd bonjour
+          cargo run              # compile puis exécute
+          cargo build --release  # compile en mode optimisé
+          cargo check            # vérifie sans produire d’exécutable (rapide)
+          cargo test             # lance les tests
+          ```
+
+          Structure d’un projet :
+
+          ```text
+          bonjour/
+          ├── Cargo.toml   ← description du projet et dépendances
+          └── src/
+              └── main.rs  ← point d’entrée du programme
+          ```
+
+          Le fichier `Cargo.toml` :
+
+          ```toml
+          [package]
+          name = "bonjour"
+          version = "0.1.0"
+          edition = "2021"
+
+          [dependencies]
+          rand = "0.8"
+          ```
+      - title: L’éditeur et les outils
+        body: |
+          - **VS Code** + l’extension **rust-analyzer** : autocomplétion, erreurs en direct, navigation dans le code.
+          - **RustRover** (JetBrains) : un IDE complet dédié à Rust.
+          - `cargo fmt` formate automatiquement le code selon le style officiel.
+          - `cargo clippy` détecte les maladresses et propose des améliorations.
+
+          > 💡 Sur Codemori, tu n’as rien à installer : l’IDE intégré compile ton code avec un vrai `rustc` sur le serveur. Mais pour tes projets personnels, installe Rust sur ta machine !
+    exercises:
+      - id: rust-inst-q1
+        type: mcq
+        prompt: Quel outil permet d’installer et de mettre à jour Rust ?
+        choices: [cargo, rustup, rustc, npm]
+        answer: 1
+        explanation: '`rustup` gère les toolchains Rust ; `rustup update` installe la dernière version.'
+      - id: rust-inst-q2
+        type: mcq
+        prompt: Quelle commande compile **et** exécute un projet Cargo ?
+        choices: [cargo build, cargo check, cargo run, cargo new]
+        answer: 2
+        explanation: '`cargo run` compile si nécessaire puis lance l’exécutable.'
+      - id: rust-inst-q3
+        type: mcq
+        prompt: Dans quel fichier déclare-t-on les dépendances d’un projet ?
+        choices: [src/main.rs, Cargo.toml, Cargo.lock, rust.json]
+        answer: 1
+        explanation: Les dépendances se déclarent dans la section `[dependencies]` de `Cargo.toml`. `Cargo.lock` enregistre les versions exactes résolues.
+      - id: rust-inst-fill
+        type: fill
+        prompt: Complète les commandes pour créer un projet nommé `jeu` puis l’exécuter.
+        code: |
+          cargo {{?}} jeu
+          cd jeu
+          cargo {{?}}
+        blanks: [[new], [run]]
+        explanation: '`cargo new` crée le squelette, `cargo run` compile et exécute.'
+      - id: rust-inst-order
+        type: order
+        prompt: Remets dans l’ordre les commandes pour démarrer un nouveau projet.
+        lines:
+          - cargo new calculatrice
+          - cd calculatrice
+          - cargo run
+        explanation: On crée le projet, on entre dans son dossier, puis on l’exécute.
+      - id: rust-inst-q4
+        type: mcq
+        prompt: À quoi sert `cargo clippy` ?
+        choices:
+          - À formater le code
+          - À détecter des maladresses et suggérer des améliorations
+          - À télécharger Rust
+        answer: 1
+        explanation: 'Clippy est un « linter » : il signale les tournures peu idiomatiques ou suspectes.'
+    project:
+      id: rust-inst-projet
+      type: code
+      title: Rapport de compilation
+      difficulty: 1
+      prompt: |
+        Lis un **nom de projet** sur l’entrée standard, puis affiche les commandes à taper pour le créer et le lancer :
+
+        ```
+        cargo new <nom>
+        cd <nom>
+        cargo run
+        ```
+      starter: |
+        use std::io;
+
+        fn main() {
+            let mut nom = String::new();
+            io::stdin().read_line(&mut nom).unwrap();
+            let nom = nom.trim();
+            // À toi !
+        }
+      solution: |
+        use std::io;
+
+        fn main() {
+            let mut nom = String::new();
+            io::stdin().read_line(&mut nom).unwrap();
+            let nom = nom.trim();
+            println!("cargo new {}", nom);
+            println!("cd {}", nom);
+            println!("cargo run");
+        }
+      tests:
+        - { input: 'jeu', output: "cargo new jeu\ncd jeu\ncargo run" }
+        - { input: 'calculatrice', output: "cargo new calculatrice\ncd calculatrice\ncargo run", hidden: true }
+        - { input: 'mon_api', output: "cargo new mon_api\ncd mon_api\ncargo run", hidden: true }
+      hints: ['Trois `println!`, dont deux utilisent `{}` pour insérer le nom.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-inst-ex1
+          type: mcq
+          prompt: Quelle commande vérifie le code **sans** produire d’exécutable ?
+          choices: [cargo check, cargo run, cargo build, cargo test]
+          answer: 0
+          explanation: '`cargo check` est bien plus rapide que `cargo build` : idéal pendant le développement.'
+        - id: rust-inst-ex2
+          type: mcq
+          prompt: Comment appelle-t-on une bibliothèque Rust ?
+          choices: [Un package npm, Une crate, Un module JAR, Une gemme]
+          answer: 1
+          explanation: Les bibliothèques Rust sont des *crates*, publiées sur crates.io.
+        - id: rust-inst-ex3
+          type: mcq
+          prompt: Où se trouve le point d’entrée d’un projet binaire créé avec `cargo new` ?
+          choices: [Cargo.toml, src/lib.rs, src/main.rs, main.rs à la racine]
+          answer: 2
+        - id: rust-inst-ex4
+          type: fill
+          prompt: Complète la commande qui compile en mode optimisé.
+          code: cargo build --{{?}}
+          blanks: [[release]]
+          explanation: Le profil `release` active les optimisations ; l’exécutable est placé dans `target/release/`.
+
+  # ------------------------------------------------------------------
+  - slug: rust-premier-programme
+    title: Premier programme
+    summary: Analyse ligne par ligne un programme Rust, affiche du texte avec println! et insère des valeurs.
+    minutes: 20
+    concepts: [affichage, main]
+    sections:
+      - title: Anatomie de « Bonjour »
+        body: |
+          ```rust
+          fn main() {
+              println!("Bonjour, le monde !");
+          }
+          ```
+
+          - `fn` déclare une **fonction**. `main` est spéciale : c’est le **point d’entrée**, la première fonction exécutée.
+          - Les **accolades** `{ }` délimitent le corps de la fonction.
+          - `println!` affiche du texte suivi d’un retour à la ligne. Le `!` indique que c’est une **macro** (une sorte de fonction spéciale).
+          - Le texte entre guillemets est une **chaîne de caractères**.
+          - Le **point-virgule** `;` termine l’instruction.
+      - title: Insérer des valeurs
+        body: |
+          Les accolades `{}` dans le texte sont remplacées par les valeurs passées en arguments, **dans l’ordre** :
+
+          ```rust
+          fn main() {
+              println!("{} + {} = {}", 2, 3, 2 + 3);   // 2 + 3 = 5
+              let nom = "Kiri";
+              println!("Bonjour {nom} !");              // variable nommée directement
+              println!("{0} et {0}", "écho");           // écho et écho
+          }
+          ```
+
+          Autres macros utiles :
+
+          | Macro | Effet |
+          |---|---|
+          | `println!` | affiche + retour à la ligne |
+          | `print!` | affiche **sans** retour à la ligne |
+          | `eprintln!` | affiche sur la sortie d’erreur |
+
+          Pour afficher des accolades littérales, on les double : `println!("{{}}")` affiche `{}`.
+      - title: Les erreurs du compilateur sont tes alliées
+        body: |
+          Oublions un guillemet :
+
+          ```rust
+          fn main() {
+              println!("Bonjour);
+          }
+          ```
+
+          Le compilateur répond :
+
+          ```text
+          error[E0765]: unterminated double quote string
+           --> main.rs:2:14
+          ```
+
+          Il indique **le fichier, la ligne et la colonne** (`main.rs:2:14`). Les messages de Rust sont réputés pour être clairs : lis-les toujours en entier, ils proposent souvent la correction !
+    exercises:
+      - id: rust-pp-q1
+        type: mcq
+        prompt: Quelle fonction est exécutée en premier dans un programme Rust ?
+        choices: [start, main, init, run]
+        answer: 1
+        concepts: [main]
+        explanation: '`main` est le point d’entrée de tout programme exécutable.'
+      - id: rust-pp-q2
+        type: mcq
+        prompt: Que signifie le `!` dans `println!` ?
+        choices: [Que l’affichage est urgent, Qu’il s’agit d’une macro, Que la ligne est en gras, Que le texte est négatif]
+        answer: 1
+        explanation: Les macros se reconnaissent au `!`. Elles génèrent du code à la compilation (ici, la mise en forme du texte).
+      - id: rust-pp-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              print!("A");
+              print!("B");
+              println!("C");
+              println!("D");
+          }
+        output: "ABC\nD"
+        explanation: '`print!` n’ajoute pas de retour à la ligne : A, B et C sont sur la même ligne.'
+      - id: rust-pp-fill
+        type: fill
+        prompt: Complète pour afficher `7 x 6 = 42`.
+        code: |
+          fn main() {
+              {{?}}("{} x {} = {}", 7, 6, 7 * 6);
+          }
+        blanks: [[println!]]
+        tests:
+          - { input: '', output: '7 x 6 = 42' }
+      - id: rust-pp-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur, explique-la et corrige-la.
+        code: |
+          fn main() {
+              println!("Ligne 1");
+              println!("Ligne 2")
+              println!("Ligne 3");
+          }
+        bugLines: [3]
+        choices:
+          - Il manque le point-virgule à la fin de l’instruction
+          - println! doit s’écrire sans point d’exclamation
+          - Le texte doit être entre apostrophes
+        answer: 0
+        solution: |
+          fn main() {
+              println!("Ligne 1");
+              println!("Ligne 2");
+              println!("Ligne 3");
+          }
+        tests:
+          - { input: '', output: "Ligne 1\nLigne 2\nLigne 3" }
+        explanation: Chaque instruction se termine par `;`. Le compilateur signale `expected ;`.
+      - id: rust-pp-code
+        type: code
+        title: Addition affichée
+        prompt: |
+          Le programme lit deux entiers `a` et `b` (un par ligne). Affiche le calcul sous la forme :
+
+          ```
+          a + b = résultat
+          ```
+
+          Exemple : avec `2` et `3`, affiche `2 + 3 = 5`.
+        starter: |
+          use std::io;
+
+          fn lire() -> i64 {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              s.trim().parse().unwrap()
+          }
+
+          fn main() {
+              let a = lire();
+              let b = lire();
+              // Affiche le calcul
+          }
+        solution: |
+          use std::io;
+
+          fn lire() -> i64 {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              s.trim().parse().unwrap()
+          }
+
+          fn main() {
+              let a = lire();
+              let b = lire();
+              println!("{} + {} = {}", a, b, a + b);
+          }
+        tests:
+          - { input: "2\n3", output: '2 + 3 = 5' }
+          - { input: "10\n-4", output: '10 + -4 = 6', hidden: true }
+          - { input: "1000\n2345", output: '1000 + 2345 = 3345', hidden: true }
+        hints: ['Utilise trois `{}` et passe `a`, `b` puis `a + b`.']
+        concepts: [affichage]
+    project:
+      id: rust-pp-projet
+      type: code
+      title: Ticket de caisse
+      difficulty: 1
+      prompt: |
+        Le programme lit le **nom d’un article** puis son **prix en centimes** (entier). Affiche :
+
+        ```
+        Article : <nom>
+        Prix : <prix> centimes
+        Merci de votre visite !
+        ```
+      starter: |
+        use std::io;
+
+        fn main() {
+            let mut nom = String::new();
+            io::stdin().read_line(&mut nom).unwrap();
+            let nom = nom.trim();
+
+            let mut prix = String::new();
+            io::stdin().read_line(&mut prix).unwrap();
+            let prix: u32 = prix.trim().parse().unwrap();
+
+            // Affiche le ticket
+        }
+      solution: |
+        use std::io;
+
+        fn main() {
+            let mut nom = String::new();
+            io::stdin().read_line(&mut nom).unwrap();
+            let nom = nom.trim();
+
+            let mut prix = String::new();
+            io::stdin().read_line(&mut prix).unwrap();
+            let prix: u32 = prix.trim().parse().unwrap();
+
+            println!("Article : {}", nom);
+            println!("Prix : {} centimes", prix);
+            println!("Merci de votre visite !");
+        }
+      tests:
+        - { input: "Croissant\n120", output: "Article : Croissant\nPrix : 120 centimes\nMerci de votre visite !" }
+        - { input: "Clavier\n4999", output: "Article : Clavier\nPrix : 4999 centimes\nMerci de votre visite !", hidden: true }
+        - { input: "Stylo\n1", output: "Article : Stylo\nPrix : 1 centimes\nMerci de votre visite !", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-pp-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                println!("{} {}", "un", "deux");
+                println!("{1} {0}", "un", "deux");
+            }
+          output: "un deux\ndeux un"
+          explanation: '`{1}` et `{0}` désignent les arguments par leur position.'
+        - id: rust-pp-ex2
+          type: mcq
+          prompt: Quelle macro affiche du texte **sans** passer à la ligne ?
+          choices: [println!, print!, eprintln!, format!]
+          answer: 1
+        - id: rust-pp-ex3
+          type: mcq
+          prompt: Dans le message `--> main.rs:4:9`, que représente `4` ?
+          choices: [Le numéro de l’erreur, La ligne, La colonne, Le nombre d’erreurs]
+          answer: 1
+          explanation: Format `fichier:ligne:colonne`.
+        - id: rust-pp-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                println!("{{{}}}", 5);
+            }
+          output: '{5}'
+          explanation: '`{{` et `}}` affichent des accolades littérales ; `{}` au milieu est remplacé par 5.'
+
+  # ------------------------------------------------------------------
+  - slug: rust-syntaxe
+    title: Syntaxe de base
+    summary: Instructions, expressions, blocs, indentation et conventions de nommage — les règles d’écriture de Rust.
+    minutes: 20
+    concepts: [syntaxe, expressions]
+    sections:
+      - title: Instructions et expressions
+        body: |
+          Rust distingue deux sortes de lignes :
+
+          - une **instruction** effectue une action et ne renvoie rien ; elle se termine par `;` ;
+          - une **expression** produit une **valeur**.
+
+          ```rust
+          let x = 5;            // instruction (déclaration)
+          let y = x * 2 + 1;    // x * 2 + 1 est une expression
+          ```
+
+          Un **bloc** `{ ... }` est lui-même une expression : sa valeur est celle de sa **dernière expression sans point-virgule**.
+
+          ```rust
+          let z = {
+              let a = 3;
+              a * a        // pas de ; → c’est la valeur du bloc
+          };
+          println!("{z}"); // 9
+          ```
+
+          ⚠️ Ajouter un `;` après `a * a` transformerait l’expression en instruction : le bloc vaudrait alors `()` (le type « unité », c’est-à-dire « rien »).
+      - title: Conventions d’écriture
+        body: |
+          | Élément | Convention | Exemple |
+          |---|---|---|
+          | variables, fonctions | `snake_case` | `nombre_total`, `calculer_prix` |
+          | types, structures | `PascalCase` | `Joueur`, `CompteBancaire` |
+          | constantes | `SCREAMING_SNAKE_CASE` | `VITESSE_MAX` |
+
+          - L’indentation standard est de **4 espaces**.
+          - Les accolades ouvrantes restent sur la même ligne.
+          - `cargo fmt` applique ces règles automatiquement.
+
+          Le compilateur émet un **avertissement** (warning) si tu ne respectes pas ces conventions : ce n’est pas une erreur, mais c’est un bon réflexe de les suivre.
+      - title: Portée d’un bloc
+        body: |
+          Une variable n’existe que dans le bloc où elle est déclarée :
+
+          ```rust
+          fn main() {
+              let a = 1;
+              {
+                  let b = 2;
+                  println!("{a} {b}"); // OK : a et b sont visibles
+              }
+              // println!("{b}");      // ERREUR : b n’existe plus ici
+          }
+          ```
+
+          On peut aussi **masquer** (*shadowing*) une variable en redéclarant le même nom avec `let` — tu le verras en détail au chapitre suivant.
+    exercises:
+      - id: rust-syn-q1
+        type: mcq
+        prompt: Quelle est la valeur du bloc `{ let a = 2; a + 1 }` ?
+        choices: ['2', '3', '() (rien)', Erreur de compilation]
+        answer: 1
+        concepts: [expressions]
+        explanation: La dernière expression `a + 1` (sans `;`) est la valeur du bloc.
+      - id: rust-syn-q2
+        type: mcq
+        prompt: Quel nom de fonction respecte les conventions Rust ?
+        choices: [CalculerTotal, calculerTotal, calculer_total, CALCULER_TOTAL]
+        answer: 2
+        explanation: Les fonctions et variables s’écrivent en `snake_case`.
+      - id: rust-syn-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let x = {
+                  let a = 4;
+                  let b = 5;
+                  a * b
+              };
+              println!("{}", x + 1);
+          }
+        output: '21'
+        explanation: Le bloc vaut `4 * 5 = 20`, puis on affiche `20 + 1`.
+      - id: rust-syn-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve la ligne fautive.
+        code: |
+          fn main() {
+              let total = 10;
+              {
+                  let bonus = 5;
+              }
+              println!("{}", total + bonus);
+          }
+        bugLines: [6]
+        choices:
+          - '`bonus` n’existe plus : il a été déclaré dans un bloc intérieur qui est terminé'
+          - '`total` devrait être déclaré avec `mut`'
+          - Il est interdit d’additionner dans println!
+        answer: 0
+        solution: |
+          fn main() {
+              let total = 10;
+              let bonus = 5;
+              println!("{}", total + bonus);
+          }
+        tests:
+          - { input: '', output: '15' }
+        explanation: Une variable vit jusqu’à la fin du bloc qui la contient. Déclare `bonus` au même niveau que `total`.
+      - id: rust-syn-fill
+        type: fill
+        prompt: Complète pour que `carre` vaille 49 grâce à la valeur du bloc.
+        code: |
+          fn main() {
+              let carre = {
+                  let n = 7;
+                  {{?}}
+              };
+              println!("{}", carre);
+          }
+        blanks: [[n * n, n*n]]
+        tests:
+          - { input: '', output: '49' }
+        explanation: La dernière expression du bloc, **sans point-virgule**, devient sa valeur.
+    project:
+      id: rust-syn-projet
+      type: code
+      title: Calcul en blocs
+      difficulty: 1
+      prompt: |
+        Lis un entier `n`. Calcule dans **un bloc** la valeur `n * n + n` et stocke-la dans une variable `resultat`, puis affiche `Résultat : <resultat>`.
+
+        Exemple : avec `3`, affiche `Résultat : 12`.
+      starter: |
+        use std::io;
+
+        fn main() {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            let n: i64 = s.trim().parse().unwrap();
+
+            let resultat = {
+                // calcule ici
+            };
+            println!("Résultat : {}", resultat);
+        }
+      solution: |
+        use std::io;
+
+        fn main() {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            let n: i64 = s.trim().parse().unwrap();
+
+            let resultat = {
+                let carre = n * n;
+                carre + n
+            };
+            println!("Résultat : {}", resultat);
+        }
+      tests:
+        - { input: '3', output: 'Résultat : 12' }
+        - { input: '0', output: 'Résultat : 0', hidden: true }
+        - { input: '-5', output: 'Résultat : 20', hidden: true }
+        - { input: '100', output: 'Résultat : 10100', hidden: true }
+      require:
+        - { pattern: 'let\s+resultat\s*=\s*\{', message: 'Calculer resultat dans un bloc { }' }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-syn-ex1
+          type: mcq
+          prompt: Quel est le type de la valeur d’un bloc dont la dernière ligne se termine par `;` ?
+          choices: [i32, '() (unité)', bool, Le type de la dernière variable]
+          answer: 1
+        - id: rust-syn-ex2
+          type: mcq
+          prompt: Quelle convention utilise-t-on pour une constante ?
+          choices: [snake_case, PascalCase, SCREAMING_SNAKE_CASE, camelCase]
+          answer: 2
+        - id: rust-syn-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let a = 2;
+                let b = { let c = a + 3; c * 2 };
+                println!("{} {}", a, b);
+            }
+          output: '2 10'
+        - id: rust-syn-ex4
+          type: mcq
+          prompt: Combien d’espaces compte l’indentation standard en Rust ?
+          choices: ['2', '4', '8', Une tabulation obligatoire]
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-variables
+    title: Variables et mutabilité
+    summary: Déclare des variables avec let, rends-les modifiables avec mut, découvre les constantes et le masquage (shadowing).
+    minutes: 25
+    concepts: [variables, mutabilite]
+    sections:
+      - title: Déclarer une variable
+        body: |
+          ```rust
+          let age = 25;
+          let prenom = "Kiri";
+          let taille: f64 = 1.62;   // type précisé explicitement
+          ```
+
+          Le compilateur **déduit** (*infère*) le type à partir de la valeur. On peut l’écrire explicitement après `:`.
+
+          En Rust, une variable est **immuable par défaut** :
+
+          ```rust
+          let score = 10;
+          score = 20; // ❌ error[E0384]: cannot assign twice to immutable variable
+          ```
+
+          Ce choix évite des modifications accidentelles et rend le code plus facile à comprendre.
+      - title: Rendre une variable modifiable avec mut
+        body: |
+          ```rust
+          let mut score = 10;
+          score = score + 5;   // ✅ OK
+          score += 5;          // raccourci équivalent
+          println!("{score}"); // 20
+          ```
+
+          Le mot-clé `mut` signale clairement : « cette valeur va changer ». Ne l’ajoute que si c’est nécessaire — le compilateur t’avertit d’ailleurs si une variable `mut` n’est jamais modifiée.
+
+          Le **type**, lui, ne peut jamais changer :
+
+          ```rust
+          let mut x = 5;
+          x = "texte"; // ❌ mismatched types
+          ```
+      - title: Constantes et masquage (shadowing)
+        body: |
+          Une **constante** est toujours immuable, son type est obligatoire, et sa valeur doit être connue à la compilation :
+
+          ```rust
+          const SECONDES_PAR_HEURE: u32 = 60 * 60;
+          ```
+
+          Le **masquage** consiste à redéclarer une variable du même nom avec `let`. C’est une **nouvelle** variable, qui peut même avoir un autre type :
+
+          ```rust
+          let saisie = "42";             // &str
+          let saisie: i32 = saisie.parse().unwrap(); // i32 : nouvelle variable
+          let saisie = saisie * 2;       // 84
+          ```
+
+          | | `let mut` | masquage `let` |
+          |---|---|---|
+          | même variable ? | oui | non, une nouvelle |
+          | changer de type ? | non | oui |
+    exercises:
+      - id: rust-var-q1
+        type: mcq
+        prompt: Quelle est la différence entre `let x = 5;` et `let mut x = 5;` ?
+        choices:
+          - Aucune, mut est facultatif
+          - Avec mut, la valeur de x peut être modifiée par la suite
+          - Avec mut, x devient une constante
+          - mut permet de changer le type de x
+        answer: 1
+        concepts: [mutabilite]
+        explanation: Sans `mut`, toute réaffectation provoque l’erreur E0384.
+      - id: rust-var-fill
+        type: fill
+        prompt: Complète pour que le compteur puisse être incrémenté.
+        code: |
+          fn main() {
+              let {{?}} compteur = 0;
+              compteur += 1;
+              compteur += 1;
+              println!("{}", compteur);
+          }
+        blanks: [[mut]]
+        tests:
+          - { input: '', output: '2' }
+        concepts: [mutabilite]
+      - id: rust-var-predict
+        type: predict
+        prompt: Que va afficher ce programme (attention au masquage) ?
+        code: |
+          fn main() {
+              let x = 3;
+              let x = x + 2;
+              {
+                  let x = x * 10;
+                  println!("{}", x);
+              }
+              println!("{}", x);
+          }
+        output: "50\n5"
+        explanation: Dans le bloc intérieur, un nouveau `x` vaut 50. À la sortie du bloc, on retrouve le `x` extérieur qui vaut 5.
+      - id: rust-var-bug
+        type: bugfix
+        prompt: Le programme doit afficher 15. Trouve et corrige l’erreur.
+        code: |
+          fn main() {
+              let total = 10;
+              total = total + 5;
+              println!("{}", total);
+          }
+        bugLines: [2, 3]
+        choices:
+          - '`total` est immuable : il faut le déclarer avec `let mut`'
+          - On ne peut pas additionner deux entiers
+          - println! ne peut pas afficher une variable
+        answer: 0
+        solution: |
+          fn main() {
+              let mut total = 10;
+              total = total + 5;
+              println!("{}", total);
+          }
+        tests:
+          - { input: '', output: '15' }
+        concepts: [mutabilite]
+      - id: rust-var-q2
+        type: mcq
+        prompt: Laquelle de ces déclarations de constante est correcte ?
+        choices:
+          - const max = 100;
+          - 'const MAX: u32 = 100;'
+          - let const MAX = 100;
+          - 'const mut MAX: u32 = 100;'
+        answer: 1
+        explanation: Une constante exige un type explicite et ne peut jamais être `mut`.
+      - id: rust-var-code
+        type: code
+        title: Tirelire
+        prompt: |
+          Lis un montant initial puis un dépôt (deux entiers, un par ligne). Utilise une variable **mutable** `solde` : ajoute le dépôt, puis double le solde (intérêts magiques ✨). Affiche le solde final.
+
+          Exemple : `10` puis `5` → `(10 + 5) × 2` → `30`.
+        starter: |
+          use std::io;
+
+          fn lire() -> i64 {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              s.trim().parse().unwrap()
+          }
+
+          fn main() {
+              let initial = lire();
+              let depot = lire();
+              // Déclare solde, modifie-le, puis affiche-le
+          }
+        solution: |
+          use std::io;
+
+          fn lire() -> i64 {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              s.trim().parse().unwrap()
+          }
+
+          fn main() {
+              let initial = lire();
+              let depot = lire();
+              let mut solde = initial;
+              solde += depot;
+              solde *= 2;
+              println!("{}", solde);
+          }
+        tests:
+          - { input: "10\n5", output: '30' }
+          - { input: "0\n0", output: '0', hidden: true }
+          - { input: "123\n77", output: '400', hidden: true }
+        require:
+          - { pattern: 'let\s+mut\s+solde', message: 'Déclarer solde avec let mut' }
+        concepts: [mutabilite, variables]
+    project:
+      id: rust-var-projet
+      type: code
+      title: Convertisseur de durée
+      difficulty: 2
+      prompt: |
+        Lis un nombre de **secondes** (entier positif). Utilise des constantes `SECONDES_PAR_MINUTE` et `SECONDES_PAR_HEURE`, puis affiche la durée au format :
+
+        ```
+        <h> h <m> min <s> s
+        ```
+
+        Exemple : `3725` → `1 h 2 min 5 s`.
+
+        Astuce : `/` est la division entière et `%` le reste de la division.
+      starter: |
+        use std::io;
+
+        // Déclare tes constantes ici
+
+        fn main() {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            let total: u64 = s.trim().parse().unwrap();
+            // Calcule heures, minutes, secondes
+        }
+      solution: |
+        use std::io;
+
+        const SECONDES_PAR_MINUTE: u64 = 60;
+        const SECONDES_PAR_HEURE: u64 = 60 * SECONDES_PAR_MINUTE;
+
+        fn main() {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            let total: u64 = s.trim().parse().unwrap();
+            let h = total / SECONDES_PAR_HEURE;
+            let reste = total % SECONDES_PAR_HEURE;
+            let m = reste / SECONDES_PAR_MINUTE;
+            let sec = reste % SECONDES_PAR_MINUTE;
+            println!("{} h {} min {} s", h, m, sec);
+        }
+      tests:
+        - { input: '3725', output: '1 h 2 min 5 s' }
+        - { input: '59', output: '0 h 0 min 59 s', hidden: true }
+        - { input: '86399', output: '23 h 59 min 59 s', hidden: true }
+        - { input: '7200', output: '2 h 0 min 0 s', hidden: true }
+      require:
+        - { pattern: 'const\s+SECONDES_PAR_HEURE', message: Déclarer la constante SECONDES_PAR_HEURE }
+      hints:
+        - Les heures valent `total / 3600`. Ce qui reste après les heures vaut `total % 3600`.
+      concepts: [variables]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-var-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let mut a = 1;
+                a += 2;
+                let a = a * 3;
+                println!("{}", a);
+            }
+          output: '9'
+        - id: rust-var-ex2
+          type: mcq
+          prompt: Quel code provoque une erreur de compilation ?
+          choices:
+            - 'let x = 1; let x = "un";'
+            - 'let mut x = 1; x = 2;'
+            - 'let mut x = 1; x = "deux";'
+            - 'let x: i64 = 1;'
+          answer: 2
+          explanation: Même avec `mut`, le type d’une variable ne peut pas changer. Le masquage (`let x = "un"`), lui, crée une nouvelle variable.
+        - id: rust-var-ex3
+          type: fill
+          prompt: Complète la déclaration de constante.
+          code: '{{?}} TAUX: f64 = 0.2;'
+          blanks: [[const]]
+        - id: rust-var-ex4
+          type: mcq
+          prompt: Par défaut, une variable Rust est…
+          choices: [modifiable, immuable, globale, nulle]
+          answer: 1
+        - id: rust-var-ex5
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let s = "5";
+                let s: i32 = s.parse().unwrap();
+                println!("{}", s + 1);
+            }
+          output: '6'
+          explanation: Le masquage crée un nouveau `s` de type `i32`.
+
+  # ------------------------------------------------------------------
+  - slug: rust-types
+    title: Types primitifs
+    summary: Entiers signés et non signés, flottants, booléens, caractères, tuples et tableaux — et les conversions avec as.
+    minutes: 30
+    concepts: [types]
+    sections:
+      - title: Les nombres
+        body: |
+          **Entiers** : la lettre indique le signe (`i` = signé, `u` = non signé), le nombre la taille en bits.
+
+          | Type | Plage |
+          |---|---|
+          | `i8` | -128 à 127 |
+          | `u8` | 0 à 255 |
+          | `i32` (par défaut) | ≈ ±2,1 milliards |
+          | `i64` | ≈ ±9,2 × 10¹⁸ |
+          | `u64` | 0 à ≈ 1,8 × 10¹⁹ |
+          | `usize` | taille d’un pointeur (index, longueurs) |
+
+          **Flottants** : `f64` (par défaut, double précision) et `f32`.
+
+          ```rust
+          let a = 42;          // i32
+          let b: u8 = 255;
+          let c = 3.14;        // f64
+          let d = 1_000_000;   // les _ améliorent la lisibilité
+          ```
+
+          ⚠️ La division entière tronque : `7 / 2` vaut `3`, alors que `7.0 / 2.0` vaut `3.5`.
+
+          En mode debug, un **dépassement** (`255u8 + 1`) provoque un *panic*. Rust ne laisse pas passer silencieusement ce genre de bug.
+      - title: Booléens et caractères
+        body: |
+          ```rust
+          let actif: bool = true;
+          let lettre: char = 'é';     // apostrophes simples !
+          let emoji = '🦀';            // un char Rust est un caractère Unicode
+          ```
+
+          - `bool` vaut `true` ou `false`.
+          - `char` occupe **4 octets** et représente n’importe quel caractère Unicode.
+          - Attention : `'a'` est un `char`, `"a"` est une chaîne (`&str`).
+      - title: Tuples, tableaux et conversions
+        body: |
+          Un **tuple** regroupe des valeurs de types différents :
+
+          ```rust
+          let point = (3, 4.5, 'x');
+          println!("{}", point.0);      // 3
+          let (a, b, c) = point;        // déstructuration
+          ```
+
+          Un **tableau** a une taille fixe et des éléments de même type :
+
+          ```rust
+          let notes = [12, 15, 9];
+          let zeros = [0; 5];           // [0, 0, 0, 0, 0]
+          println!("{}", notes[0]);     // 12
+          println!("{}", notes.len());  // 3
+          ```
+
+          **Conversions** : Rust ne convertit jamais implicitement entre types numériques. On utilise `as` :
+
+          ```rust
+          let entier = 7;
+          let moitie = entier as f64 / 2.0;   // 3.5
+          let tronque = 9.99_f64 as i32;      // 9 (troncature)
+          ```
+    exercises:
+      - id: rust-types-q1
+        type: mcq
+        prompt: Quel type choisir pour stocker un âge (entre 0 et 150) en économisant la mémoire ?
+        choices: [i64, u8, f32, char]
+        answer: 1
+        explanation: '`u8` va de 0 à 255 : parfait pour un âge, et il n’occupe qu’un octet.'
+      - id: rust-types-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let a = 7 / 2;
+              let b = 7.0 / 2.0;
+              let c = 7 % 2;
+              println!("{} {} {}", a, b, c);
+          }
+        output: '3 3.5 1'
+        explanation: La division entière tronque, `%` donne le reste.
+      - id: rust-types-q2
+        type: mcq
+        prompt: Lequel de ces littéraux est un `char` ?
+        choices: ['"a"', "'a'", 'a', '`a`']
+        answer: 1
+        explanation: Les `char` s’écrivent entre apostrophes simples, les chaînes entre guillemets.
+      - id: rust-types-fill
+        type: fill
+        prompt: Complète pour convertir `total` en `f64` et calculer une moyenne décimale.
+        code: |
+          fn main() {
+              let total = 31;
+              let nombre = 4;
+              let moyenne = total {{?}} f64 / nombre as f64;
+              println!("{}", moyenne);
+          }
+        blanks: [[as]]
+        tests:
+          - { input: '', output: '7.75' }
+      - id: rust-types-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Pourquoi ?
+        code: |
+          fn main() {
+              let prix: f64 = 19.99;
+              let quantite: i32 = 3;
+              let total = prix * quantite;
+              println!("{}", total);
+          }
+        bugLines: [4]
+        choices:
+          - On ne peut pas multiplier un f64 par un i32 sans conversion explicite
+          - Le type f64 n’existe pas
+          - Il faut écrire total en majuscules
+        answer: 0
+        solution: |
+          fn main() {
+              let prix: f64 = 19.99;
+              let quantite: i32 = 3;
+              let total = prix * quantite as f64;
+              println!("{}", total);
+          }
+        tests:
+          - { input: '', output: '59.97' }
+        explanation: Rust refuse de mélanger les types numériques. Convertis avec `quantite as f64`.
+      - id: rust-types-predict2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let t = (10, "dix", 'X');
+              let tab = [1, 2, 3, 4];
+              println!("{} {} {}", t.1, tab[2], tab.len());
+          }
+        output: 'dix 3 4'
+      - id: rust-types-code
+        type: code
+        title: Moyenne de trois notes
+        prompt: |
+          Lis trois notes **entières** (une par ligne) et affiche leur moyenne avec **deux décimales**.
+
+          Exemple : `12`, `15`, `10` → `12.33`
+
+          Pour formater : `println!("{:.2}", valeur);`
+        starter: |
+          use std::io;
+
+          fn lire() -> i32 {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              s.trim().parse().unwrap()
+          }
+
+          fn main() {
+              let a = lire();
+              let b = lire();
+              let c = lire();
+              // Calcule et affiche la moyenne
+          }
+        solution: |
+          use std::io;
+
+          fn lire() -> i32 {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              s.trim().parse().unwrap()
+          }
+
+          fn main() {
+              let a = lire();
+              let b = lire();
+              let c = lire();
+              let moyenne = (a + b + c) as f64 / 3.0;
+              println!("{:.2}", moyenne);
+          }
+        tests:
+          - { input: "12\n15\n10", output: '12.33' }
+          - { input: "20\n20\n20", output: '20.00', hidden: true }
+          - { input: "0\n1\n1", output: '0.67', hidden: true }
+        hints: ['La somme est entière : convertis-la en `f64` avant de diviser par `3.0`.']
+    project:
+      id: rust-types-projet
+      type: code
+      title: Fiche d’un rectangle
+      difficulty: 2
+      prompt: |
+        Lis la **largeur** et la **hauteur** d’un rectangle (deux nombres décimaux, un par ligne). Stocke-les dans un **tuple** `dimensions`, puis affiche :
+
+        ```
+        Aire : <aire>
+        Périmètre : <périmètre>
+        Carré : <true|false>
+        ```
+
+        Les nombres sont affichés avec une décimale (`{:.1}`).
+      starter: |
+        use std::io;
+
+        fn lire() -> f64 {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            s.trim().parse().unwrap()
+        }
+
+        fn main() {
+            let dimensions = (lire(), lire());
+            // À toi !
+        }
+      solution: |
+        use std::io;
+
+        fn lire() -> f64 {
+            let mut s = String::new();
+            io::stdin().read_line(&mut s).unwrap();
+            s.trim().parse().unwrap()
+        }
+
+        fn main() {
+            let dimensions = (lire(), lire());
+            let (l, h) = dimensions;
+            println!("Aire : {:.1}", l * h);
+            println!("Périmètre : {:.1}", 2.0 * (l + h));
+            println!("Carré : {}", l == h);
+        }
+      tests:
+        - { input: "3\n4", output: "Aire : 12.0\nPérimètre : 14.0\nCarré : false" }
+        - { input: "2.5\n2.5", output: "Aire : 6.2\nPérimètre : 10.0\nCarré : true", hidden: true }
+        - { input: "10\n0.5", output: "Aire : 5.0\nPérimètre : 21.0\nCarré : false", hidden: true }
+      hints: ['Déstructure le tuple : `let (l, h) = dimensions;`', 'Une comparaison `l == h` produit directement un `bool`.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-types-ex1
+          type: mcq
+          prompt: Quel est le type entier utilisé par défaut ?
+          choices: [i8, i32, i64, usize]
+          answer: 1
+        - id: rust-types-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let x = 9.7_f64 as i32;
+                let y = (x as f64) / 2.0;
+                println!("{} {}", x, y);
+            }
+          output: '9 4.5'
+          explanation: '`as i32` tronque (ne fait pas d’arrondi).'
+        - id: rust-types-ex3
+          type: mcq
+          prompt: Combien d’octets occupe un `char` en Rust ?
+          choices: ['1', '2', '4', Variable]
+          answer: 2
+        - id: rust-types-ex4
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let tab = [5; 3];
+                let (a, b) = (tab[0] + tab[1], tab.len());
+                println!("{} {}", a, b);
+            }
+          output: '10 3'
+        - id: rust-types-ex5
+          type: mcq
+          prompt: Que se passe-t-il en mode debug si un `u8` valant 255 est incrémenté ?
+          choices: [Il vaut 0, Il vaut 256, Le programme panique (dépassement), Erreur de compilation systématique]
+          answer: 2
+          explanation: En mode debug, Rust détecte le dépassement et arrête le programme. En mode release, la valeur « boucle » (wrapping) sauf vérification explicite.
