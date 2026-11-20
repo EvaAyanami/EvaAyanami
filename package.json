@@ -1,0 +1,17 @@
+{
+  "name": "codemori",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Codemori — plateforme française d'apprentissage interactif de Rust, C++ et Java",
+  "workspaces": ["apps/api", "apps/runner", "apps/web"],
+  "scripts": {
+    "dev:api": "npm run dev -w apps/api",
+    "dev:runner": "npm run dev -w apps/runner",
+    "dev:web": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/runner && npm run build -w apps/api && npm run build -w apps/web",
+    "content:validate": "npm run content:validate -w apps/api",
+    "content:verify": "npm run content:verify -w apps/api",
+    "db:seed": "npm run db:seed -w apps/api",
+    "test": "npm test -w apps/api && npm test -w apps/runner"
+  }
+}
