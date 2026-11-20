@@ -1442,7 +1442,7 @@ chapters:
       - id: cpp-ctor-q1
         type: mcq
         prompt: Pourquoi la liste d’initialisation est-elle obligatoire pour un membre const ?
-        choices: [Un const doit être initialisé, il ne peut pas être affecté dans le corps, Pour la performance seulement, Elle ne l’est pas, Pour l’héritage]
+        choices: ['Un const doit être initialisé, il ne peut pas être affecté dans le corps', 'Pour la performance seulement', 'Elle ne l’est pas', 'Pour l’héritage']
         answer: 0
       - id: cpp-ctor-q2
         type: mcq
@@ -1587,7 +1587,7 @@ chapters:
         - id: cpp-ctor-ex2
           type: mcq
           prompt: Que dit la règle de zéro ?
-          choices: [Si les membres gèrent leurs ressources, ne pas écrire de fonctions spéciales, Initialiser tout à zéro, Ne jamais utiliser de constructeur, Toujours écrire un destructeur]
+          choices: ['Si les membres gèrent leurs ressources, ne pas écrire de fonctions spéciales', 'Initialiser tout à zéro', 'Ne jamais utiliser de constructeur', 'Toujours écrire un destructeur']
           answer: 0
         - id: cpp-ctor-ex3
           type: mcq
@@ -1660,7 +1660,7 @@ chapters:
       - id: cpp-dtor-q2
         type: mcq
         prompt: Le destructeur est-il appelé si une exception est levée dans la portée ?
-        choices: [Oui, lors du déroulement de la pile, Non, Seulement en mode debug, Seulement pour les objets du tas]
+        choices: ['Oui, lors du déroulement de la pile', 'Non', 'Seulement en mode debug', 'Seulement pour les objets du tas']
         answer: 0
       - id: cpp-dtor-fill
         type: fill
@@ -1792,7 +1792,7 @@ chapters:
         - id: cpp-dtor-ex2
           type: mcq
           prompt: Que dit la règle de trois ?
-          choices: [Destructeur, constructeur de copie et affectation personnalisés vont généralement ensemble, Toujours trois constructeurs, Trois niveaux d’héritage maximum, Trois membres par classe]
+          choices: ['Destructeur, constructeur de copie et affectation personnalisés vont généralement ensemble', 'Toujours trois constructeurs', 'Trois niveaux d’héritage maximum', 'Trois membres par classe']
           answer: 0
         - id: cpp-dtor-ex3
           type: mcq

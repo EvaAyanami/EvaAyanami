@@ -285,7 +285,7 @@ chapters:
         - id: rust-arch-ex2
           type: mcq
           prompt: Pourquoi injecter une dépendance via un trait générique plutôt que de l’instancier dans le service ?
-          choices: [Pour pouvoir la remplacer (tests, autres implémentations), Pour réduire la taille du binaire, Pour éviter le borrow checker, Aucune raison]
+          choices: ['Pour pouvoir la remplacer (tests, autres implémentations)', 'Pour réduire la taille du binaire', 'Pour éviter le borrow checker', 'Aucune raison']
           answer: 0
         - id: rust-arch-ex3
           type: mcq
@@ -1567,7 +1567,7 @@ chapters:
       - id: rust-perf-q3
         type: mcq
         prompt: Pour parcourir une matrice stockée ligne par ligne, quel ordre de boucles est le plus rapide ?
-        choices: [Lignes à l’extérieur, colonnes à l’intérieur, Colonnes à l’extérieur, Indifférent, Aléatoire]
+        choices: ['Lignes à l’extérieur, colonnes à l’intérieur', 'Colonnes à l’extérieur', 'Indifférent', 'Aléatoire']
         answer: 0
       - id: rust-perf-predict
         type: predict

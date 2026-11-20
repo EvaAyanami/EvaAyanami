@@ -511,7 +511,7 @@ chapters:
         - id: rust-rc-ex3
           type: mcq
           prompt: Quelle est la différence principale entre Rc et Arc ?
-          choices: [Arc utilise un compteur atomique, utilisable entre threads, Arc permet la modification, Rc est plus lent, Aucune]
+          choices: ['Arc utilise un compteur atomique, utilisable entre threads', 'Arc permet la modification', 'Rc est plus lent', 'Aucune']
           answer: 0
         - id: rust-rc-ex4
           type: predict
@@ -773,7 +773,7 @@ chapters:
         - id: rust-mutex-ex2
           type: mcq
           prompt: Rust empêche-t-il les interblocages (deadlocks) à la compilation ?
-          choices: [Oui, toujours, Non, Seulement avec RwLock, Seulement en release]
+          choices: ['Oui, toujours', 'Non', 'Seulement avec RwLock', 'Seulement en release']
           answer: 1
         - id: rust-mutex-ex3
           type: mcq
@@ -849,7 +849,7 @@ chapters:
       - id: rust-conc-q2
         type: mcq
         prompt: Que signifie mpsc ?
-        choices: [Multiple producer, single consumer, Memory protected shared channel, Mutex per single core, Multi-process system call]
+        choices: ['Multiple producer, single consumer', 'Memory protected shared channel', 'Mutex per single core', 'Multi-process system call']
         answer: 0
       - id: rust-conc-predict
         type: predict
@@ -1069,7 +1069,7 @@ chapters:
       - id: rust-thr-q2
         type: mcq
         prompt: Pourquoi faut-il souvent `move` devant la closure de `thread::spawn` ?
-        choices: [Le thread peut survivre aux variables locales, il doit donc les posséder, Pour accélérer le thread, Pour le rendre mutable, Ce n’est jamais nécessaire]
+        choices: ['Le thread peut survivre aux variables locales, il doit donc les posséder', 'Pour accélérer le thread', 'Pour le rendre mutable', 'Ce n’est jamais nécessaire']
         answer: 0
       - id: rust-thr-predict
         type: predict

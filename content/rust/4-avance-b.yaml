@@ -1227,7 +1227,7 @@ chapters:
         - id: rust-gm-ex1
           type: mcq
           prompt: Pourquoi `Option<&T>` a-t-il la même taille que `&T` ?
-          choices: [Une référence n’est jamais nulle, la valeur nulle sert à coder None, Les Option sont gratuites, &T est vide, Par hasard]
+          choices: ['Une référence n’est jamais nulle, la valeur nulle sert à coder None', 'Les Option sont gratuites', '&T est vide', 'Par hasard']
           answer: 0
         - id: rust-gm-ex2
           type: mcq
@@ -1242,7 +1242,7 @@ chapters:
         - id: rust-gm-ex4
           type: mcq
           prompt: Qu’est-ce qu’un fat pointer ?
-          choices: [Un pointeur accompagné d’une métadonnée (longueur, vtable), Un pointeur vers une grosse donnée, Un pointeur nul, Un Box]
+          choices: ['Un pointeur accompagné d’une métadonnée (longueur, vtable)', 'Un pointeur vers une grosse donnée', 'Un pointeur nul', 'Un Box']
           answer: 0
 
   # ------------------------------------------------------------------

@@ -1,0 +1,2543 @@
+language: cpp
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: cpp-stl
+    title: La STL
+    summary: Vue d’ensemble de la bibliothèque standard — conteneurs, itérateurs, algorithmes et foncteurs, et comment ils s’articulent.
+    minutes: 25
+    concepts: [collections, stl]
+    sections:
+      - title: Trois piliers
+        body: |
+          La **STL** (*Standard Template Library*) repose sur trois briques indépendantes :
+
+          1. **Conteneurs** : `vector`, `deque`, `list`, `array`, `map`, `set`, `unordered_map`, `unordered_set`, `stack`, `queue`, `priority_queue`…
+          2. **Itérateurs** : des objets qui parcourent les conteneurs (`begin()`, `end()`).
+          3. **Algorithmes** (`<algorithm>`, `<numeric>`) : `sort`, `find`, `count_if`, `transform`, `accumulate`… qui travaillent sur des **intervalles d’itérateurs** `[début, fin)`.
+
+          ```cpp
+          std::vector<int> v{5, 2, 8, 1};
+          std::sort(v.begin(), v.end());
+          auto it = std::find(v.begin(), v.end(), 8);
+          if (it != v.end()) std::cout << "trouvé à l’indice " << (it - v.begin());
+          ```
+
+          Grâce aux itérateurs, **un seul** `std::sort` fonctionne pour tous les conteneurs à accès aléatoire.
+      - title: Algorithmes avec lambdas et ranges
+        body: |
+          ```cpp
+          int pairs = std::count_if(v.begin(), v.end(), [](int x) { return x % 2 == 0; });
+          std::transform(v.begin(), v.end(), v.begin(), [](int x) { return x * 10; });
+          bool tous = std::all_of(v.begin(), v.end(), [](int x) { return x > 0; });
+          ```
+
+          **C++20 ranges** : on passe directement le conteneur, et on compose des vues paresseuses :
+
+          ```cpp
+          #include <ranges>
+          std::ranges::sort(v);
+          for (int x : v | std::views::filter([](int x) { return x > 2; })
+                         | std::views::transform([](int x) { return x * x; }))
+              std::cout << x << ' ';
+          ```
+    exercises:
+      - id: cpp-stl-q1
+        type: mcq
+        prompt: Quels sont les trois piliers de la STL ?
+        choices: ['Conteneurs, itérateurs, algorithmes', 'Classes, objets, méthodes', 'Pointeurs, références, valeurs', 'Flux, fichiers, chaînes']
+        answer: 0
+      - id: cpp-stl-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          #include <numeric>
+          int main() {
+              std::vector<int> v{4, 7, 1, 8, 3};
+              std::sort(v.begin(), v.end());
+              int n = std::count_if(v.begin(), v.end(), [](int x) { return x > 3; });
+              int s = std::accumulate(v.begin(), v.end(), 0);
+              std::cout << v[0] << v[4] << " " << n << " " << s << "\n";
+          }
+        output: 18 3 23
+      - id: cpp-stl-fill
+        type: fill
+        prompt: Complète pour doubler chaque élément avec std::transform.
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          int main() {
+              std::vector<int> v{1, 2, 3};
+              std::{{?}}(v.begin(), v.end(), v.begin(), [](int x) { return x * 2; });
+              for (int x : v) std::cout << x;
+              std::cout << "\n";
+          }
+        blanks: [[transform]]
+        tests:
+          - { input: '', output: '246' }
+      - id: cpp-stl-code
+        type: code
+        title: Statistiques avec la STL
+        prompt: |
+          Lis `n` puis `n` entiers. **Sans écrire de boucle for/while pour les calculs** (seulement pour la lecture), affiche : la somme, le nombre de valeurs négatives, et les valeurs triées par ordre décroissant (séparées par des espaces). Utilise `accumulate`, `count_if`, `sort` avec `std::greater<int>()`.
+        starter: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          #include <numeric>
+          #include <functional>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<long long> v(n);
+              for (auto& x : v) std::cin >> x;
+          }
+        solution: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          #include <numeric>
+          #include <functional>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<long long> v(n);
+              for (auto& x : v) std::cin >> x;
+              std::cout << std::accumulate(v.begin(), v.end(), 0LL) << "\n";
+              std::cout << std::count_if(v.begin(), v.end(), [](long long x) { return x < 0; }) << "\n";
+              std::sort(v.begin(), v.end(), std::greater<long long>());
+              for (std::size_t i = 0; i < v.size(); ++i) std::cout << (i ? " " : "") << v[i];
+              std::cout << "\n";
+          }
+        tests:
+          - { input: "5\n3 -1 4 -1 5", output: "10\n2\n5 4 3 -1 -1" }
+          - { input: "1\n0", output: "0\n0\n0", hidden: true }
+        require:
+          - { pattern: 'accumulate', message: Utiliser std::accumulate }
+          - { pattern: 'count_if', message: Utiliser std::count_if }
+    project:
+      id: cpp-stl-projet
+      type: code
+      title: Classement de joueurs
+      difficulty: 3
+      prompt: |
+        Chaque ligne : `nom score`. Avec les algorithmes de la STL :
+
+        - trie les joueurs par score décroissant puis nom croissant (`std::sort` + lambda) ;
+        - affiche le podium (`1. nom (score)` … jusqu’à 3) ;
+        - affiche `Moyenne : X.X` ;
+        - affiche `Au-dessus : a, b, …` (joueurs dont le score dépasse la moyenne, dans l’ordre du classement) en utilisant `std::copy_if` vers un vecteur.
+      starter: |
+        #include <iostream>
+        #include <vector>
+        #include <string>
+        #include <algorithm>
+        #include <numeric>
+        #include <iomanip>
+
+        struct Joueur { std::string nom; int score; };
+
+        int main() {
+            std::vector<Joueur> js;
+            Joueur j;
+            while (std::cin >> j.nom >> j.score) js.push_back(j);
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+        #include <string>
+        #include <algorithm>
+        #include <numeric>
+        #include <iomanip>
+
+        struct Joueur { std::string nom; int score; };
+
+        int main() {
+            std::vector<Joueur> js;
+            Joueur j;
+            while (std::cin >> j.nom >> j.score) js.push_back(j);
+            std::sort(js.begin(), js.end(), [](const Joueur& a, const Joueur& b) {
+                return a.score != b.score ? a.score > b.score : a.nom < b.nom;
+            });
+            for (std::size_t i = 0; i < js.size() && i < 3; ++i)
+                std::cout << i + 1 << ". " << js[i].nom << " (" << js[i].score << ")\n";
+            double moyenne = std::accumulate(js.begin(), js.end(), 0.0, [](double s, const Joueur& x) { return s + x.score; }) / js.size();
+            std::cout << "Moyenne : " << std::fixed << std::setprecision(1) << moyenne << "\n";
+            std::vector<Joueur> dessus;
+            std::copy_if(js.begin(), js.end(), std::back_inserter(dessus), [&](const Joueur& x) { return x.score > moyenne; });
+            std::cout << "Au-dessus : ";
+            for (std::size_t i = 0; i < dessus.size(); ++i) std::cout << (i ? ", " : "") << dessus[i].nom;
+            std::cout << "\n";
+        }
+      tests:
+        - { input: "Ada 90\nBob 70\nZoe 90\nKiri 85", output: "1. Ada (90)\n2. Zoe (90)\n3. Kiri (85)\nMoyenne : 83.8\nAu-dessus : Ada, Zoe, Kiri" }
+        - { input: "Solo 10", output: "1. Solo (10)\nMoyenne : 10.0\nAu-dessus : ", hidden: true }
+      require:
+        - { pattern: 'copy_if', message: Utiliser std::copy_if }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-stl-ex1
+          type: mcq
+          prompt: Sur quoi travaillent les algorithmes de la STL ?
+          choices: ['Des intervalles d’itérateurs [début, fin)', 'Des conteneurs uniquement', 'Des pointeurs bruts uniquement', 'Des chaînes']
+          answer: 0
+        - id: cpp-stl-ex2
+          type: mcq
+          prompt: Que renvoie std::find si l’élément est absent ?
+          choices: [L’itérateur end(), nullptr, '-1', Une exception]
+          answer: 0
+        - id: cpp-stl-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            #include <iostream>
+            #include <vector>
+            #include <algorithm>
+            int main() {
+                std::vector<int> v{3, 1, 2};
+                std::reverse(v.begin(), v.end());
+                bool ok = std::is_sorted(v.begin(), v.end());
+                std::cout << v[0] << " " << ok << " " << *std::max_element(v.begin(), v.end()) << "\n";
+            }
+          output: 2 0 3
+        - id: cpp-stl-ex4
+          type: mcq
+          prompt: Quel en-tête fournit les vues filter et transform (C++20) ?
+          choices: ['<ranges>', '<views>', '<algorithm>', '<functional>']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-vector
+    title: std::vector en profondeur
+    summary: Capacité et réallocation, reserve, emplace_back, insertion et suppression, l’idiome erase-remove et l’invalidation des itérateurs.
+    minutes: 30
+    concepts: [collections, vecteurs]
+    sections:
+      - title: Taille, capacité, réallocation
+        body: |
+          ```cpp
+          std::vector<int> v;
+          v.reserve(100);              // réserve la place, size() reste 0
+          std::cout << v.size() << " " << v.capacity();   // 0 100
+          v.push_back(1);
+          v.emplace_back(2);           // construit sur place
+          v.resize(5);                 // taille 5, complète avec 0
+          v.shrink_to_fit();           // demande à libérer la capacité inutile
+          ```
+
+          Quand `size() == capacity()`, un ajout **réalloue** (souvent ×2) et copie/déplace tous les éléments : `reserve` évite ces réallocations si la taille finale est connue.
+      - title: Supprimer et invalider
+        body: |
+          ```cpp
+          v.erase(v.begin() + 2);                       // supprime l’indice 2
+          v.insert(v.begin(), 99);                      // insère en tête (O(n))
+          std::erase_if(v, [](int x) { return x < 0; }); // C++20 : supprime selon un critère
+          // Avant C++20 : l’idiome erase-remove
+          v.erase(std::remove(v.begin(), v.end(), 0), v.end());
+          ```
+
+          ⚠️ **Invalidation** : une réallocation invalide **tous** les itérateurs, pointeurs et références vers les éléments ; `erase`/`insert` invalident ceux qui suivent la position. Ne jamais garder `&v[0]` puis faire `push_back` !
+    exercises:
+      - id: cpp-vec-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          int main() {
+              std::vector<int> v{1, 0, 2, 0, 3};
+              v.erase(std::remove(v.begin(), v.end(), 0), v.end());
+              v.insert(v.begin() + 1, 9);
+              v.resize(5, 7);
+              for (int x : v) std::cout << x;
+              std::cout << " " << v.size() << "\n";
+          }
+        output: '19237 5'
+      - id: cpp-vec-q1
+        type: mcq
+        prompt: Que fait reserve(n) ?
+        choices: [Réserve de la capacité sans changer la taille, Ajoute n éléments, Supprime n éléments, Trie le vecteur]
+        answer: 0
+      - id: cpp-vec-bug
+        type: bugfix
+        prompt: Ce programme garde un pointeur qui peut être invalidé. Trouve la ligne à l’origine du problème.
+        code: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> v{1, 2, 3};
+              int* premier = &v[0];
+              for (int i = 0; i < 1000; ++i) v.push_back(i);
+              std::cout << *premier << "\n";
+          }
+        bugLines: [6]
+        choices:
+          - Les push_back peuvent réallouer le vecteur et invalider le pointeur premier
+          - '&v[0] est interdit'
+          - La boucle est infinie
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <vector>
+          int main() {
+              std::vector<int> v{1, 2, 3};
+              for (int i = 0; i < 1000; ++i) v.push_back(i);
+              int* premier = &v[0];
+              std::cout << *premier << "\n";
+          }
+        tests:
+          - { input: '', output: '1' }
+      - id: cpp-vec-code
+        type: code
+        title: Nettoyage de données
+        prompt: |
+          Lis `n` puis `n` entiers. Supprime les valeurs négatives avec `std::erase_if`, supprime les doublons (après tri, avec `std::unique` + `erase`), puis affiche la taille et les valeurs restantes.
+        starter: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<int> v(n);
+              for (auto& x : v) std::cin >> x;
+          }
+        solution: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+
+          int main() {
+              int n;
+              std::cin >> n;
+              std::vector<int> v(n);
+              for (auto& x : v) std::cin >> x;
+              std::erase_if(v, [](int x) { return x < 0; });
+              std::sort(v.begin(), v.end());
+              v.erase(std::unique(v.begin(), v.end()), v.end());
+              std::cout << v.size() << "\n";
+              for (std::size_t i = 0; i < v.size(); ++i) std::cout << (i ? " " : "") << v[i];
+              std::cout << "\n";
+          }
+        tests:
+          - { input: "8\n5 -1 3 5 0 -7 3 9", output: "4\n0 3 5 9" }
+          - { input: "2\n-1 -2", output: "0\n", hidden: true }
+        require:
+          - { pattern: 'erase_if', message: Utiliser std::erase_if }
+          - { pattern: 'unique', message: Utiliser std::unique }
+    project:
+      id: cpp-vec-projet
+      type: code
+      title: Matrice et transposée
+      difficulty: 3
+      prompt: |
+        Lis `l c` puis une matrice `l × c` d’entiers. Stocke-la dans un **unique** `std::vector<int>` de taille `l*c` (indice `i*c + j`). Affiche la transposée (`c × l`), puis la somme de chaque ligne de la matrice d’origine séparées par des espaces.
+      starter: |
+        #include <iostream>
+        #include <vector>
+
+        int main() {
+            int l, c;
+            std::cin >> l >> c;
+            std::vector<int> m(l * c);
+            for (auto& x : m) std::cin >> x;
+        }
+      solution: |
+        #include <iostream>
+        #include <vector>
+
+        int main() {
+            int l, c;
+            std::cin >> l >> c;
+            std::vector<int> m(l * c);
+            for (auto& x : m) std::cin >> x;
+            for (int j = 0; j < c; ++j) {
+                for (int i = 0; i < l; ++i) std::cout << (i ? " " : "") << m[i * c + j];
+                std::cout << "\n";
+            }
+            for (int i = 0; i < l; ++i) {
+                long long s = 0;
+                for (int j = 0; j < c; ++j) s += m[i * c + j];
+                std::cout << (i ? " " : "") << s;
+            }
+            std::cout << "\n";
+        }
+      tests:
+        - { input: "2 3\n1 2 3\n4 5 6", output: "1 4\n2 5\n3 6\n6 15" }
+        - { input: "1 1\n7", output: "7\n7", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-vec-ex1
+          type: mcq
+          prompt: Qu’invalide une réallocation de vector ?
+          choices: ['Tous les itérateurs, pointeurs et références vers les éléments', 'Rien', 'Seulement end()', 'Seulement le premier élément']
+          answer: 0
+        - id: cpp-vec-ex2
+          type: mcq
+          prompt: Que fait std::remove seul (sans erase) ?
+          choices: [Déplace les éléments conservés au début et renvoie la nouvelle fin logique, Supprime réellement les éléments, Trie le vecteur, Vide le vecteur]
+          answer: 0
+        - id: cpp-vec-ex3
+          type: mcq
+          prompt: Complexité d’un insert en tête de vector ?
+          choices: ['O(n)', 'O(1)', 'O(log n)', 'O(n²)']
+          answer: 0
+        - id: cpp-vec-ex4
+          type: mcq
+          prompt: Quelle fonction C++20 supprime les éléments vérifiant un critère ?
+          choices: ['std::erase_if', 'std::remove_all', 'v.filter', 'std::drop']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-map
+    title: Map
+    summary: std::map (trié) et std::unordered_map (hachage) — insertion, recherche, piège de operator[], parcours et comptage.
+    minutes: 30
+    concepts: [hashmap, collections]
+    sections:
+      - title: map et unordered_map
+        body: |
+          ```cpp
+          #include <map>
+          #include <unordered_map>
+
+          std::map<std::string, int> ages{{"Ada", 36}, {"Bob", 25}};
+          ages["Kiri"] = 16;                      // insère ou modifie
+          ages.insert({"Zoe", 30});               // n’écrase pas si la clé existe
+          if (auto it = ages.find("Bob"); it != ages.end()) std::cout << it->second;
+          if (ages.contains("Ada")) { /* C++20 */ }
+          ages.erase("Bob");
+          for (const auto& [nom, age] : ages) std::cout << nom << " " << age << "\n"; // trié par clé
+          ```
+
+          | | `std::map` | `std::unordered_map` |
+          |---|---|---|
+          | Structure | arbre rouge-noir | table de hachage |
+          | Ordre | trié par clé | aucun |
+          | Recherche | O(log n) | O(1) en moyenne |
+      - title: Le piège de operator[]
+        body: |
+          `m[cle]` **crée** l’entrée (avec une valeur par défaut) si elle n’existe pas — même pour une simple lecture !
+
+          ```cpp
+          std::map<std::string, int> m;
+          if (m["absent"] == 0) { }   // ⚠️ insère "absent" → 0
+          std::cout << m.size();     // 1
+          ```
+
+          Pour lire sans insérer : `find`, `contains`, `count` ou `at` (qui lève `std::out_of_range`).
+
+          Le comptage d’occurrences, lui, profite de ce comportement : `++compteur[mot];`.
+    exercises:
+      - id: cpp-map-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <map>
+          #include <string>
+          int main() {
+              std::map<std::string, int> m;
+              for (std::string mot : {"b", "a", "b", "c", "b"}) ++m[mot];
+              if (m["z"] == 0) std::cout << "absent ";
+              for (const auto& [k, v] : m) std::cout << k << v;
+              std::cout << " " << m.size() << "\n";
+          }
+        output: absent a1b3c1z0 4
+      - id: cpp-map-q1
+        type: mcq
+        prompt: Quelle structure garantit le parcours dans l’ordre des clés ?
+        choices: ['std::map', 'std::unordered_map', 'std::vector', 'std::unordered_set']
+        answer: 0
+      - id: cpp-map-fill
+        type: fill
+        prompt: Complète la boucle avec des structured bindings.
+        code: |
+          #include <iostream>
+          #include <map>
+          int main() {
+              std::map<int, char> m{{2, 'b'}, {1, 'a'}};
+              for (const auto& [{{?}}, {{?}}] : m) std::cout << k << v;
+              std::cout << "\n";
+          }
+        blanks: [[k], [v]]
+        tests:
+          - { input: '', output: 1a2b }
+      - id: cpp-map-code
+        type: code
+        title: Mots les plus fréquents
+        prompt: |
+          Lis un texte (mots séparés par des espaces, en minuscules), compte les occurrences avec un `std::unordered_map`, puis affiche les 3 mots les plus fréquents (`mot : n`), par fréquence décroissante puis ordre alphabétique.
+        starter: |
+          #include <iostream>
+          #include <string>
+          #include <unordered_map>
+          #include <vector>
+          #include <algorithm>
+
+          int main() {
+              std::unordered_map<std::string, int> freq;
+              std::string mot;
+              while (std::cin >> mot) ++freq[mot];
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <unordered_map>
+          #include <vector>
+          #include <algorithm>
+
+          int main() {
+              std::unordered_map<std::string, int> freq;
+              std::string mot;
+              while (std::cin >> mot) ++freq[mot];
+              std::vector<std::pair<std::string, int>> v(freq.begin(), freq.end());
+              std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) {
+                  return a.second != b.second ? a.second > b.second : a.first < b.first;
+              });
+              for (std::size_t i = 0; i < v.size() && i < 3; ++i) std::cout << v[i].first << " : " << v[i].second << "\n";
+          }
+        tests:
+          - { input: le chat voit le chien et le chat fuit, output: "le : 3\nchat : 2\nchien : 1" }
+          - { input: solo, output: 'solo : 1', hidden: true }
+    project:
+      id: cpp-map-projet
+      type: code
+      title: Annuaire
+      difficulty: 3
+      prompt: |
+        Commandes : `ajouter nom numero` (refuse si le nom existe : `existe déjà`), `chercher nom` (`nom : numero` ou `inconnu`), `supprimer nom` (`supprimé` ou `inconnu`), `lister` (tous les contacts triés `nom : numero`, ou `(vide)`). Utilise un `std::map` et **jamais** `operator[]` pour la lecture.
+      starter: |
+        #include <iostream>
+        #include <map>
+        #include <string>
+
+        int main() {
+            std::map<std::string, std::string> annuaire;
+            std::string cmd;
+            while (std::cin >> cmd) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <map>
+        #include <string>
+
+        int main() {
+            std::map<std::string, std::string> annuaire;
+            std::string cmd, nom, num;
+            while (std::cin >> cmd) {
+                if (cmd == "ajouter") {
+                    std::cin >> nom >> num;
+                    if (!annuaire.insert({nom, num}).second) std::cout << "existe déjà\n";
+                } else if (cmd == "chercher") {
+                    std::cin >> nom;
+                    if (auto it = annuaire.find(nom); it != annuaire.end()) std::cout << nom << " : " << it->second << "\n";
+                    else std::cout << "inconnu\n";
+                } else if (cmd == "supprimer") {
+                    std::cin >> nom;
+                    std::cout << (annuaire.erase(nom) ? "supprimé" : "inconnu") << "\n";
+                } else {
+                    if (annuaire.empty()) std::cout << "(vide)\n";
+                    for (const auto& [n, t] : annuaire) std::cout << n << " : " << t << "\n";
+                }
+            }
+        }
+      tests:
+        - { input: "ajouter Zoe 01\najouter Ada 02\najouter Ada 03\nchercher Ada\nchercher Bob\nsupprimer Zoe\nlister", output: "existe déjà\nAda : 02\ninconnu\nsupprimé\nAda : 02" }
+        - { input: "lister\nsupprimer X", output: "(vide)\ninconnu", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-map-ex1
+          type: mcq
+          prompt: Que se passe-t-il avec `m["x"]` si "x" n’existe pas ?
+          choices: [Une entrée est créée avec une valeur par défaut, Exception, Renvoie nullptr, Erreur de compilation]
+          answer: 0
+        - id: cpp-map-ex2
+          type: mcq
+          prompt: Complexité moyenne d’une recherche dans unordered_map ?
+          choices: ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)']
+          answer: 0
+        - id: cpp-map-ex3
+          type: mcq
+          prompt: Que renvoie `insert` sur une map ?
+          choices: ['Une paire (itérateur, booléen indiquant l’insertion)', 'Un booléen', 'Rien', 'La valeur']
+          answer: 0
+        - id: cpp-map-ex4
+          type: mcq
+          prompt: Quelle méthode lève std::out_of_range si la clé est absente ?
+          choices: ['at', 'find', 'operator[]', 'count']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-set
+    title: Set
+    summary: Ensembles triés et non triés, unicité, opérations ensemblistes, multiset et comparateurs personnalisés.
+    minutes: 25
+    concepts: [collections]
+    sections:
+      - title: std::set et unordered_set
+        body: |
+          ```cpp
+          #include <set>
+          std::set<int> s{5, 1, 3, 1};        // {1, 3, 5} : trié, sans doublon
+          s.insert(4);
+          bool present = s.contains(3);        // C++20 (sinon s.count(3))
+          s.erase(1);
+          auto it = s.lower_bound(4);          // premier élément >= 4
+          for (int x : s) std::cout << x;      // 345
+
+          std::unordered_set<std::string> vus; // hachage, O(1) moyen, sans ordre
+          if (!vus.insert("kiri").second) std::cout << "déjà vu";
+          ```
+
+          `std::multiset` autorise les doublons tout en restant trié.
+      - title: Opérations ensemblistes et comparateurs
+        body: |
+          Sur des intervalles **triés** (`<algorithm>`) :
+
+          ```cpp
+          std::set<int> a{1, 2, 3}, b{2, 3, 4}, r;
+          std::set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::inserter(r, r.begin())); // {2, 3}
+          // set_union, set_difference, set_symmetric_difference
+          ```
+
+          Ordre personnalisé :
+
+          ```cpp
+          struct ParLongueur {
+              bool operator()(const std::string& x, const std::string& y) const {
+                  return x.size() != y.size() ? x.size() < y.size() : x < y;
+              }
+          };
+          std::set<std::string, ParLongueur> mots;
+          ```
+
+          Les éléments d’un set sont **constants** : pour « modifier », on retire puis on réinsère.
+    exercises:
+      - id: cpp-set-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <set>
+          int main() {
+              std::set<int> s{4, 1, 4, 9, 1};
+              std::multiset<int> m{4, 1, 4, 9, 1};
+              s.insert(2);
+              std::cout << s.size() << " " << m.size() << " " << m.count(4) << " " << *s.lower_bound(3) << "\n";
+          }
+        output: 4 5 2 4
+      - id: cpp-set-q1
+        type: mcq
+        prompt: Quelle collection accepte des doublons tout en restant triée ?
+        choices: ['std::multiset', 'std::set', 'std::unordered_set', 'std::map']
+        answer: 0
+      - id: cpp-set-q2
+        type: mcq
+        prompt: Que vaut `s.insert(x).second` si x était déjà présent ?
+        choices: ['false', 'true', 'x', 'Une exception']
+        answer: 0
+      - id: cpp-set-code
+        type: code
+        title: Élèves communs
+        prompt: |
+          Deux lignes : les élèves inscrits au club A, puis au club B (noms séparés par des espaces). Affiche sur trois lignes : les élèves dans les deux clubs, ceux seulement dans A, et le nombre total d’élèves distincts. Les listes sont triées ; une liste vide affiche `-`.
+        starter: |
+          #include <iostream>
+          #include <set>
+          #include <sstream>
+          #include <string>
+          #include <algorithm>
+          #include <iterator>
+
+          int main() {
+              std::string ligneA, ligneB;
+              std::getline(std::cin, ligneA);
+              std::getline(std::cin, ligneB);
+          }
+        solution: |
+          #include <iostream>
+          #include <set>
+          #include <sstream>
+          #include <string>
+          #include <algorithm>
+          #include <iterator>
+
+          std::set<std::string> lire(const std::string& l) {
+              std::istringstream is(l);
+              std::set<std::string> s;
+              std::string m;
+              while (is >> m) s.insert(m);
+              return s;
+          }
+
+          void afficher(const std::set<std::string>& s) {
+              if (s.empty()) { std::cout << "-\n"; return; }
+              bool premier = true;
+              for (const auto& x : s) { std::cout << (premier ? "" : " ") << x; premier = false; }
+              std::cout << "\n";
+          }
+
+          int main() {
+              std::string ligneA, ligneB;
+              std::getline(std::cin, ligneA);
+              std::getline(std::cin, ligneB);
+              auto a = lire(ligneA), b = lire(ligneB);
+              std::set<std::string> inter, diff, uni;
+              std::set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::inserter(inter, inter.begin()));
+              std::set_difference(a.begin(), a.end(), b.begin(), b.end(), std::inserter(diff, diff.begin()));
+              std::set_union(a.begin(), a.end(), b.begin(), b.end(), std::inserter(uni, uni.begin()));
+              afficher(inter);
+              afficher(diff);
+              std::cout << uni.size() << "\n";
+          }
+        tests:
+          - { input: "Zoe Ada Bob\nBob Kiri Ada", output: "Ada Bob\nZoe\n4" }
+          - { input: "X\nY", output: "-\nX\n2", hidden: true }
+    project:
+      id: cpp-set-projet
+      type: code
+      title: Détecteur de doublons en flux
+      difficulty: 2
+      prompt: |
+        Lis des identifiants (un par mot). Pour chacun, affiche `nouveau` ou `doublon` (utilise un `unordered_set`). À la fin, affiche `uniques : N` puis les identifiants uniques triés par longueur puis ordre alphabétique (comparateur personnalisé dans un `std::set`).
+      starter: |
+        #include <iostream>
+        #include <set>
+        #include <string>
+        #include <unordered_set>
+
+        int main() {
+            std::string id;
+            while (std::cin >> id) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <set>
+        #include <string>
+        #include <unordered_set>
+
+        struct ParLongueur {
+            bool operator()(const std::string& a, const std::string& b) const {
+                return a.size() != b.size() ? a.size() < b.size() : a < b;
+            }
+        };
+
+        int main() {
+            std::unordered_set<std::string> vus;
+            std::set<std::string, ParLongueur> tries;
+            std::string id;
+            while (std::cin >> id) {
+                std::cout << (vus.insert(id).second ? "nouveau" : "doublon") << "\n";
+                tries.insert(id);
+            }
+            std::cout << "uniques : " << vus.size() << "\n";
+            bool premier = true;
+            for (const auto& x : tries) { std::cout << (premier ? "" : " ") << x; premier = false; }
+            std::cout << "\n";
+        }
+      tests:
+        - { input: abc de abc fgh de z, output: "nouveau\nnouveau\ndoublon\nnouveau\ndoublon\nnouveau\nuniques : 4\nz de abc fgh" }
+        - { input: x, output: "nouveau\nuniques : 1\nx", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-set-ex1
+          type: mcq
+          prompt: Peut-on modifier directement un élément d’un std::set ?
+          choices: ['Non, les éléments sont constants', 'Oui', 'Seulement avec at', 'Seulement s’il est unique']
+          answer: 0
+        - id: cpp-set-ex2
+          type: mcq
+          prompt: Que renvoie lower_bound(x) sur un set ?
+          choices: [Le premier élément >= x, Le dernier élément < x, x, La taille]
+          answer: 0
+        - id: cpp-set-ex3
+          type: mcq
+          prompt: Que doivent être les intervalles passés à std::set_intersection ?
+          choices: [Triés, De même taille, Des vecteurs, Non vides]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-iterateurs
+    title: Itérateurs
+    summary: Catégories d’itérateurs, begin/end, itérateurs inverses et constants, adaptateurs d’insertion et écriture de son propre itérateur.
+    minutes: 30
+    concepts: [iterateurs]
+    sections:
+      - title: Le concept d’itérateur
+        body: |
+          Un itérateur généralise le pointeur : `*it` (valeur), `++it` (suivant), `it == fin`.
+
+          ```cpp
+          std::vector<int> v{1, 2, 3};
+          for (auto it = v.begin(); it != v.end(); ++it) *it *= 2;
+          for (auto it = v.rbegin(); it != v.rend(); ++it) std::cout << *it;  // à l’envers
+          for (auto it = v.cbegin(); it != v.cend(); ++it) { /* lecture seule */ }
+          ```
+
+          | Catégorie | Opérations | Exemple |
+          |---|---|---|
+          | input / output | lecture ou écriture, un seul passage | `istream_iterator` |
+          | forward | `++`, plusieurs passages | `forward_list` |
+          | bidirectionnel | `++`, `--` | `list`, `map`, `set` |
+          | accès aléatoire | `it + n`, `it[n]`, `<` | `vector`, `deque` |
+          | contigu (C++20) | mémoire contiguë | `vector`, `array` |
+
+          `std::sort` exige un accès aléatoire : il ne fonctionne pas sur une `std::list` (qui a sa propre méthode `sort`).
+      - title: Outils autour des itérateurs
+        body: |
+          ```cpp
+          std::distance(v.begin(), it);            // nombre de pas
+          std::advance(it, 2); auto j = std::next(it);
+          std::copy(v.begin(), v.end(), std::back_inserter(w));   // ajoute à w
+          std::copy(v.begin(), v.end(), std::ostream_iterator<int>(std::cout, " "));
+          std::vector<int> lus{std::istream_iterator<int>(std::cin), {}}; // lit tout stdin
+          ```
+
+          Un type devient itérable dans une boucle `for (x : obj)` s’il fournit `begin()` et `end()` renvoyant des objets qui supportent `*`, `++` et `!=`.
+    exercises:
+      - id: cpp-it-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <iterator>
+          #include <algorithm>
+          int main() {
+              std::vector<int> v{10, 20, 30, 40};
+              auto it = std::find(v.begin(), v.end(), 30);
+              std::cout << std::distance(v.begin(), it) << " " << *std::next(it) << " " << *std::prev(it) << " ";
+              std::copy(v.rbegin(), v.rend(), std::ostream_iterator<int>(std::cout, ","));
+              std::cout << "\n";
+          }
+        output: 2 40 20 40,30,20,10,
+      - id: cpp-it-q1
+        type: mcq
+        prompt: Pourquoi std::sort ne fonctionne-t-il pas sur une std::list ?
+        choices: [Il exige des itérateurs à accès aléatoire, Les listes sont toujours triées, Les listes sont immuables, Il fonctionne]
+        answer: 0
+      - id: cpp-it-fill
+        type: fill
+        prompt: Complète pour copier en ajoutant à la fin de w.
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          #include <iterator>
+          int main() {
+              std::vector<int> v{1, 2}, w{0};
+              std::copy(v.begin(), v.end(), std::{{?}}(w));
+              for (int x : w) std::cout << x;
+              std::cout << "\n";
+          }
+        blanks: [[back_inserter]]
+        tests:
+          - { input: '', output: '012' }
+      - id: cpp-it-code
+        type: code
+        title: Un intervalle itérable
+        prompt: |
+          Écris une classe `Intervalle(debut, fin, pas)` utilisable dans une boucle `for (int x : Intervalle(…))` : elle fournit `begin()` et `end()` renvoyant un itérateur maison (opérateurs `*`, `++`, `!=`). L’itération s’arrête dès que la valeur atteint ou dépasse `fin` (pas positif).
+
+          Pour chaque ligne `debut fin pas`, affiche les valeurs séparées par des espaces.
+        starter: |
+          #include <iostream>
+
+          int main() {
+              int d, f, p;
+              while (std::cin >> d >> f >> p) {
+                  bool premier = true;
+                  for (int x : Intervalle(d, f, p)) { std::cout << (premier ? "" : " ") << x; premier = false; }
+                  std::cout << "\n";
+              }
+          }
+        solution: |
+          #include <iostream>
+
+          class Intervalle {
+          public:
+              Intervalle(int d, int f, int p) : d_(d), f_(f), p_(p) {}
+              class Iterateur {
+              public:
+                  Iterateur(int v, int f, int p) : v_(v), f_(f), p_(p) {}
+                  int operator*() const { return v_; }
+                  Iterateur& operator++() { v_ += p_; return *this; }
+                  bool operator!=(const Iterateur&) const { return v_ < f_; }
+              private:
+                  int v_, f_, p_;
+              };
+              Iterateur begin() const { return {d_, f_, p_}; }
+              Iterateur end() const { return {f_, f_, p_}; }
+          private:
+              int d_, f_, p_;
+          };
+
+          int main() {
+              int d, f, p;
+              while (std::cin >> d >> f >> p) {
+                  bool premier = true;
+                  for (int x : Intervalle(d, f, p)) { std::cout << (premier ? "" : " ") << x; premier = false; }
+                  std::cout << "\n";
+              }
+          }
+        tests:
+          - { input: "0 10 3\n5 6 1", output: "0 3 6 9\n5" }
+          - { input: "4 4 1\n-3 3 2", output: "\n-3 -1 1", hidden: true }
+        concepts: [iterateurs]
+    project:
+      id: cpp-it-projet
+      type: code
+      title: Fusion de listes triées
+      difficulty: 3
+      prompt: |
+        Deux lignes contiennent chacune des entiers **triés**. Lis-les avec des `std::istringstream` + `std::istream_iterator`, fusionne-les avec `std::merge` dans un vecteur, affiche le résultat, puis affiche les valeurs présentes dans les deux listes avec `std::set_intersection` (ou `-`).
+      starter: |
+        #include <iostream>
+        #include <sstream>
+        #include <vector>
+        #include <iterator>
+        #include <algorithm>
+        #include <string>
+
+        int main() {
+            std::string l1, l2;
+            std::getline(std::cin, l1);
+            std::getline(std::cin, l2);
+        }
+      solution: |
+        #include <iostream>
+        #include <sstream>
+        #include <vector>
+        #include <iterator>
+        #include <algorithm>
+        #include <string>
+
+        std::vector<int> lire(const std::string& l) {
+            std::istringstream is(l);
+            return {std::istream_iterator<int>(is), std::istream_iterator<int>()};
+        }
+
+        void afficher(const std::vector<int>& v) {
+            if (v.empty()) { std::cout << "-\n"; return; }
+            for (std::size_t i = 0; i < v.size(); ++i) std::cout << (i ? " " : "") << v[i];
+            std::cout << "\n";
+        }
+
+        int main() {
+            std::string l1, l2;
+            std::getline(std::cin, l1);
+            std::getline(std::cin, l2);
+            auto a = lire(l1), b = lire(l2);
+            std::vector<int> fusion, communs;
+            std::merge(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(fusion));
+            std::set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(communs));
+            afficher(fusion);
+            afficher(communs);
+        }
+      tests:
+        - { input: "1 3 5 7\n2 3 4 7 8", output: "1 2 3 3 4 5 7 7 8\n3 7" }
+        - { input: "1 2\n3", output: "1 2 3\n-", hidden: true }
+      require:
+        - { pattern: 'std::merge', message: Utiliser std::merge }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-it-ex1
+          type: mcq
+          prompt: Quelle catégorie d’itérateur fournit std::map ?
+          choices: [Bidirectionnel, Accès aléatoire, Input uniquement, Contigu]
+          answer: 0
+        - id: cpp-it-ex2
+          type: mcq
+          prompt: Que fait std::advance(it, 3) ?
+          choices: [Avance it de 3 positions, Renvoie la 3e valeur, Supprime 3 éléments, Copie 3 éléments]
+          answer: 0
+        - id: cpp-it-ex3
+          type: mcq
+          prompt: Que faut-il fournir pour qu’un type marche dans une boucle for sur intervalle ?
+          choices: ['begin() et end()', 'size()', 'operator[]', 'Un destructeur virtuel']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-templates
+    title: Templates
+    summary: Fonctions et classes génériques, déduction des paramètres, spécialisation, paramètres non-types et premières contraintes.
+    minutes: 35
+    concepts: [generiques]
+    sections:
+      - title: Fonctions et classes templates
+        body: |
+          ```cpp
+          template <typename T>
+          T maximum(T a, T b) { return a > b ? a : b; }
+
+          maximum(3, 7);          // T = int (déduit)
+          maximum<double>(2, 3.5);// explicite
+
+          template <typename T>
+          class Pile {
+          public:
+              void empiler(const T& x) { d.push_back(x); }
+              T depiler() { T x = d.back(); d.pop_back(); return x; }
+              bool vide() const { return d.empty(); }
+          private:
+              std::vector<T> d;
+          };
+          Pile<std::string> p;
+          ```
+
+          Le compilateur **instancie** une version par type utilisé. Le code template doit donc être visible là où il est utilisé : on le place généralement **entièrement dans les en-têtes**.
+      - title: Spécialisation et paramètres non-types
+        body: |
+          ```cpp
+          template <typename T>
+          std::string decrire(const T&) { return "valeur"; }
+          template <>
+          std::string decrire<bool>(const bool& b) { return b ? "vrai" : "faux"; }   // spécialisation
+
+          template <typename T, std::size_t N>
+          constexpr std::size_t taille(const T (&)[N]) { return N; }                   // paramètre non-type
+
+          template <typename T, typename U = int>       // paramètre par défaut
+          struct Paire { T premier; U second; };
+          ```
+
+          Les erreurs de templates sont souvent longues et obscures ; les **concepts** C++20 (niveau Avancé) les rendent lisibles : `template <std::integral T>`.
+    exercises:
+      - id: cpp-tpl-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <string>
+          template <typename T>
+          T somme(T a, T b, T c) { return a + b + c; }
+          template <typename T, int N>
+          int fois() { return N * static_cast<int>(sizeof(T)); }
+          int main() {
+              std::cout << somme(1, 2, 3) << " " << somme<std::string>("a", "b", "c") << " " << fois<char, 5>() << "\n";
+          }
+        output: 6 abc 5
+        concepts: [generiques]
+      - id: cpp-tpl-q1
+        type: mcq
+        prompt: Pourquoi place-t-on habituellement le code template dans les en-têtes ?
+        choices: [Le compilateur doit voir le code pour instancier chaque version, C’est plus joli, Les .cpp ne supportent pas les templates, Pour accélérer l’édition de liens]
+        answer: 0
+      - id: cpp-tpl-fill
+        type: fill
+        prompt: Complète la déclaration de template.
+        code: |
+          #include <iostream>
+          {{?}} <typename T>
+          T carre(T x) { return x * x; }
+          int main() { std::cout << carre(3) << " " << carre(1.5) << "\n"; }
+        blanks: [[template]]
+        tests:
+          - { input: '', output: 9 2.25 }
+      - id: cpp-tpl-code
+        type: code
+        title: Paire générique
+        prompt: |
+          Écris une classe template `Paire<T, U>` (membres publics `premier`, `second`), une fonction template `echanger(Paire<T, U>) -> Paire<U, T>` et un `operator<<` template pour afficher `(a, b)`.
+
+          Pour chaque ligne `entier mot`, construis une `Paire<int, std::string>`, affiche-la puis affiche sa version échangée.
+        starter: |
+          #include <iostream>
+          #include <string>
+
+          int main() {
+              int n;
+              std::string m;
+              while (std::cin >> n >> m) {
+                  Paire<int, std::string> p{n, m};
+                  std::cout << p << " " << echanger(p) << "\n";
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+
+          template <typename T, typename U>
+          struct Paire {
+              T premier;
+              U second;
+          };
+
+          template <typename T, typename U>
+          Paire<U, T> echanger(const Paire<T, U>& p) {
+              return {p.second, p.premier};
+          }
+
+          template <typename T, typename U>
+          std::ostream& operator<<(std::ostream& o, const Paire<T, U>& p) {
+              return o << "(" << p.premier << ", " << p.second << ")";
+          }
+
+          int main() {
+              int n;
+              std::string m;
+              while (std::cin >> n >> m) {
+                  Paire<int, std::string> p{n, m};
+                  std::cout << p << " " << echanger(p) << "\n";
+              }
+          }
+        tests:
+          - { input: 42 kiri, output: '(42, kiri) (kiri, 42)' }
+          - { input: "1 a\n2 b", output: "(1, a) (a, 1)\n(2, b) (b, 2)", hidden: true }
+        concepts: [generiques]
+    project:
+      id: cpp-tpl-projet
+      type: code
+      title: File circulaire générique
+      difficulty: 3
+      prompt: |
+        Implémente `template <typename T, std::size_t N> class FileCirculaire` basée sur un `std::array<T, N>` : `bool enfiler(const T&)` (false si pleine), `std::optional<T> defiler()`, `std::size_t taille() const`.
+
+        Instancie une `FileCirculaire<int, 3>` et une `FileCirculaire<std::string, 2>`. Commandes : `+i X`, `-i`, `+s MOT`, `-s`. Affiche `ok`/`pleine` pour un ajout, la valeur ou `vide` pour un retrait. Termine par les tailles des deux files.
+      starter: |
+        #include <iostream>
+        #include <array>
+        #include <optional>
+        #include <string>
+
+        int main() {
+            std::string cmd;
+            while (std::cin >> cmd) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <array>
+        #include <optional>
+        #include <string>
+
+        template <typename T, std::size_t N>
+        class FileCirculaire {
+        public:
+            bool enfiler(const T& x) {
+                if (n_ == N) return false;
+                d_[(tete_ + n_) % N] = x;
+                ++n_;
+                return true;
+            }
+            std::optional<T> defiler() {
+                if (n_ == 0) return std::nullopt;
+                T v = d_[tete_];
+                tete_ = (tete_ + 1) % N;
+                --n_;
+                return v;
+            }
+            std::size_t taille() const { return n_; }
+        private:
+            std::array<T, N> d_{};
+            std::size_t tete_ = 0, n_ = 0;
+        };
+
+        int main() {
+            FileCirculaire<int, 3> fi;
+            FileCirculaire<std::string, 2> fs;
+            std::string cmd;
+            while (std::cin >> cmd) {
+                if (cmd == "+i") { int x; std::cin >> x; std::cout << (fi.enfiler(x) ? "ok" : "pleine") << "\n"; }
+                else if (cmd == "+s") { std::string x; std::cin >> x; std::cout << (fs.enfiler(x) ? "ok" : "pleine") << "\n"; }
+                else if (cmd == "-i") { auto v = fi.defiler(); if (v) std::cout << *v << "\n"; else std::cout << "vide\n"; }
+                else { auto v = fs.defiler(); if (v) std::cout << *v << "\n"; else std::cout << "vide\n"; }
+            }
+            std::cout << fi.taille() << " " << fs.taille() << "\n";
+        }
+      tests:
+        - { input: "+i 1\n+i 2\n+i 3\n+i 4\n-i\n+i 5\n+s a\n+s b\n+s c\n-s", output: "ok\nok\nok\npleine\n1\nok\nok\nok\npleine\na\n3 1" }
+        - { input: "-i\n-s", output: "vide\nvide\n0 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-tpl-ex1
+          type: mcq
+          prompt: Qu’est-ce que l’instanciation d’un template ?
+          choices: [La génération par le compilateur d’une version pour un type concret, La création d’un objet, Un appel virtuel, Une macro]
+          answer: 0
+        - id: cpp-tpl-ex2
+          type: mcq
+          prompt: Que permet une spécialisation de template ?
+          choices: [Fournir une implémentation particulière pour un type donné, Rendre le template virtuel, Supprimer le template, Accélérer la compilation]
+          answer: 0
+        - id: cpp-tpl-ex3
+          type: mcq
+          prompt: Dans `template <typename T, std::size_t N>`, N est…
+          choices: [Un paramètre non-type (valeur connue à la compilation), Un type, Une variable globale, Un pointeur]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-exceptions
+    title: Exceptions
+    summary: throw, try, catch, hiérarchie std::exception, exceptions personnalisées, noexcept et sûreté face aux exceptions.
+    minutes: 30
+    concepts: [erreurs]
+    sections:
+      - title: Lever et attraper
+        body: |
+          ```cpp
+          #include <stdexcept>
+
+          double diviser(double a, double b) {
+              if (b == 0) throw std::invalid_argument("division par zéro");
+              return a / b;
+          }
+
+          try {
+              std::cout << diviser(1, 0);
+          } catch (const std::invalid_argument& e) {      // attraper par référence const
+              std::cerr << "Erreur : " << e.what() << "\n";
+          } catch (const std::exception& e) {             // plus général ensuite
+              std::cerr << "Autre : " << e.what() << "\n";
+          } catch (...) {                                 // tout le reste
+              std::cerr << "Inconnue\n";
+          }
+          ```
+
+          Hiérarchie : `std::exception` → `std::logic_error` (`invalid_argument`, `out_of_range`, `domain_error`) et `std::runtime_error` (`overflow_error`, `range_error`…). `std::bad_alloc` signale un échec d’allocation.
+      - title: Exceptions personnalisées et sûreté
+        body: |
+          ```cpp
+          class SoldeInsuffisant : public std::runtime_error {
+          public:
+              explicit SoldeInsuffisant(double manque)
+                  : std::runtime_error("solde insuffisant"), manque_(manque) {}
+              double manque() const { return manque_; }
+          private:
+              double manque_;
+          };
+          ```
+
+          - Grâce à **RAII**, les destructeurs libèrent les ressources pendant la remontée de l’exception.
+          - `noexcept` promet qu’une fonction ne lève pas (destructeurs, constructeurs de déplacement) ; si elle le fait quand même, le programme s’arrête.
+          - Garanties : **forte** (en cas d’échec, l’état est inchangé), **de base** (pas de fuite, objet valide), **aucune levée**.
+          - Les exceptions sont faites pour les situations **exceptionnelles**, pas pour le flux normal du programme.
+    exercises:
+      - id: cpp-exc-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <stdexcept>
+          #include <vector>
+          int main() {
+              std::vector<int> v{1, 2, 3};
+              try {
+                  std::cout << v.at(1) << " ";
+                  std::cout << v.at(5) << " ";
+                  std::cout << "jamais ";
+              } catch (const std::out_of_range&) {
+                  std::cout << "hors limites ";
+              } catch (const std::exception&) {
+                  std::cout << "autre ";
+              }
+              std::cout << "fin\n";
+          }
+        output: 2 hors limites fin
+      - id: cpp-exc-q1
+        type: mcq
+        prompt: Pourquoi attraper par `const std::exception&` plutôt que par valeur ?
+        choices: [Pour éviter le découpage (slicing) et une copie, Par obligation syntaxique, Pour aller plus vite à la compilation, C’est équivalent]
+        answer: 0
+      - id: cpp-exc-q2
+        type: mcq
+        prompt: Dans quel ordre écrire les blocs catch ?
+        choices: [Du plus spécifique au plus général, Du plus général au plus spécifique, Ordre alphabétique, L’ordre n’a pas d’importance]
+        answer: 0
+      - id: cpp-exc-fill
+        type: fill
+        prompt: Complète pour lever une exception.
+        code: |
+          #include <iostream>
+          #include <stdexcept>
+          int racine(int x) {
+              if (x < 0) {{?}} std::domain_error("négatif");
+              return x;
+          }
+          int main() {
+              try { racine(-4); } catch (const std::exception& e) { std::cout << e.what() << "\n"; }
+          }
+        blanks: [[throw]]
+        tests:
+          - { input: '', output: négatif }
+      - id: cpp-exc-code
+        type: code
+        title: Conversion robuste
+        prompt: |
+          Pour chaque mot lu, convertis-le en entier avec `std::stoi` et attrape les exceptions : affiche le double de la valeur, `invalide : <mot>` (`std::invalid_argument`) ou `trop grand : <mot>` (`std::out_of_range`). Un mot comme `12abc` est accepté par stoi (il lit `12`) : refuse-le aussi en vérifiant le nombre de caractères lus (`pos`).
+        starter: |
+          #include <iostream>
+          #include <string>
+          #include <stdexcept>
+
+          int main() {
+              std::string mot;
+              while (std::cin >> mot) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <string>
+          #include <stdexcept>
+
+          int main() {
+              std::string mot;
+              while (std::cin >> mot) {
+                  try {
+                      std::size_t pos = 0;
+                      int n = std::stoi(mot, &pos);
+                      if (pos != mot.size()) throw std::invalid_argument("reste");
+                      std::cout << 2LL * n << "\n";
+                  } catch (const std::invalid_argument&) {
+                      std::cout << "invalide : " << mot << "\n";
+                  } catch (const std::out_of_range&) {
+                      std::cout << "trop grand : " << mot << "\n";
+                  }
+              }
+          }
+        tests:
+          - { input: 21 abc 99999999999 12abc -4, output: "42\ninvalide : abc\ntrop grand : 99999999999\ninvalide : 12abc\n-8" }
+          - { input: '0', output: '0', hidden: true }
+        concepts: [erreurs]
+    project:
+      id: cpp-exc-projet
+      type: code
+      title: Banque avec exceptions
+      difficulty: 3
+      prompt: |
+        Définis une exception `SoldeInsuffisant` (dérivée de `std::runtime_error`) qui stocke le montant manquant, et une classe `Compte` dont `retirer` lève cette exception et `deposer` lève `std::invalid_argument` pour un montant ≤ 0.
+
+        Commandes `depot X` / `retrait X` (solde initial 0). Affiche le solde après chaque opération réussie, `erreur : montant invalide` ou `erreur : solde insuffisant (manque M)`.
+      starter: |
+        #include <iostream>
+        #include <stdexcept>
+        #include <string>
+
+        int main() {
+            std::string cmd;
+            long long x;
+            while (std::cin >> cmd >> x) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <stdexcept>
+        #include <string>
+
+        class SoldeInsuffisant : public std::runtime_error {
+        public:
+            explicit SoldeInsuffisant(long long manque) : std::runtime_error("solde insuffisant"), manque_(manque) {}
+            long long manque() const { return manque_; }
+        private:
+            long long manque_;
+        };
+
+        class Compte {
+        public:
+            void deposer(long long m) {
+                if (m <= 0) throw std::invalid_argument("montant invalide");
+                solde_ += m;
+            }
+            void retirer(long long m) {
+                if (m <= 0) throw std::invalid_argument("montant invalide");
+                if (m > solde_) throw SoldeInsuffisant(m - solde_);
+                solde_ -= m;
+            }
+            long long solde() const { return solde_; }
+        private:
+            long long solde_ = 0;
+        };
+
+        int main() {
+            Compte c;
+            std::string cmd;
+            long long x;
+            while (std::cin >> cmd >> x) {
+                try {
+                    if (cmd == "depot") c.deposer(x); else c.retirer(x);
+                    std::cout << c.solde() << "\n";
+                } catch (const SoldeInsuffisant& e) {
+                    std::cout << "erreur : " << e.what() << " (manque " << e.manque() << ")\n";
+                } catch (const std::invalid_argument& e) {
+                    std::cout << "erreur : " << e.what() << "\n";
+                }
+            }
+        }
+      tests:
+        - { input: "depot 100\nretrait 30\nretrait 100\ndepot -5", output: "100\n70\nerreur : solde insuffisant (manque 30)\nerreur : montant invalide" }
+        - { input: "retrait 1", output: 'erreur : solde insuffisant (manque 1)', hidden: true }
+      require:
+        - { pattern: 'class\s+SoldeInsuffisant\s*:\s*public\s+std::runtime_error', message: SoldeInsuffisant doit dériver de std::runtime_error }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-exc-ex1
+          type: mcq
+          prompt: Que garantit noexcept ?
+          choices: [La fonction ne lève pas d’exception (sinon arrêt du programme), Elle est plus rapide, Elle est const, Elle attrape tout]
+          answer: 0
+        - id: cpp-exc-ex2
+          type: mcq
+          prompt: Que fait catch (...) ?
+          choices: [Attrape n’importe quelle exception, Ne compile pas, Relance l’exception, Ignore les erreurs de compilation]
+          answer: 0
+        - id: cpp-exc-ex3
+          type: mcq
+          prompt: Qu’est-ce que la garantie forte ?
+          choices: ['En cas d’exception, l’état reste celui d’avant l’opération', 'Aucune exception possible', 'Le programme s’arrête', 'La mémoire est libérée']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-fichiers
+    title: Fichiers
+    summary: Lire et écrire des fichiers avec fstream, lecture ligne par ligne, flux de chaînes, mode binaire et std::filesystem.
+    minutes: 30
+    concepts: [fichiers, systeme]
+    sections:
+      - title: fstream
+        body: |
+          ```cpp
+          #include <fstream>
+
+          {
+              std::ofstream out("notes.txt");               // ouvre (et crée) en écriture
+              out << "Ada 18\nBob 12\n";
+          }                                                  // fermé automatiquement (RAII)
+
+          std::ifstream in("notes.txt");
+          if (!in) { std::cerr << "ouverture impossible\n"; return 1; }
+          std::string nom; int note;
+          while (in >> nom >> note) std::cout << nom << " : " << note << "\n";
+
+          std::ofstream journal("app.log", std::ios::app); // ajout en fin de fichier
+          ```
+
+          Lecture ligne par ligne : `std::string ligne; while (std::getline(in, ligne)) { … }`.
+      - title: Flux de chaînes et filesystem
+        body: |
+          `std::istringstream` découpe une ligne comme un flux ; `std::ostringstream` construit une chaîne :
+
+          ```cpp
+          std::istringstream is("12;34;56");
+          std::string champ;
+          while (std::getline(is, champ, ';')) std::cout << std::stoi(champ) << "\n";
+          ```
+
+          `<filesystem>` (C++17) manipule les chemins et répertoires :
+
+          ```cpp
+          namespace fs = std::filesystem;
+          fs::create_directories("donnees/cache");
+          for (const auto& e : fs::directory_iterator(".")) std::cout << e.path().filename() << "\n";
+          std::cout << fs::file_size("notes.txt") << " " << fs::path("a/b.txt").extension();
+          ```
+
+          Mode binaire : `std::ifstream f("img.bin", std::ios::binary); f.read(buffer, n);`.
+    exercises:
+      - id: cpp-file-q1
+        type: mcq
+        prompt: Quel mode ouvre un fichier en ajout (sans effacer son contenu) ?
+        choices: ['std::ios::app', 'std::ios::trunc', 'std::ios::in', 'std::ios::binary']
+        answer: 0
+      - id: cpp-file-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <sstream>
+          #include <string>
+          int main() {
+              std::istringstream is("rouge;vert;;bleu");
+              std::string c;
+              int n = 0;
+              while (std::getline(is, c, ';')) if (!c.empty()) ++n;
+              std::ostringstream os;
+              os << n << " couleurs";
+              std::cout << os.str() << "\n";
+          }
+        output: 3 couleurs
+      - id: cpp-file-fill
+        type: fill
+        prompt: Complète pour lire un fichier ligne par ligne.
+        code: |
+          std::ifstream in("data.txt");
+          std::string ligne;
+          while (std::{{?}}(in, ligne)) {
+              std::cout << ligne << "\n";
+          }
+        blanks: [[getline]]
+      - id: cpp-file-code
+        type: code
+        title: Écrire puis relire
+        prompt: |
+          Écris chaque ligne de l’entrée standard dans le fichier `/tmp/codemori_cpp.txt` en la préfixant par son numéro (`1: …`). Ferme le fichier, rouvre-le en lecture, et affiche uniquement les lignes contenant `ERREUR`, puis `total : N`. Supprime le fichier avec `std::filesystem::remove`.
+        starter: |
+          #include <iostream>
+          #include <fstream>
+          #include <string>
+          #include <filesystem>
+
+          int main() {
+          }
+        solution: |
+          #include <iostream>
+          #include <fstream>
+          #include <string>
+          #include <filesystem>
+
+          int main() {
+              const std::string chemin = "/tmp/codemori_cpp.txt";
+              int n = 0;
+              {
+                  std::ofstream out(chemin);
+                  std::string l;
+                  while (std::getline(std::cin, l)) out << ++n << ": " << l << "\n";
+              }
+              std::ifstream in(chemin);
+              std::string l;
+              while (std::getline(in, l)) {
+                  if (l.find("ERREUR") != std::string::npos) std::cout << l << "\n";
+              }
+              in.close();
+              std::cout << "total : " << n << "\n";
+              std::filesystem::remove(chemin);
+          }
+        tests:
+          - { input: "démarrage\nERREUR disque\nok\nERREUR réseau", output: "2: ERREUR disque\n4: ERREUR réseau\ntotal : 4" }
+          - { input: tout va bien, output: 'total : 1', hidden: true }
+        concepts: [fichiers]
+    project:
+      id: cpp-file-projet
+      type: code
+      title: Analyse d’un CSV
+      difficulty: 3
+      prompt: |
+        L’entrée est un fichier CSV (séparateur `;`) dont la première ligne est l’en-tête `produit;quantite;prix`. Écris-le d’abord dans `/tmp/ventes.csv`, puis relis-le avec un `ifstream` en découpant chaque ligne avec un `istringstream`.
+
+        Affiche le chiffre d’affaires par produit (quantité × prix, cumulé), trié par produit (`produit : X.XX`), puis `Total : X.XX`. Les lignes mal formées (champ manquant ou nombre invalide) sont ignorées et comptées : `lignes ignorées : N`.
+      starter: |
+        #include <iostream>
+        #include <fstream>
+        #include <sstream>
+        #include <string>
+        #include <map>
+        #include <iomanip>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <fstream>
+        #include <sstream>
+        #include <string>
+        #include <map>
+        #include <iomanip>
+        #include <filesystem>
+
+        int main() {
+            const std::string chemin = "/tmp/ventes.csv";
+            {
+                std::ofstream out(chemin);
+                std::string l;
+                while (std::getline(std::cin, l)) out << l << "\n";
+            }
+            std::ifstream in(chemin);
+            std::string ligne;
+            std::getline(in, ligne);
+            std::map<std::string, double> ca;
+            int ignorees = 0;
+            while (std::getline(in, ligne)) {
+                std::istringstream is(ligne);
+                std::string p, q, pr;
+                if (!std::getline(is, p, ';') || !std::getline(is, q, ';') || !std::getline(is, pr, ';') || p.empty()) { ++ignorees; continue; }
+                try {
+                    std::size_t a = 0, b = 0;
+                    int quantite = std::stoi(q, &a);
+                    double prix = std::stod(pr, &b);
+                    if (a != q.size() || b != pr.size()) throw std::invalid_argument("x");
+                    ca[p] += quantite * prix;
+                } catch (const std::exception&) {
+                    ++ignorees;
+                }
+            }
+            double total = 0;
+            std::cout << std::fixed << std::setprecision(2);
+            for (const auto& [p, v] : ca) { std::cout << p << " : " << v << "\n"; total += v; }
+            std::cout << "Total : " << total << "\n";
+            std::cout << "lignes ignorées : " << ignorees << "\n";
+            std::filesystem::remove(chemin);
+        }
+      tests:
+        - { input: "produit;quantite;prix\nstylo;10;1.5\ncahier;2;3.2\nstylo;4;1.5\ngomme;x;1\nrègle", output: "cahier : 6.40\nstylo : 21.00\nTotal : 27.40\nlignes ignorées : 2" }
+        - { input: "produit;quantite;prix", output: "Total : 0.00\nlignes ignorées : 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-file-ex1
+          type: mcq
+          prompt: Quand un ofstream est-il fermé si on n’appelle pas close() ?
+          choices: [À sa destruction (RAII), Jamais, À la fin du programme seulement, Après chaque écriture]
+          answer: 0
+        - id: cpp-file-ex2
+          type: mcq
+          prompt: Comment vérifier qu’un ifstream a bien été ouvert ?
+          choices: ['if (!in) { … }', 'in.exists()', 'in == nullptr', 'in.size() > 0']
+          answer: 0
+        - id: cpp-file-ex3
+          type: mcq
+          prompt: Quel espace de noms C++17 permet de lister un répertoire ?
+          choices: ['std::filesystem', 'std::dir', 'std::os', 'std::io']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-namespaces
+    title: Namespaces
+    summary: Organiser le code avec les espaces de noms, imbrication, alias, using et espaces de noms anonymes.
+    minutes: 20
+    concepts: [modules]
+    sections:
+      - title: Espaces de noms
+        body: |
+          Les **espaces de noms** évitent les collisions de noms entre bibliothèques :
+
+          ```cpp
+          namespace geometrie {
+              constexpr double PI = 3.14159;
+              double aireCercle(double r) { return PI * r * r; }
+
+              namespace volumes {                // imbriqué
+                  double cube(double c) { return c * c * c; }
+              }
+          }
+          namespace geometrie::plans { /* C++17 : imbrication compacte */ }
+
+          std::cout << geometrie::aireCercle(2);
+          std::cout << geometrie::volumes::cube(3);
+          ```
+      - title: using, alias et anonymes
+        body: |
+          ```cpp
+          using geometrie::aireCercle;      // importe un seul nom (OK dans un .cpp)
+          namespace vol = geometrie::volumes; // alias
+          vol::cube(2);
+
+          namespace {                       // anonyme : visible uniquement dans ce fichier
+              int compteurInterne = 0;      // (équivalent de static pour les globales)
+          }
+          ```
+
+          Bonnes pratiques :
+
+          - ne **jamais** écrire `using namespace …;` dans un en-tête ;
+          - un espace de noms par bibliothèque ou module (`monprojet::reseau`) ;
+          - les fonctions libres liées à un type dans le même espace de noms que lui (*ADL* : la recherche dépendante des arguments les trouvera).
+    exercises:
+      - id: cpp-ns-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int x = 1;
+          namespace a {
+              int x = 2;
+              namespace b { int x = 3; }
+          }
+          int main() {
+              namespace ab = a::b;
+              int x = 4;
+              std::cout << x << ::x << a::x << ab::x << "\n";
+          }
+        output: '4123'
+        explanation: '`::x` désigne la variable globale.'
+      - id: cpp-ns-q1
+        type: mcq
+        prompt: Pourquoi ne pas écrire `using namespace std;` dans un fichier d’en-tête ?
+        choices: [Il polluerait tous les fichiers qui incluent l’en-tête, C’est une erreur de compilation, Cela ralentit le programme, Pour la lisibilité seulement]
+        answer: 0
+      - id: cpp-ns-fill
+        type: fill
+        prompt: Complète l’alias d’espace de noms.
+        code: |
+          #include <iostream>
+          namespace tres::longue::adresse { int valeur() { return 7; } }
+          int main() {
+              {{?}} t = tres::longue::adresse;
+              std::cout << t::valeur() << "\n";
+          }
+        blanks: [[namespace]]
+        tests:
+          - { input: '', output: '7' }
+      - id: cpp-ns-code
+        type: code
+        title: Bibliothèque de conversions
+        prompt: |
+          Crée `namespace conversions` contenant `namespace longueur { double kmVersMiles(double); }` et `namespace masse { double kgVersLivres(double); }` (facteurs 0.621371 et 2.20462).
+
+          Chaque ligne : `valeur unite` (`km` ou `kg`). Affiche `5.00 km = 3.11 mi` ou `2.00 kg = 4.41 lb`.
+        starter: |
+          #include <iostream>
+          #include <iomanip>
+          #include <string>
+
+          int main() {
+              double v;
+              std::string u;
+              std::cout << std::fixed << std::setprecision(2);
+              while (std::cin >> v >> u) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <iomanip>
+          #include <string>
+
+          namespace conversions {
+              namespace longueur {
+                  double kmVersMiles(double km) { return km * 0.621371; }
+              }
+              namespace masse {
+                  double kgVersLivres(double kg) { return kg * 2.20462; }
+              }
+          }
+
+          int main() {
+              double v;
+              std::string u;
+              std::cout << std::fixed << std::setprecision(2);
+              while (std::cin >> v >> u) {
+                  if (u == "km") std::cout << v << " km = " << conversions::longueur::kmVersMiles(v) << " mi\n";
+                  else std::cout << v << " kg = " << conversions::masse::kgVersLivres(v) << " lb\n";
+              }
+          }
+        tests:
+          - { input: "5 km\n2 kg", output: "5.00 km = 3.11 mi\n2.00 kg = 4.41 lb" }
+          - { input: 0 kg, output: 0.00 kg = 0.00 lb, hidden: true }
+        require:
+          - { pattern: 'namespace\s+conversions', message: Créer le namespace conversions }
+    project:
+      id: cpp-ns-projet
+      type: code
+      title: Deux bibliothèques, un nom
+      difficulty: 2
+      prompt: |
+        Deux « bibliothèques » définissent chacune une fonction `formater(double)` : `namespace fr` (virgule décimale, 2 décimales, symbole `€` après : `3,50 €`) et `namespace us` (point, `$` avant : `$3.50`).
+
+        Chaque ligne : `fr X` ou `us X`. Affiche le montant formaté. Utilise un espace de noms **anonyme** pour une fonction utilitaire interne `arrondi2(double) -> std::string` qui produit `3.50`.
+      starter: |
+        #include <iostream>
+        #include <string>
+        #include <sstream>
+        #include <iomanip>
+
+        int main() {
+            std::string pays;
+            double x;
+            while (std::cin >> pays >> x) {
+            }
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+        #include <sstream>
+        #include <iomanip>
+
+        namespace {
+            std::string arrondi2(double x) {
+                std::ostringstream os;
+                os << std::fixed << std::setprecision(2) << x;
+                return os.str();
+            }
+        }
+
+        namespace fr {
+            std::string formater(double x) {
+                std::string s = arrondi2(x);
+                s[s.find('.')] = ',';
+                return s + " €";
+            }
+        }
+
+        namespace us {
+            std::string formater(double x) { return "$" + arrondi2(x); }
+        }
+
+        int main() {
+            std::string pays;
+            double x;
+            while (std::cin >> pays >> x) {
+                std::cout << (pays == "fr" ? fr::formater(x) : us::formater(x)) << "\n";
+            }
+        }
+      tests:
+        - { input: "fr 3.5\nus 3.5\nfr 1234.567", output: "3,50 €\n$3.50\n1234,57 €" }
+        - { input: us 0, output: '$0.00', hidden: true }
+      require:
+        - { pattern: 'namespace\s*\{', message: Utiliser un espace de noms anonyme }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-ns-ex1
+          type: mcq
+          prompt: Que désigne `::x` ?
+          choices: [La variable x de l’espace de noms global, Une erreur, x du namespace std, Le membre x de la classe courante]
+          answer: 0
+        - id: cpp-ns-ex2
+          type: mcq
+          prompt: À quoi sert un espace de noms anonyme ?
+          choices: [Rendre des noms visibles seulement dans le fichier courant, Créer un alias, Importer std, Rien]
+          answer: 0
+        - id: cpp-ns-ex3
+          type: mcq
+          prompt: Quelle syntaxe C++17 déclare un namespace imbriqué en une ligne ?
+          choices: ['namespace a::b { }', 'namespace a.b { }', 'namespace a/b { }', 'namespace a > b { }']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-surcharge-operateurs
+    title: Surcharge d’opérateurs
+    summary: Donner un sens aux opérateurs pour ses types — arithmétique, comparaison, flux <<, indexation, appel et règles de conception.
+    minutes: 30
+    concepts: [operateurs, classes]
+    sections:
+      - title: Les opérateurs courants
+        body: |
+          ```cpp
+          struct Vec2 {
+              double x, y;
+              Vec2 operator+(const Vec2& o) const { return {x + o.x, y + o.y}; }
+              Vec2& operator+=(const Vec2& o) { x += o.x; y += o.y; return *this; }
+              Vec2 operator*(double k) const { return {x * k, y * k}; }
+              bool operator==(const Vec2&) const = default;
+          };
+          Vec2 operator*(double k, const Vec2& v) { return v * k; }   // k * v (fonction libre)
+
+          std::ostream& operator<<(std::ostream& o, const Vec2& v) {   // affichage
+              return o << "(" << v.x << ", " << v.y << ")";
+          }
+          ```
+
+          Règle : implémenter `+` à partir de `+=`, et `<<` comme **fonction libre** (le membre de gauche est le flux).
+      - title: Indexation, appel et comparaison
+        body: |
+          ```cpp
+          class Matrice {
+          public:
+              double& operator()(int i, int j) { return d[i * c + j]; }        // m(1, 2)
+              double operator()(int i, int j) const { return d[i * c + j]; }
+          };
+
+          class Polynome {
+          public:
+              double operator()(double x) const;   // un objet « appelable » (foncteur)
+              double& operator[](std::size_t i) { return coef[i]; }
+          };
+          ```
+
+          C++20 : `auto operator<=>(const T&) const = default;` génère `<`, `<=`, `>`, `>=`.
+
+          Bonnes pratiques : respecter la **sémantique attendue** (`+` ne doit pas soustraire !), offrir les versions `const`, ne pas surcharger `&&`, `||` ou `,`.
+    exercises:
+      - id: cpp-ops-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          struct Argent {
+              long long centimes;
+              Argent operator+(const Argent& o) const { return {centimes + o.centimes}; }
+              bool operator<(const Argent& o) const { return centimes < o.centimes; }
+          };
+          std::ostream& operator<<(std::ostream& o, const Argent& a) {
+              return o << a.centimes / 100 << "," << (a.centimes % 100 < 10 ? "0" : "") << a.centimes % 100 << " €";
+          }
+          int main() {
+              Argent a{250}, b{1305};
+              std::cout << a + b << " " << (a < b) << "\n";
+          }
+        output: 15,55 € 1
+      - id: cpp-ops-q1
+        type: mcq
+        prompt: Pourquoi operator<< pour l’affichage est-il une fonction libre ?
+        choices: ['L’opérande de gauche est le flux std::ostream, pas notre objet', 'C’est obligatoire pour tous les opérateurs', 'Pour qu’il soit plus rapide', 'Pour qu’il soit virtuel']
+        answer: 0
+      - id: cpp-ops-fill
+        type: fill
+        prompt: Complète l’opérateur += pour qu’il renvoie l’objet courant.
+        code: |
+          #include <iostream>
+          struct Compteur {
+              int v = 0;
+              Compteur& operator+=(int n) { v += n; return {{?}}this; }
+          };
+          int main() {
+              Compteur c;
+              (c += 2) += 3;
+              std::cout << c.v << "\n";
+          }
+        blanks: [['*']]
+        tests:
+          - { input: '', output: '5' }
+      - id: cpp-ops-code
+        type: code
+        title: Nombres complexes
+        prompt: |
+          Écris une struct `Complexe { double re, im; }` avec `+`, `-`, `*`, `==` et `<<` (format `a+bi` ou `a-bi`, nombres affichés tels quels par cout).
+
+          Chaque ligne : `a b op c d`. Affiche le résultat de `(a+bi) op (c+di)` (op parmi `+ - * =`; pour `=` affiche `vrai` ou `faux`).
+        starter: |
+          #include <iostream>
+
+          int main() {
+              double a, b, c, d;
+              char op;
+              while (std::cin >> a >> b >> op >> c >> d) {
+              }
+          }
+        solution: |
+          #include <iostream>
+
+          struct Complexe {
+              double re, im;
+              Complexe operator+(const Complexe& o) const { return {re + o.re, im + o.im}; }
+              Complexe operator-(const Complexe& o) const { return {re - o.re, im - o.im}; }
+              Complexe operator*(const Complexe& o) const { return {re * o.re - im * o.im, re * o.im + im * o.re}; }
+              bool operator==(const Complexe&) const = default;
+          };
+
+          std::ostream& operator<<(std::ostream& o, const Complexe& z) {
+              o << z.re;
+              if (z.im < 0) o << "-" << -z.im << "i";
+              else o << "+" << z.im << "i";
+              return o;
+          }
+
+          int main() {
+              double a, b, c, d;
+              char op;
+              while (std::cin >> a >> b >> op >> c >> d) {
+                  Complexe x{a, b}, y{c, d};
+                  if (op == '+') std::cout << x + y << "\n";
+                  else if (op == '-') std::cout << x - y << "\n";
+                  else if (op == '*') std::cout << x * y << "\n";
+                  else std::cout << (x == y ? "vrai" : "faux") << "\n";
+              }
+          }
+        tests:
+          - { input: "1 2 + 3 4\n1 2 * 3 4\n1 1 = 1 1", output: "4+6i\n-5+10i\nvrai" }
+          - { input: 0 1 * 0 1, output: -1+0i, hidden: true }
+          - { input: 5 5 - 1 9, output: 4-4i, hidden: true }
+    project:
+      id: cpp-ops-projet
+      type: code
+      title: Polynômes
+      difficulty: 3
+      prompt: |
+        Écris une classe `Polynome` (coefficients du degré 0 au degré n dans un `std::vector<long long>`) avec `operator+`, `operator*`, `operator()(long long x)` (évaluation, schéma de Horner) et `operator<<` (format `3x^2 + 2x + 1`, en omettant les termes nuls ; `0` pour le polynôme nul ; coefficient 1 omis devant x ; termes négatifs affichés `- 4x`).
+
+        Entrée : deux lignes de coefficients (degré croissant) puis une valeur `x`. Affiche P, Q, P+Q, P×Q, puis `P(x) = …`.
+      starter: |
+        #include <iostream>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        #include <algorithm>
+        #include <cstdlib>
+
+        class Polynome {
+        public:
+            explicit Polynome(std::vector<long long> c) : c_(std::move(c)) { normaliser(); }
+            Polynome operator+(const Polynome& o) const {
+                std::vector<long long> r(std::max(c_.size(), o.c_.size()), 0);
+                for (std::size_t i = 0; i < c_.size(); ++i) r[i] += c_[i];
+                for (std::size_t i = 0; i < o.c_.size(); ++i) r[i] += o.c_[i];
+                return Polynome(r);
+            }
+            Polynome operator*(const Polynome& o) const {
+                std::vector<long long> r(c_.size() + o.c_.size(), 0);
+                for (std::size_t i = 0; i < c_.size(); ++i)
+                    for (std::size_t j = 0; j < o.c_.size(); ++j) r[i + j] += c_[i] * o.c_[j];
+                return Polynome(r);
+            }
+            long long operator()(long long x) const {
+                long long r = 0;
+                for (std::size_t i = c_.size(); i-- > 0;) r = r * x + c_[i];
+                return r;
+            }
+            friend std::ostream& operator<<(std::ostream& o, const Polynome& p) {
+                bool premier = true;
+                for (std::size_t i = p.c_.size(); i-- > 0;) {
+                    long long c = p.c_[i];
+                    if (c == 0) continue;
+                    if (premier) { if (c < 0) o << "-"; }
+                    else o << (c < 0 ? " - " : " + ");
+                    long long a = std::llabs(c);
+                    if (a != 1 || i == 0) o << a;
+                    if (i >= 1) o << "x";
+                    if (i >= 2) o << "^" << i;
+                    premier = false;
+                }
+                if (premier) o << "0";
+                return o;
+            }
+        private:
+            void normaliser() { while (!c_.empty() && c_.back() == 0) c_.pop_back(); }
+            std::vector<long long> c_;
+        };
+
+        Polynome lire() {
+            std::string l;
+            std::getline(std::cin, l);
+            std::istringstream is(l);
+            std::vector<long long> c;
+            long long x;
+            while (is >> x) c.push_back(x);
+            return Polynome(c);
+        }
+
+        int main() {
+            Polynome p = lire(), q = lire();
+            long long x;
+            std::cin >> x;
+            std::cout << p << "\n" << q << "\n" << p + q << "\n" << p * q << "\n";
+            std::cout << "P(" << x << ") = " << p(x) << "\n";
+        }
+      tests:
+        - { input: "1 2 3\n-1 1\n2", output: "3x^2 + 2x + 1\nx - 1\n3x^2 + 3x\n3x^3 - x^2 - x - 1\nP(2) = 17" }
+        - { input: "0\n5\n10", output: "0\n5\n5\n0\nP(10) = 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-ops-ex1
+          type: mcq
+          prompt: Quel opérateur rend un objet « appelable » comme une fonction ?
+          choices: ['operator()', 'operator[]', 'operator->', 'operator call']
+          answer: 0
+        - id: cpp-ops-ex2
+          type: mcq
+          prompt: Quels opérateurs ne faut-il pas surcharger (perte de l’évaluation paresseuse) ?
+          choices: ['&& et ||', '+ et -', '== et !=', '<< et >>']
+          answer: 0
+        - id: cpp-ops-ex3
+          type: mcq
+          prompt: Pourquoi implémenter + à partir de += ?
+          choices: [Pour éviter de dupliquer la logique, C’est obligatoire, Pour la vitesse de compilation, Pour pouvoir les rendre virtuels]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-smart-pointers
+    title: Smart pointers
+    summary: unique_ptr, shared_ptr et weak_ptr — propriété exclusive ou partagée, make_unique/make_shared et cycles de références.
+    minutes: 35
+    concepts: [smart-pointers, memoire]
+    sections:
+      - title: unique_ptr
+        body: |
+          `std::unique_ptr<T>` **possède** seul un objet du tas et le détruit automatiquement :
+
+          ```cpp
+          #include <memory>
+          auto p = std::make_unique<Joueur>("Kiri");   // jamais de new explicite
+          p->jouer();
+          // auto q = p;                // ❌ non copiable
+          auto q = std::move(p);        // ✅ transfert de propriété ; p devient nullptr
+          ```
+
+          - Coût nul par rapport à un pointeur brut.
+          - Idéal pour les objets polymorphes : `std::vector<std::unique_ptr<Forme>>`.
+          - Pour passer un objet **sans** transférer la propriété : `Joueur&` ou `Joueur*` (pointeur brut = « observateur »).
+      - title: shared_ptr et weak_ptr
+        body: |
+          `std::shared_ptr<T>` : propriété **partagée** avec comptage de références (atomique) :
+
+          ```cpp
+          auto a = std::make_shared<Texture>("herbe.png");
+          auto b = a;                         // compteur = 2
+          std::cout << a.use_count();         // 2
+          b.reset();                          // compteur = 1
+          ```
+
+          ⚠️ Deux `shared_ptr` qui se référencent mutuellement ne sont jamais libérés (**cycle**). On casse le cycle avec `std::weak_ptr` :
+
+          ```cpp
+          struct Noeud {
+              std::vector<std::shared_ptr<Noeud>> enfants;
+              std::weak_ptr<Noeud> parent;    // ne possède pas
+          };
+          if (auto p = noeud->parent.lock()) { /* parent encore vivant */ }
+          ```
+
+          Règle : **unique_ptr par défaut**, shared_ptr seulement si la propriété est réellement partagée.
+    exercises:
+      - id: cpp-sp-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <memory>
+          struct T { ~T() { std::cout << "détruit "; } };
+          int main() {
+              auto a = std::make_shared<T>();
+              {
+                  auto b = a;
+                  std::cout << a.use_count() << " ";
+              }
+              std::weak_ptr<T> w = a;
+              std::cout << a.use_count() << " ";
+              a.reset();
+              std::cout << w.expired() << "\n";
+          }
+        output: 2 1 détruit 1
+        concepts: [smart-pointers]
+      - id: cpp-sp-q1
+        type: mcq
+        prompt: Comment transférer la propriété d’un unique_ptr ?
+        choices: ['std::move(p)', 'Copie simple', 'p.copy()', 'C’est impossible']
+        answer: 0
+      - id: cpp-sp-q2
+        type: mcq
+        prompt: Quel pointeur intelligent choisir par défaut ?
+        choices: ['std::unique_ptr', 'std::shared_ptr', 'std::weak_ptr', 'Un pointeur brut avec new']
+        answer: 0
+      - id: cpp-sp-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve la ligne fautive.
+        code: |
+          #include <iostream>
+          #include <memory>
+          #include <vector>
+          int main() {
+              std::vector<std::unique_ptr<int>> v;
+              auto p = std::make_unique<int>(42);
+              v.push_back(p);
+              std::cout << *v[0] << "\n";
+          }
+        bugLines: [7]
+        choices:
+          - unique_ptr n’est pas copiable ; il faut v.push_back(std::move(p))
+          - make_unique n’existe pas
+          - Un vector ne peut pas contenir de pointeurs
+        answer: 0
+        solution: |
+          #include <iostream>
+          #include <memory>
+          #include <vector>
+          int main() {
+              std::vector<std::unique_ptr<int>> v;
+              auto p = std::make_unique<int>(42);
+              v.push_back(std::move(p));
+              std::cout << *v[0] << "\n";
+          }
+        tests:
+          - { input: '', output: '42' }
+      - id: cpp-sp-code
+        type: code
+        title: Arbre généalogique sans fuite
+        prompt: |
+          Chaque ligne `parent enfant` décrit une filiation. Représente les personnes par `std::shared_ptr<Personne>` avec `std::vector<std::shared_ptr<Personne>> enfants` et `std::weak_ptr<Personne> parent`.
+
+          Affiche la lignée ascendante de la dernière personne citée (`Eve <- Cleo <- …`) en remontant avec `lock()`.
+        starter: |
+          #include <iostream>
+          #include <map>
+          #include <memory>
+          #include <string>
+          #include <vector>
+
+          struct Personne {
+              std::string nom;
+              std::vector<std::shared_ptr<Personne>> enfants;
+              std::weak_ptr<Personne> parent;
+          };
+
+          int main() {
+          }
+        solution: |
+          #include <iostream>
+          #include <map>
+          #include <memory>
+          #include <string>
+          #include <vector>
+
+          struct Personne {
+              std::string nom;
+              std::vector<std::shared_ptr<Personne>> enfants;
+              std::weak_ptr<Personne> parent;
+          };
+
+          int main() {
+              std::map<std::string, std::shared_ptr<Personne>> m;
+              auto obtenir = [&](const std::string& n) {
+                  auto& p = m[n];
+                  if (!p) p = std::make_shared<Personne>(Personne{n, {}, {}});
+                  return p;
+              };
+              std::string a, b, dernier;
+              while (std::cin >> a >> b) {
+                  auto p = obtenir(a), e = obtenir(b);
+                  e->parent = p;
+                  p->enfants.push_back(e);
+                  dernier = b;
+              }
+              std::string chemin;
+              for (auto p = m[dernier]; p; p = p->parent.lock()) chemin += (chemin.empty() ? "" : " <- ") + p->nom;
+              std::cout << chemin << "\n";
+          }
+        tests:
+          - { input: "Ada Bob\nBob Cleo\nAda Dan\nCleo Eve", output: Eve <- Cleo <- Bob <- Ada }
+          - { input: X Y, output: Y <- X, hidden: true }
+        require:
+          - { pattern: 'weak_ptr', message: Utiliser weak_ptr pour le parent }
+    project:
+      id: cpp-sp-projet
+      type: code
+      title: Cache de textures partagées
+      difficulty: 3
+      prompt: |
+        Un gestionnaire de ressources garde des `std::weak_ptr<Texture>` dans une `std::map` : `charger(nom)` renvoie la texture existante si elle est encore vivante (`lock()`), sinon en crée une nouvelle (afficher `chargement nom`). La `Texture` affiche `libération nom` dans son destructeur.
+
+        Les objets du jeu (« sprites ») gardent des `shared_ptr<Texture>`. Commandes : `sprite id texture` (crée/remplace un sprite), `supprimer id`, `stats` (affiche `textures vivantes : N`). Les sprites sont dans une `std::map<std::string, std::shared_ptr<Texture>>`.
+      starter: |
+        #include <iostream>
+        #include <map>
+        #include <memory>
+        #include <string>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <map>
+        #include <memory>
+        #include <string>
+
+        struct Texture {
+            std::string nom;
+            explicit Texture(std::string n) : nom(std::move(n)) { std::cout << "chargement " << nom << "\n"; }
+            ~Texture() { std::cout << "libération " << nom << "\n"; }
+        };
+
+        class Gestionnaire {
+        public:
+            std::shared_ptr<Texture> charger(const std::string& nom) {
+                if (auto t = cache_[nom].lock()) return t;
+                auto t = std::make_shared<Texture>(nom);
+                cache_[nom] = t;
+                return t;
+            }
+            int vivantes() const {
+                int n = 0;
+                for (const auto& [k, w] : cache_) if (!w.expired()) ++n;
+                return n;
+            }
+        private:
+            std::map<std::string, std::weak_ptr<Texture>> cache_;
+        };
+
+        int main() {
+            Gestionnaire g;
+            std::map<std::string, std::shared_ptr<Texture>> sprites;
+            std::string cmd, id, tex;
+            while (std::cin >> cmd) {
+                if (cmd == "sprite") { std::cin >> id >> tex; sprites[id] = g.charger(tex); }
+                else if (cmd == "supprimer") { std::cin >> id; sprites.erase(id); }
+                else std::cout << "textures vivantes : " << g.vivantes() << "\n";
+            }
+            sprites.clear();
+            std::cout << "fin\n";
+        }
+      tests:
+        - { input: "sprite a herbe\nsprite b herbe\nsprite c eau\nstats\nsupprimer a\nsupprimer b\nstats\nsprite c lave", output: "chargement herbe\nchargement eau\ntextures vivantes : 2\nlibération herbe\ntextures vivantes : 1\nchargement lave\nlibération eau\nlibération lave\nfin" }
+        - { input: stats, output: "textures vivantes : 0\nfin", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-sp-ex1
+          type: mcq
+          prompt: Que renvoie weak_ptr::lock() si l’objet a été détruit ?
+          choices: [Un shared_ptr vide, Une exception, L’objet détruit, Un unique_ptr]
+          answer: 0
+        - id: cpp-sp-ex2
+          type: mcq
+          prompt: Pourquoi préférer make_shared à shared_ptr<T>(new T) ?
+          choices: [Une seule allocation (objet + compteur) et pas de new explicite, C’est obligatoire, Pour la copie, Aucune différence]
+          answer: 0
+        - id: cpp-sp-ex3
+          type: mcq
+          prompt: Que représente un pointeur brut T* en C++ moderne ?
+          choices: [Un observateur non propriétaire, Un propriétaire unique, Un compteur partagé, Une erreur]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-raii
+    title: RAII
+    summary: Le principe fondamental du C++ — lier toute ressource à la durée de vie d’un objet, gardes de portée, verrous et transactions.
+    minutes: 30
+    concepts: [memoire, raii]
+    sections:
+      - title: Toute ressource est un objet
+        body: |
+          **RAII** : *Resource Acquisition Is Initialization*. Une ressource (mémoire, fichier, socket, verrou, transaction, connexion…) est :
+
+          1. **acquise** dans le constructeur d’un objet ;
+          2. **libérée** dans son destructeur.
+
+          Comme le destructeur est appelé **automatiquement** à la fin de la portée — y compris lors d’un `return` anticipé ou d’une **exception** —, les fuites deviennent impossibles.
+
+          ```cpp
+          void traiter() {
+              std::lock_guard<std::mutex> verrou(m);        // verrouille
+              std::ifstream f("donnees.txt");                // ouvre
+              auto buffer = std::make_unique<char[]>(4096);  // alloue
+              if (!f) return;                                // tout est libéré
+              risque();                                      // même si exception
+          }                                                  // libération en ordre inverse
+          ```
+      - title: Écrire ses propres gardes
+        body: |
+          ```cpp
+          template <typename F>
+          class GardePortee {                       // exécute une action en sortie de portée
+          public:
+              explicit GardePortee(F f) : f_(std::move(f)) {}
+              ~GardePortee() { if (actif_) f_(); }
+              void annuler() { actif_ = false; }    // pour « valider » une transaction
+              GardePortee(const GardePortee&) = delete;
+              GardePortee& operator=(const GardePortee&) = delete;
+          private:
+              F f_;
+              bool actif_ = true;
+          };
+
+          auto annulation = GardePortee([&] { compte.solde = ancien; });   // rollback par défaut
+          operationRisquee();
+          annulation.annuler();                                          // succès : on garde
+          ```
+
+          Une classe RAII est généralement **non copiable** (ou déplaçable seulement) pour éviter la double libération.
+    exercises:
+      - id: cpp-raii-q1
+        type: mcq
+        prompt: Quel est l’avantage décisif de RAII face aux exceptions ?
+        choices: [Les destructeurs libèrent les ressources même quand une exception remonte, Les exceptions sont désactivées, Le programme est plus rapide, Les ressources ne sont jamais libérées]
+        answer: 0
+      - id: cpp-raii-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <stdexcept>
+          struct Verrou {
+              Verrou() { std::cout << "verrouille "; }
+              ~Verrou() { std::cout << "déverrouille "; }
+          };
+          void travail(bool echec) {
+              Verrou v;
+              if (echec) throw std::runtime_error("x");
+              std::cout << "travail ";
+          }
+          int main() {
+              travail(false);
+              try { travail(true); } catch (...) { std::cout << "erreur "; }
+              std::cout << "\n";
+          }
+        output: verrouille travail déverrouille verrouille déverrouille erreur
+      - id: cpp-raii-q2
+        type: mcq
+        prompt: Pourquoi une classe RAII est-elle souvent non copiable ?
+        choices: [Pour éviter que deux objets libèrent la même ressource, Pour économiser de la mémoire, C’est imposé par le compilateur, Pour l’héritage]
+        answer: 0
+      - id: cpp-raii-code
+        type: code
+        title: Transaction annulable
+        prompt: |
+          Écris une classe `Transaction` qui mémorise le solde d’un compte à sa construction et le **restaure** dans son destructeur, sauf si `valider()` a été appelée.
+
+          Chaque ligne d’entrée est une suite d’opérations à appliquer de façon atomique au compte (solde initial 100) : `+X` ou `-X`. Si un retrait rend le solde négatif, lève une exception : la transaction est annulée. Affiche `ok : solde` ou `annulée : solde`.
+        starter: |
+          #include <iostream>
+          #include <sstream>
+          #include <stdexcept>
+          #include <string>
+
+          int main() {
+              long long solde = 100;
+              std::string ligne;
+              while (std::getline(std::cin, ligne)) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <sstream>
+          #include <stdexcept>
+          #include <string>
+
+          class Transaction {
+          public:
+              explicit Transaction(long long& solde) : solde_(solde), sauvegarde_(solde) {}
+              ~Transaction() { if (!valide_) solde_ = sauvegarde_; }
+              void valider() { valide_ = true; }
+              Transaction(const Transaction&) = delete;
+              Transaction& operator=(const Transaction&) = delete;
+          private:
+              long long& solde_;
+              long long sauvegarde_;
+              bool valide_ = false;
+          };
+
+          int main() {
+              long long solde = 100;
+              std::string ligne;
+              while (std::getline(std::cin, ligne)) {
+                  try {
+                      Transaction t(solde);
+                      std::istringstream is(ligne);
+                      std::string op;
+                      while (is >> op) {
+                          long long v = std::stoll(op.substr(1));
+                          if (op[0] == '+') solde += v;
+                          else {
+                              solde -= v;
+                              if (solde < 0) throw std::runtime_error("découvert");
+                          }
+                      }
+                      t.valider();
+                      std::cout << "ok : " << solde << "\n";
+                  } catch (const std::exception&) {
+                      std::cout << "annulée : " << solde << "\n";
+                  }
+              }
+          }
+        tests:
+          - { input: "+50 -30\n-500 +1000\n-120", output: "ok : 120\nannulée : 120\nok : 0" }
+          - { input: "-101", output: 'annulée : 100', hidden: true }
+        require:
+          - { pattern: '~Transaction', message: Écrire le destructeur de Transaction }
+    project:
+      id: cpp-raii-projet
+      type: code
+      title: Pool de connexions RAII
+      difficulty: 3
+      prompt: |
+        Un pool possède `N` connexions numérotées de 1 à N. `Pool::emprunter()` renvoie un objet RAII `Bail` (non copiable, mais **déplaçable**) qui contient le numéro de la connexion empruntée et la **rend au pool** dans son destructeur. S’il n’y a plus de connexion libre, `emprunter` lève `std::runtime_error("pool épuisé")`. Le pool redonne toujours la plus petite connexion libre.
+
+        Première ligne : N. Commandes : `prendre nom` (stocke le bail sous ce nom dans une `std::map<std::string, Bail>` ; affiche `nom -> connexion k` ou `nom : pool épuisé`), `rendre nom` (supprime le bail ; affiche `nom a rendu`), `libres` (affiche le nombre de connexions libres).
+      starter: |
+        #include <iostream>
+        #include <map>
+        #include <set>
+        #include <stdexcept>
+        #include <string>
+
+        int main() {
+            int n;
+            std::cin >> n;
+        }
+      solution: |
+        #include <iostream>
+        #include <map>
+        #include <set>
+        #include <stdexcept>
+        #include <string>
+
+        class Pool;
+
+        class Bail {
+        public:
+            Bail(Pool* p, int id) : pool_(p), id_(id) {}
+            Bail(Bail&& o) noexcept : pool_(o.pool_), id_(o.id_) { o.pool_ = nullptr; }
+            Bail& operator=(Bail&&) = delete;
+            Bail(const Bail&) = delete;
+            ~Bail();
+            int id() const { return id_; }
+        private:
+            Pool* pool_;
+            int id_;
+        };
+
+        class Pool {
+        public:
+            explicit Pool(int n) { for (int i = 1; i <= n; ++i) libres_.insert(i); }
+            Bail emprunter() {
+                if (libres_.empty()) throw std::runtime_error("pool épuisé");
+                int id = *libres_.begin();
+                libres_.erase(libres_.begin());
+                return Bail(this, id);
+            }
+            void rendre(int id) { libres_.insert(id); }
+            std::size_t nbLibres() const { return libres_.size(); }
+        private:
+            std::set<int> libres_;
+        };
+
+        Bail::~Bail() { if (pool_) pool_->rendre(id_); }
+
+        int main() {
+            int n;
+            std::cin >> n;
+            Pool pool(n);
+            std::map<std::string, Bail> baux;
+            std::string cmd, nom;
+            while (std::cin >> cmd) {
+                if (cmd == "prendre") {
+                    std::cin >> nom;
+                    try {
+                        auto [it, ok] = baux.emplace(nom, pool.emprunter());
+                        std::cout << nom << " -> connexion " << it->second.id() << "\n";
+                    } catch (const std::runtime_error& e) {
+                        std::cout << nom << " : " << e.what() << "\n";
+                    }
+                } else if (cmd == "rendre") {
+                    std::cin >> nom;
+                    baux.erase(nom);
+                    std::cout << nom << " a rendu\n";
+                } else {
+                    std::cout << pool.nbLibres() << "\n";
+                }
+            }
+        }
+      tests:
+        - { input: "2\nprendre a\nprendre b\nprendre c\nlibres\nrendre a\nprendre c\nlibres", output: "a -> connexion 1\nb -> connexion 2\nc : pool épuisé\n0\na a rendu\nc -> connexion 1\n0" }
+        - { input: "1\nlibres\nprendre x\nrendre x\nlibres", output: "1\nx -> connexion 1\nx a rendu\n1", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-raii-ex1
+          type: mcq
+          prompt: Que signifie RAII ?
+          choices: [Resource Acquisition Is Initialization, Runtime Allocation Is Immediate, Random Access Indexed Iterator, Reference And Immutable Instance]
+          answer: 0
+        - id: cpp-raii-ex2
+          type: mcq
+          prompt: Lequel n’est PAS un exemple de RAII dans la bibliothèque standard ?
+          choices: ['std::cout << x', 'std::lock_guard', 'std::unique_ptr', 'std::ifstream']
+          answer: 0
+        - id: cpp-raii-ex3
+          type: mcq
+          prompt: Dans quel ordre les ressources RAII d’une fonction sont-elles libérées ?
+          choices: [Ordre inverse de leur acquisition, Ordre d’acquisition, Aléatoire, À la fin du programme]
+          answer: 0

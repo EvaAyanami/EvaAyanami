@@ -1099,7 +1099,7 @@ chapters:
       - id: cpp-cond-q1
         type: mcq
         prompt: Peut-on faire un switch sur une std::string ?
-        choices: [Non, seulement sur des types entiers, caractères et énumérations, Oui, Seulement en C++23, Seulement avec break]
+        choices: ['Non, seulement sur des types entiers, caractères et énumérations', 'Oui', 'Seulement en C++23', 'Seulement avec break']
         answer: 0
       - id: cpp-cond-fill
         type: fill

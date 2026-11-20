@@ -1071,7 +1071,7 @@ chapters:
         - id: rust-hm-ex1
           type: mcq
           prompt: L’ordre de parcours d’un HashMap est-il garanti ?
-          choices: [Oui, ordre d’insertion, Oui, ordre alphabétique, Non]
+          choices: ['Oui, ordre d’insertion', 'Oui, ordre alphabétique', 'Non']
           answer: 2
         - id: rust-hm-ex2
           type: predict
