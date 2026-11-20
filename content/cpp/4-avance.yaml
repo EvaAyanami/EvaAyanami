@@ -1,0 +1,2312 @@
+language: cpp
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: cpp-move
+    title: Move semantics
+    summary: Déplacer au lieu de copier — std::move, constructeur et affectation par déplacement, règle de cinq et état « déplacé ».
+    minutes: 35
+    concepts: [move, memoire]
+    sections:
+      - title: Copier coûte cher
+        body: |
+          Copier un `std::vector` d’un million d’éléments copie… un million d’éléments. Or souvent, l’objet source n’est plus utilisé ensuite (valeur temporaire, variable qu’on abandonne). C++11 permet alors de **déplacer** : on « vole » ses ressources internes (le pointeur vers le tas) en O(1).
+
+          ```cpp
+          std::vector<int> a(1'000'000, 7);
+          std::vector<int> b = std::move(a);   // déplacement : b récupère le tampon de a
+          // a est maintenant dans un état valide mais non spécifié (ici : vide)
+          ```
+
+          `std::move` ne déplace rien par lui-même : c’est un **cast** qui dit « tu peux piller cet objet ». Le déplacement est effectué par le constructeur (ou l’affectation) de déplacement.
+      - title: Écrire une classe déplaçable
+        body: |
+          ```cpp
+          class Tampon {
+          public:
+              explicit Tampon(std::size_t n) : n_(n), d_(new int[n]{}) {}
+              ~Tampon() { delete[] d_; }
+              Tampon(const Tampon& o) : n_(o.n_), d_(new int[o.n_]) { std::copy(o.d_, o.d_ + n_, d_); }
+              Tampon& operator=(Tampon o) noexcept { swap(o); return *this; }      // copie-et-échange
+              Tampon(Tampon&& o) noexcept : n_(o.n_), d_(o.d_) { o.n_ = 0; o.d_ = nullptr; }
+              void swap(Tampon& o) noexcept { std::swap(n_, o.n_); std::swap(d_, o.d_); }
+          private:
+              std::size_t n_;
+              int* d_;
+          };
+          ```
+
+          **Règle de cinq** : si tu écris l’un parmi destructeur, copie (constructeur/affectation) ou déplacement (constructeur/affectation), pense aux cinq. Mieux : la **règle de zéro** (membres RAII, rien à écrire).
+
+          Marque le déplacement `noexcept` : `std::vector` ne l’utilisera lors d’une réallocation que s’il est garanti sans exception.
+    exercises:
+      - id: cpp-move-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <string>
+          #include <vector>
+          #include <utility>
+          int main() {
+              std::string a = "kiri";
+              std::string b = std::move(a);
+              std::vector<std::string> v;
+              v.push_back(std::move(b));
+              std::cout << b.size() << " " << v[0] << " " << v.size() << "\n";
+          }
+        output: 0 kiri 1
+        explanation: Une std::string déplacée est laissée vide en pratique (état valide mais non spécifié par la norme).
+      - id: cpp-move-q1
+        type: mcq
+        prompt: Que fait std::move ?
+        choices: ['Un cast qui autorise le déplacement (il ne déplace rien lui-même)', 'Il copie l’objet', 'Il libère l’objet', 'Il déplace l’objet en mémoire']
+        answer: 0
+      - id: cpp-move-q2
+        type: mcq
+        prompt: Pourquoi marquer le constructeur de déplacement noexcept ?
+        choices: ['std::vector ne l’utilise lors des réallocations que s’il est noexcept', 'C’est obligatoire', 'Pour qu’il soit plus court', 'Pour la copie']
+        answer: 0
+      - id: cpp-move-code
+        type: code
+        title: Compter copies et déplacements
+        prompt: |
+          Écris une classe `Trace` avec un constructeur par défaut, un constructeur de copie et un constructeur de déplacement qui incrémentent des compteurs **statiques** `copies` et `deplacements`.
+
+          Pour chaque ligne `n`, crée un `std::vector<Trace>` après `reserve(n)`, puis ajoute `n` éléments avec `push_back(Trace())` ; enfin copie le vecteur (`auto w = v;`). Affiche `copies=C deplacements=D` (compteurs remis à zéro à chaque ligne).
+        starter: |
+          #include <iostream>
+          #include <vector>
+
+          int main() {
+              int n;
+              while (std::cin >> n) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <vector>
+
+          struct Trace {
+              static inline int copies = 0;
+              static inline int deplacements = 0;
+              Trace() = default;
+              Trace(const Trace&) { ++copies; }
+              Trace(Trace&&) noexcept { ++deplacements; }
+          };
+
+          int main() {
+              int n;
+              while (std::cin >> n) {
+                  Trace::copies = Trace::deplacements = 0;
+                  std::vector<Trace> v;
+                  v.reserve(n);
+                  for (int i = 0; i < n; ++i) v.push_back(Trace());
+                  auto w = v;
+                  std::cout << "copies=" << Trace::copies << " deplacements=" << Trace::deplacements << "\n";
+              }
+          }
+        tests:
+          - { input: '3', output: copies=3 deplacements=3 }
+          - { input: "0\n5", output: "copies=0 deplacements=0\ncopies=5 deplacements=5", hidden: true }
+    project:
+      id: cpp-move-projet
+      type: code
+      title: Tampon déplaçable
+      difficulty: 3
+      prompt: |
+        Implémente `class Tampon` (taille + `int*` alloué avec `new[]`) avec la **règle de cinq** : destructeur, copie (profonde), affectation (copie-et-échange), déplacement `noexcept`. Ajoute `int& operator[](std::size_t)`, `std::size_t taille() const`.
+
+        Entrée : `n` puis `n` entiers. Remplis un `Tampon a`, crée `b` par **copie** puis multiplie chaque case de `b` par 2, crée `c` par **déplacement** de `a`. Affiche `a.taille()`, le contenu de `b` puis celui de `c`.
+      starter: |
+        #include <iostream>
+        #include <utility>
+        #include <algorithm>
+
+        int main() {
+            std::size_t n;
+            std::cin >> n;
+        }
+      solution: |
+        #include <iostream>
+        #include <utility>
+        #include <algorithm>
+
+        class Tampon {
+        public:
+            explicit Tampon(std::size_t n) : n_(n), d_(new int[n]{}) {}
+            ~Tampon() { delete[] d_; }
+            Tampon(const Tampon& o) : n_(o.n_), d_(new int[o.n_]) { std::copy(o.d_, o.d_ + n_, d_); }
+            Tampon(Tampon&& o) noexcept : n_(o.n_), d_(o.d_) { o.n_ = 0; o.d_ = nullptr; }
+            Tampon& operator=(Tampon o) noexcept { swap(o); return *this; }
+            void swap(Tampon& o) noexcept { std::swap(n_, o.n_); std::swap(d_, o.d_); }
+            int& operator[](std::size_t i) { return d_[i]; }
+            std::size_t taille() const { return n_; }
+        private:
+            std::size_t n_;
+            int* d_;
+        };
+
+        void afficher(Tampon& t) {
+            for (std::size_t i = 0; i < t.taille(); ++i) std::cout << (i ? " " : "") << t[i];
+            std::cout << "\n";
+        }
+
+        int main() {
+            std::size_t n;
+            std::cin >> n;
+            Tampon a(n);
+            for (std::size_t i = 0; i < n; ++i) std::cin >> a[i];
+            Tampon b = a;
+            for (std::size_t i = 0; i < b.taille(); ++i) b[i] *= 2;
+            Tampon c = std::move(a);
+            std::cout << a.taille() << "\n";
+            afficher(b);
+            afficher(c);
+        }
+      tests:
+        - { input: "3\n1 2 3", output: "0\n2 4 6\n1 2 3" }
+        - { input: "1\n-5", output: "0\n-10\n-5", hidden: true }
+      require:
+        - { pattern: 'Tampon\s*\(\s*Tampon\s*&&', message: 'Écrire le constructeur de déplacement' }
+        - { pattern: 'noexcept', message: 'Marquer le déplacement noexcept' }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-move-ex1
+          type: mcq
+          prompt: Dans quel état est un objet après avoir été déplacé ?
+          choices: ['Valide mais non spécifié (on peut le détruire ou lui réaffecter une valeur)', 'Détruit', 'Inchangé', 'Indéfini : on ne peut plus rien en faire']
+          answer: 0
+        - id: cpp-move-ex2
+          type: mcq
+          prompt: Que dit la règle de cinq ?
+          choices: ['Destructeur, copie et déplacement (constructeurs et affectations) vont ensemble', 'Cinq constructeurs maximum', 'Cinq membres par classe', 'Cinq niveaux d’héritage']
+          answer: 0
+        - id: cpp-move-ex3
+          type: mcq
+          prompt: Quel est le coût typique du déplacement d’un std::vector ?
+          choices: ['O(1) : on transfère le pointeur interne', 'O(n)', 'O(n log n)', 'Il est impossible']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-rvalue
+    title: Rvalue references
+    summary: lvalues et rvalues, références T&&, références universelles, std::forward et transfert parfait (perfect forwarding).
+    minutes: 30
+    concepts: [move, generiques]
+    sections:
+      - title: lvalue, rvalue
+        body: |
+          - **lvalue** : a un nom / une adresse durable (`x`, `v[0]`, `*p`).
+          - **rvalue** : valeur temporaire sans nom (`42`, `a + b`, `std::string("x")`, résultat de `std::move(x)`).
+
+          ```cpp
+          void f(int& x)       { std::cout << "lvalue\n"; }
+          void f(int&& x)      { std::cout << "rvalue\n"; }
+          void f(const int& x) { }   // accepte les deux (si pas d’autre surcharge)
+
+          int a = 1;
+          f(a);            // lvalue
+          f(2);            // rvalue
+          f(std::move(a)); // rvalue
+          ```
+
+          ⚠️ À l’intérieur de `f(int&& x)`, `x` a un nom : c’est une **lvalue** ! Pour la transmettre comme rvalue, il faut `std::move(x)`.
+      - title: Références universelles et forward
+        body: |
+          Dans un template, `T&&` avec `T` **déduit** est une **référence universelle** (*forwarding reference*) : elle accepte lvalues et rvalues.
+
+          ```cpp
+          template <typename T>
+          void emballer(T&& arg) {
+              cible(std::forward<T>(arg));   // conserve la « catégorie » d’origine
+          }
+
+          template <typename T, typename... Args>
+          std::unique_ptr<T> fabriquer(Args&&... args) {           // comme make_unique
+              return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+          }
+          ```
+
+          `std::forward<T>` est un cast conditionnel : rvalue si l’argument d’origine était une rvalue, lvalue sinon. C’est le **transfert parfait**.
+    exercises:
+      - id: cpp-rv-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <utility>
+          void f(int&) { std::cout << "L"; }
+          void f(int&&) { std::cout << "R"; }
+          template <typename T> void g(T&& x) { f(std::forward<T>(x)); }
+          template <typename T> void h(T&& x) { f(x); }
+          int main() {
+              int a = 1;
+              f(a); f(3); g(a); g(3); h(3);
+              std::cout << "\n";
+          }
+        output: LRLRL
+        explanation: 'Dans h, x a un nom (lvalue) : sans forward, l’information « rvalue » est perdue.'
+      - id: cpp-rv-q1
+        type: mcq
+        prompt: Dans `void f(std::string&& s)`, quelle est la catégorie de l’expression `s` ?
+        choices: ['lvalue (elle a un nom)', 'rvalue', 'prvalue', 'Ni l’une ni l’autre']
+        answer: 0
+      - id: cpp-rv-q2
+        type: mcq
+        prompt: Quand T&& est-il une référence universelle ?
+        choices: ['Quand T est un paramètre template déduit', 'Toujours', 'Jamais', 'Seulement pour les classes']
+        answer: 0
+      - id: cpp-rv-code
+        type: code
+        title: Fabrique avec transfert parfait
+        prompt: |
+          Écris `template <typename T, typename... Args> std::unique_ptr<T> fabriquer(Args&&... args)` qui construit un `T` en transférant parfaitement ses arguments.
+
+          La classe `Info` (fournie) affiche si son nom a été copié ou déplacé. Pour chaque mot lu, appelle `fabriquer<Info>(mot, 1)` (lvalue) puis `fabriquer<Info>(std::string(mot), 2)` (rvalue).
+        starter: |
+          #include <iostream>
+          #include <memory>
+          #include <string>
+          #include <utility>
+
+          struct Info {
+              Info(const std::string& n, int id) { std::cout << "copie " << n << " #" << id << "\n"; }
+              Info(std::string&& n, int id) { std::cout << "déplacement " << n << " #" << id << "\n"; }
+          };
+
+          int main() {
+              std::string mot;
+              while (std::cin >> mot) {
+                  auto a = fabriquer<Info>(mot, 1);
+                  auto b = fabriquer<Info>(std::string(mot), 2);
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <memory>
+          #include <string>
+          #include <utility>
+
+          struct Info {
+              Info(const std::string& n, int id) { std::cout << "copie " << n << " #" << id << "\n"; }
+              Info(std::string&& n, int id) { std::cout << "déplacement " << n << " #" << id << "\n"; }
+          };
+
+          template <typename T, typename... Args>
+          std::unique_ptr<T> fabriquer(Args&&... args) {
+              return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+          }
+
+          int main() {
+              std::string mot;
+              while (std::cin >> mot) {
+                  auto a = fabriquer<Info>(mot, 1);
+                  auto b = fabriquer<Info>(std::string(mot), 2);
+              }
+          }
+        tests:
+          - { input: kiri, output: "copie kiri #1\ndéplacement kiri #2" }
+          - { input: a b, output: "copie a #1\ndéplacement a #2\ncopie b #1\ndéplacement b #2", hidden: true }
+        require:
+          - { pattern: 'std::forward', message: Utiliser std::forward }
+    project:
+      id: cpp-rv-projet
+      type: code
+      title: Conteneur avec emplace
+      difficulty: 3
+      prompt: |
+        Écris `template <typename T> class Sac` (basé sur un `std::vector<T>`) avec :
+
+        - `void ajouter(const T&)` qui affiche `ajout par copie` ;
+        - `void ajouter(T&&)` qui affiche `ajout par déplacement` ;
+        - `template <typename... Args> T& emplacer(Args&&...)` qui construit en place (`emplace_back` + `std::forward`) et affiche `construction en place`.
+
+        Utilise `Sac<std::string>`. Pour chaque ligne `mode mot` (`copie`, `deplacement`, `place`), appelle la méthode correspondante (`place` construit une chaîne de 3 répétitions du mot grâce au constructeur `std::string(count, char)`… non : utilise `emplacer(mot + mot + mot)`). Termine en affichant le contenu séparé par des virgules.
+      starter: |
+        #include <iostream>
+        #include <string>
+        #include <utility>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <string>
+        #include <utility>
+        #include <vector>
+
+        template <typename T>
+        class Sac {
+        public:
+            void ajouter(const T& x) { std::cout << "ajout par copie\n"; d_.push_back(x); }
+            void ajouter(T&& x) { std::cout << "ajout par déplacement\n"; d_.push_back(std::move(x)); }
+            template <typename... Args>
+            T& emplacer(Args&&... args) {
+                std::cout << "construction en place\n";
+                return d_.emplace_back(std::forward<Args>(args)...);
+            }
+            const std::vector<T>& contenu() const { return d_; }
+        private:
+            std::vector<T> d_;
+        };
+
+        int main() {
+            Sac<std::string> sac;
+            std::string mode, mot;
+            while (std::cin >> mode >> mot) {
+                if (mode == "copie") sac.ajouter(mot);
+                else if (mode == "deplacement") sac.ajouter(std::move(mot));
+                else sac.emplacer(mot + mot + mot);
+            }
+            const auto& c = sac.contenu();
+            for (std::size_t i = 0; i < c.size(); ++i) std::cout << (i ? "," : "") << c[i];
+            std::cout << "\n";
+        }
+      tests:
+        - { input: "copie a\ndeplacement b\nplace c", output: "ajout par copie\najout par déplacement\nconstruction en place\na,b,ccc" }
+        - { input: place xy, output: "construction en place\nxyxyxy", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-rv-ex1
+          type: mcq
+          prompt: Lequel est une rvalue ?
+          choices: ['a + b', 'x', 'v[0]', '*p']
+          answer: 0
+        - id: cpp-rv-ex2
+          type: mcq
+          prompt: Que fait std::forward<T>(x) ?
+          choices: ['Un cast conditionnel qui préserve la catégorie de valeur d’origine', 'Il copie toujours', 'Il déplace toujours', 'Il avance un itérateur']
+          answer: 0
+        - id: cpp-rv-ex3
+          type: mcq
+          prompt: Quelle surcharge accepte à la fois lvalues et rvalues ?
+          choices: ['f(const T&)', 'f(T&)', 'f(T&&) avec T non déduit', 'Aucune']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-lambdas
+    title: Lambdas
+    summary: Fonctions anonymes, captures par valeur et par référence, mutable, lambdas génériques, std::function et pièges de durée de vie.
+    minutes: 30
+    concepts: [closures]
+    sections:
+      - title: Syntaxe et captures
+        body: |
+          ```cpp
+          auto carre = [](int x) { return x * x; };
+          int seuil = 10, total = 0;
+          auto grand = [seuil](int x) { return x > seuil; };      // capture par valeur
+          auto ajouter = [&total](int x) { total += x; };          // par référence
+          auto tout = [=](int x) { return x + seuil; };             // tout par valeur
+          auto toutRef = [&] { total = 0; };                        // tout par référence
+          auto init = [n = 5](int x) { return x * n; };             // capture avec initialisation (C++14)
+          auto deplace = [v = std::move(vecteur)] { return v.size(); };
+
+          int c = 0;
+          auto compteur = [c]() mutable { return ++c; };            // modifie SA copie
+          ```
+
+          Type de retour explicite : `[](double x) -> int { return x; }`.
+      - title: Génériques et std::function
+        body: |
+          ```cpp
+          auto max2 = [](auto a, auto b) { return a > b ? a : b; };  // lambda générique (C++14)
+          auto cmp = []<typename T>(const T& a, const T& b) { return a < b; }; // C++20
+
+          #include <functional>
+          std::function<int(int)> op = carre;          // stocke n’importe quel « appelable »
+          std::vector<std::function<double(double)>> pipeline;
+          ```
+
+          Chaque lambda a un **type unique** : `auto` ou un template pour la stocker sans surcoût ; `std::function` pour l’effacement de type (un peu plus coûteux).
+
+          ⚠️ Capturer par référence une variable locale puis **renvoyer** la lambda = référence pendante !
+    exercises:
+      - id: cpp-lam-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          int main() {
+              int a = 1, b = 1;
+              auto parValeur = [a]() { return a * 10; };
+              auto parRef = [&b]() { return b * 10; };
+              a = 5; b = 5;
+              int c = 0;
+              auto compteur = [c]() mutable { return ++c; };
+              compteur(); compteur();
+              std::cout << parValeur() << " " << parRef() << " " << compteur() << " " << c << "\n";
+          }
+        output: 10 50 3 0
+        concepts: [closures]
+      - id: cpp-lam-q1
+        type: mcq
+        prompt: Que capture `[=]` ?
+        choices: ['Toutes les variables utilisées, par valeur', 'Toutes, par référence', 'Rien', 'Seulement this']
+        answer: 0
+      - id: cpp-lam-fill
+        type: fill
+        prompt: Complète pour trier par valeur absolue.
+        code: |
+          #include <iostream>
+          #include <vector>
+          #include <algorithm>
+          #include <cstdlib>
+          int main() {
+              std::vector<int> v{-5, 2, -1, 4};
+              std::sort(v.begin(), v.end(), {{?}}(int a, int b) { return std::abs(a) < std::abs(b); });
+              for (int x : v) std::cout << x << " ";
+              std::cout << "\n";
+          }
+        blanks: [['[]']]
+        tests:
+          - { input: '', output: -1 2 4 -5 }
+      - id: cpp-lam-code
+        type: code
+        title: Fabrique de fonctions
+        prompt: |
+          Écris `std::function<long long(long long)> composer(std::vector<std::function<long long(long long)>> fs)` qui renvoie une lambda appliquant les fonctions **dans l’ordre**.
+
+          Chaque ligne : une valeur `x` puis des opérations `+N`, `*N`, `^2` (carré). Construis une lambda par opération (capture de N par valeur), compose-les et affiche le résultat.
+        starter: |
+          #include <iostream>
+          #include <functional>
+          #include <sstream>
+          #include <string>
+          #include <vector>
+
+          int main() {
+              std::string ligne;
+              while (std::getline(std::cin, ligne)) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <functional>
+          #include <sstream>
+          #include <string>
+          #include <vector>
+
+          using Fn = std::function<long long(long long)>;
+
+          Fn composer(std::vector<Fn> fs) {
+              return [fs = std::move(fs)](long long x) {
+                  for (const auto& f : fs) x = f(x);
+                  return x;
+              };
+          }
+
+          int main() {
+              std::string ligne;
+              while (std::getline(std::cin, ligne)) {
+                  std::istringstream is(ligne);
+                  long long x;
+                  is >> x;
+                  std::vector<Fn> fs;
+                  std::string op;
+                  while (is >> op) {
+                      if (op == "^2") fs.push_back([](long long v) { return v * v; });
+                      else {
+                          long long n = std::stoll(op.substr(1));
+                          if (op[0] == '+') fs.push_back([n](long long v) { return v + n; });
+                          else fs.push_back([n](long long v) { return v * n; });
+                      }
+                  }
+                  std::cout << composer(fs)(x) << "\n";
+              }
+          }
+        tests:
+          - { input: "2 +3 ^2 *2\n5", output: "50\n5" }
+          - { input: "-1 *-3 +1 ^2", output: '16', hidden: true }
+        concepts: [closures]
+    project:
+      id: cpp-lam-projet
+      type: code
+      title: Système d’événements
+      difficulty: 3
+      prompt: |
+        Écris une classe `Bus` qui associe des noms d’événements à des listes d’abonnés `std::function<void(const std::string&)>` : `abonner(evt, fn)`, `publier(evt, donnee)`.
+
+        Lis d’abord une ligne d’abonnements : des paires `evenement action` où action est `afficher`, `compter` ou `majuscules`. Chaque action est une lambda (`compter` incrémente un compteur capturé **par référence** dans `main`). Les lignes suivantes sont des publications `evenement donnee`.
+
+        `afficher` affiche `[evt] donnee`, `majuscules` affiche la donnée en majuscules. Termine par `compteur : N`.
+      starter: |
+        #include <iostream>
+        #include <functional>
+        #include <map>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        #include <cctype>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <functional>
+        #include <map>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+        #include <cctype>
+
+        class Bus {
+        public:
+            using Abonne = std::function<void(const std::string&)>;
+            void abonner(const std::string& evt, Abonne fn) { abonnes_[evt].push_back(std::move(fn)); }
+            void publier(const std::string& evt, const std::string& d) const {
+                if (auto it = abonnes_.find(evt); it != abonnes_.end())
+                    for (const auto& f : it->second) f(d);
+            }
+        private:
+            std::map<std::string, std::vector<Abonne>> abonnes_;
+        };
+
+        int main() {
+            Bus bus;
+            int compteur = 0;
+            std::string ligne;
+            std::getline(std::cin, ligne);
+            std::istringstream is(ligne);
+            std::string evt, action;
+            while (is >> evt >> action) {
+                if (action == "afficher") bus.abonner(evt, [evt](const std::string& d) { std::cout << "[" << evt << "] " << d << "\n"; });
+                else if (action == "compter") bus.abonner(evt, [&compteur](const std::string&) { ++compteur; });
+                else bus.abonner(evt, [](const std::string& d) {
+                    std::string m = d;
+                    for (char& c : m) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                    std::cout << m << "\n";
+                });
+            }
+            std::string donnee;
+            while (std::cin >> evt >> donnee) bus.publier(evt, donnee);
+            std::cout << "compteur : " << compteur << "\n";
+        }
+      tests:
+        - { input: "login afficher login compter achat majuscules achat compter\nlogin kiri\nachat livre\nlogout bob", output: "[login] kiri\nLIVRE\ncompteur : 2" }
+        - { input: "x compter\nx a\nx b\ny c", output: 'compteur : 2', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-lam-ex1
+          type: mcq
+          prompt: Que permet le mot-clé mutable sur une lambda ?
+          choices: ['Modifier les variables capturées par valeur (ses propres copies)', 'Modifier les originaux', 'Capturer this', 'La rendre générique']
+          answer: 0
+        - id: cpp-lam-ex2
+          type: mcq
+          prompt: Quel danger présente une lambda qui capture une variable locale par référence et qui est renvoyée ?
+          choices: ['Référence pendante (comportement indéfini)', 'Copie inutile', 'Erreur de compilation', 'Aucun']
+          answer: 0
+        - id: cpp-lam-ex3
+          type: mcq
+          prompt: Quel est l’intérêt de std::function ?
+          choices: ['Stocker n’importe quel appelable de signature donnée (effacement de type)', 'Accélérer les lambdas', 'Créer des threads', 'Trier']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-concurrence
+    title: Concurrence
+    summary: Problèmes de la concurrence — data races, comportement indéfini, std::atomic, modèle mémoire, async et futures.
+    minutes: 30
+    concepts: [concurrence]
+    sections:
+      - title: Data races et atomiques
+        body: |
+          Deux threads qui accèdent à la même variable, dont au moins un en écriture, sans synchronisation = **data race** = **comportement indéfini** en C++ (aucune vérification à la compilation, contrairement à Rust).
+
+          ```cpp
+          int compteur = 0;                     // ❌ ++compteur depuis 2 threads : UB
+          std::atomic<int> compteurSur{0};      // ✅ opérations indivisibles
+          compteurSur.fetch_add(1);             // ou ++compteurSur
+          ```
+
+          `std::atomic<T>` garantit des opérations indivisibles (`load`, `store`, `fetch_add`, `exchange`, `compare_exchange_strong`) sans mutex, pour les types simples.
+
+          Le **modèle mémoire** (`std::memory_order_relaxed`, `acquire`, `release`, `seq_cst` par défaut) contrôle les garanties d’ordre — `seq_cst` est le plus simple et le plus sûr.
+      - title: async et future
+        body: |
+          ```cpp
+          #include <future>
+          std::future<long long> f = std::async(std::launch::async, [] { return calculLong(); });
+          // … autre travail …
+          long long r = f.get();          // attend le résultat (relance l’exception éventuelle)
+
+          std::promise<int> p;
+          std::future<int> fut = p.get_future();
+          std::thread t([&p] { p.set_value(42); });
+          std::cout << fut.get();
+          t.join();
+          ```
+
+          Outils de détection : **ThreadSanitizer** (`-fsanitize=thread`) détecte les data races à l’exécution.
+    exercises:
+      - id: cpp-conc-q1
+        type: mcq
+        prompt: Qu’est-ce qu’une data race en C++ ?
+        choices: ['Des accès concurrents non synchronisés dont au moins une écriture : comportement indéfini', 'Une course entre deux programmes', 'Une erreur de compilation', 'Un deadlock']
+        answer: 0
+        concepts: [concurrence]
+      - id: cpp-conc-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <atomic>
+          #include <thread>
+          #include <vector>
+          int main() {
+              std::atomic<int> c{0};
+              std::vector<std::thread> ts;
+              for (int i = 0; i < 4; ++i) ts.emplace_back([&c] { for (int k = 0; k < 1000; ++k) ++c; });
+              for (auto& t : ts) t.join();
+              std::cout << c.load() << "\n";
+          }
+        output: '4000'
+      - id: cpp-conc-q2
+        type: mcq
+        prompt: Que fait future::get() ?
+        choices: ['Attend le résultat et le renvoie (ou relance l’exception)', 'Annule la tâche', 'Renvoie immédiatement 0', 'Crée un thread']
+        answer: 0
+      - id: cpp-conc-code
+        type: code
+        title: Somme parallèle avec async
+        prompt: |
+          Lis `n` puis `n` entiers. Découpe le vecteur en **4** morceaux et calcule la somme de chacun avec `std::async(std::launch::async, …)`, puis additionne les 4 `future`. Affiche la somme totale.
+        starter: |
+          #include <iostream>
+          #include <future>
+          #include <numeric>
+          #include <vector>
+
+          int main() {
+              std::size_t n;
+              std::cin >> n;
+              std::vector<long long> v(n);
+              for (auto& x : v) std::cin >> x;
+          }
+        solution: |
+          #include <iostream>
+          #include <future>
+          #include <numeric>
+          #include <vector>
+
+          int main() {
+              std::size_t n;
+              std::cin >> n;
+              std::vector<long long> v(n);
+              for (auto& x : v) std::cin >> x;
+              std::vector<std::future<long long>> fs;
+              std::size_t taille = (n + 3) / 4;
+              for (std::size_t k = 0; k < 4; ++k) {
+                  std::size_t d = std::min(n, k * taille), f = std::min(n, d + taille);
+                  fs.push_back(std::async(std::launch::async, [&v, d, f] { return std::accumulate(v.begin() + d, v.begin() + f, 0LL); }));
+              }
+              long long total = 0;
+              for (auto& f : fs) total += f.get();
+              std::cout << total << "\n";
+          }
+        tests:
+          - { input: "5\n1 2 3 4 5", output: '15' }
+          - { input: "1\n-7", output: '-7', hidden: true }
+          - { input: "0", output: '0', hidden: true }
+        require:
+          - { pattern: 'std::async', message: Utiliser std::async }
+    project:
+      id: cpp-conc-projet
+      type: code
+      title: Compteur de mots concurrent
+      difficulty: 3
+      prompt: |
+        Chaque ligne d’entrée est un « document ». Lance un thread par document (avec `std::async`) qui compte ses mots et renvoie le résultat ; en parallèle, un `std::atomic<long long>` cumule le nombre total de caractères non-espaces, mis à jour par chaque tâche.
+
+        Affiche `document i : m mots` (dans l’ordre) puis `caractères : C`.
+      starter: |
+        #include <iostream>
+        #include <atomic>
+        #include <future>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <atomic>
+        #include <cctype>
+        #include <future>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+            std::vector<std::string> docs;
+            std::string l;
+            while (std::getline(std::cin, l)) docs.push_back(l);
+            std::atomic<long long> caracteres{0};
+            std::vector<std::future<int>> fs;
+            for (const auto& d : docs) {
+                fs.push_back(std::async(std::launch::async, [&caracteres, &d] {
+                    std::istringstream is(d);
+                    std::string m;
+                    int n = 0;
+                    while (is >> m) ++n;
+                    long long c = 0;
+                    for (unsigned char ch : d) if (!std::isspace(ch)) ++c;
+                    caracteres += c;
+                    return n;
+                }));
+            }
+            for (std::size_t i = 0; i < fs.size(); ++i) std::cout << "document " << i + 1 << " : " << fs[i].get() << " mots\n";
+            std::cout << "caractères : " << caracteres.load() << "\n";
+        }
+      tests:
+        - { input: "le chat dort\nRust et C++", output: "document 1 : 3 mots\ndocument 2 : 3 mots\ncaractères : 19" }
+        - { input: '', output: 'caractères : 0', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-conc-ex1
+          type: mcq
+          prompt: Quel outil détecte les data races à l’exécution ?
+          choices: ['ThreadSanitizer (-fsanitize=thread)', 'Valgrind memcheck uniquement', 'cppcheck', 'Le compilateur']
+          answer: 0
+        - id: cpp-conc-ex2
+          type: mcq
+          prompt: Quel ordre mémoire est utilisé par défaut par std::atomic ?
+          choices: ['memory_order_seq_cst', 'memory_order_relaxed', 'memory_order_acquire', 'Aucun']
+          answer: 0
+        - id: cpp-conc-ex3
+          type: mcq
+          prompt: À quoi sert std::promise ?
+          choices: ['Fournir plus tard une valeur à un std::future', 'Verrouiller', 'Créer un thread', 'Attendre une durée']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-threads
+    title: Threads
+    summary: std::thread, std::jthread et l’arrêt coopératif, join/detach, passage d’arguments, thread_local et coût des threads.
+    minutes: 30
+    concepts: [concurrence]
+    sections:
+      - title: std::thread et jthread
+        body: |
+          ```cpp
+          #include <thread>
+
+          void travail(int id, std::string& sortie) { sortie = "fini " + std::to_string(id); }
+
+          std::string res;
+          std::thread t(travail, 1, std::ref(res));   // std::ref pour passer une référence
+          t.join();                                    // attendre la fin (obligatoire avant destruction)
+
+          std::jthread j([](std::stop_token st) {      // C++20 : join automatique
+              while (!st.stop_requested()) { /* … */ }
+          });
+          j.request_stop();                            // arrêt coopératif
+          ```
+
+          ⚠️ Détruire un `std::thread` encore joignable appelle `std::terminate` : il faut `join()` ou `detach()`. `std::jthread` corrige ce piège (RAII).
+      - title: Bonnes pratiques
+        body: |
+          - `std::thread::hardware_concurrency()` : nombre de threads matériels.
+          - Créer un thread coûte (pile, appel système) : pour beaucoup de petites tâches, utiliser un **pool**.
+          - `thread_local int x;` : une variable distincte par thread.
+          - Éviter `detach()` : un thread détaché qui accède à des objets détruits provoque des bugs subtils.
+          - L’ordre d’exécution des threads n’est **pas déterministe** : ne jamais supposer qu’un thread s’exécute avant un autre sans synchronisation.
+    exercises:
+      - id: cpp-thr-q1
+        type: mcq
+        prompt: Que se passe-t-il si un std::thread joignable est détruit ?
+        choices: ['std::terminate est appelé', 'Il est joint automatiquement', 'Il est détaché', 'Rien']
+        answer: 0
+      - id: cpp-thr-q2
+        type: mcq
+        prompt: Comment passer une variable par référence au constructeur de std::thread ?
+        choices: ['std::ref(x)', '&x', 'x', 'std::move(x)']
+        answer: 0
+      - id: cpp-thr-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <thread>
+          #include <vector>
+          thread_local int local = 0;
+          int main() {
+              std::vector<int> resultats(3);
+              std::vector<std::thread> ts;
+              for (int i = 0; i < 3; ++i)
+                  ts.emplace_back([i, &resultats] { for (int k = 0; k <= i; ++k) ++local; resultats[i] = local; });
+              for (auto& t : ts) t.join();
+              std::cout << resultats[0] << resultats[1] << resultats[2] << " " << local << "\n";
+          }
+        output: 123 0
+        explanation: Chaque thread a sa propre copie de la variable thread_local.
+      - id: cpp-thr-code
+        type: code
+        title: Travail partagé
+        prompt: |
+          Lis `n` et `t`. Lance `t` threads (`std::jthread`) : le thread `i` calcule la somme des carrés des entiers `k` de 1 à n tels que `k % t == i` et l’écrit dans `resultats[i]`. Après la fin des threads (fin de portée), affiche chaque résultat puis le total.
+        starter: |
+          #include <iostream>
+          #include <thread>
+          #include <vector>
+
+          int main() {
+              long long n;
+              int t;
+              std::cin >> n >> t;
+              std::vector<long long> resultats(t);
+          }
+        solution: |
+          #include <iostream>
+          #include <thread>
+          #include <vector>
+
+          int main() {
+              long long n;
+              int t;
+              std::cin >> n >> t;
+              std::vector<long long> resultats(t);
+              {
+                  std::vector<std::jthread> ts;
+                  for (int i = 0; i < t; ++i) {
+                      ts.emplace_back([i, n, t, &resultats] {
+                          long long s = 0;
+                          for (long long k = 1; k <= n; ++k) if (k % t == i) s += k * k;
+                          resultats[i] = s;
+                      });
+                  }
+              }
+              long long total = 0;
+              for (int i = 0; i < t; ++i) { std::cout << resultats[i] << "\n"; total += resultats[i]; }
+              std::cout << total << "\n";
+          }
+        tests:
+          - { input: 4 2, output: "20\n10\n30" }
+          - { input: 3 1, output: "14\n14", hidden: true }
+        require:
+          - { pattern: 'jthread', message: Utiliser std::jthread }
+    project:
+      id: cpp-thr-projet
+      type: code
+      title: Arrêt coopératif
+      difficulty: 3
+      prompt: |
+        Lance un `std::jthread` « travailleur » qui, tant que l’arrêt n’est pas demandé (`stop_token`), retire des tâches d’une file protégée par un mutex et les traite (une tâche = un entier ; le traitement ajoute sa valeur à un total). Le thread principal pousse toutes les tâches lues dans la file, attend que la file soit vide (attente active courte avec `std::this_thread::yield()`), puis demande l’arrêt et attend la fin du thread.
+
+        Affiche `traitées : N` puis `total : S`.
+      starter: |
+        #include <iostream>
+        #include <mutex>
+        #include <queue>
+        #include <thread>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <mutex>
+        #include <queue>
+        #include <thread>
+
+        int main() {
+            std::queue<long long> file;
+            std::mutex m;
+            long long total = 0;
+            int traitees = 0;
+            int enCours = 0;
+            {
+                std::jthread travailleur([&](std::stop_token st) {
+                    while (!st.stop_requested()) {
+                        long long x = 0;
+                        bool a = false;
+                        {
+                            std::lock_guard<std::mutex> g(m);
+                            if (!file.empty()) { x = file.front(); file.pop(); a = true; ++enCours; }
+                        }
+                        if (a) {
+                            std::lock_guard<std::mutex> g(m);
+                            total += x;
+                            ++traitees;
+                            --enCours;
+                        } else {
+                            std::this_thread::yield();
+                        }
+                    }
+                });
+                long long v;
+                while (std::cin >> v) {
+                    std::lock_guard<std::mutex> g(m);
+                    file.push(v);
+                }
+                while (true) {
+                    {
+                        std::lock_guard<std::mutex> g(m);
+                        if (file.empty() && enCours == 0) break;
+                    }
+                    std::this_thread::yield();
+                }
+                travailleur.request_stop();
+            }
+            std::cout << "traitées : " << traitees << "\n" << "total : " << total << "\n";
+        }
+      tests:
+        - { input: 1 2 3 4, output: "traitées : 4\ntotal : 10" }
+        - { input: '', output: "traitées : 0\ntotal : 0", hidden: true }
+      require:
+        - { pattern: 'stop_token', message: Utiliser un stop_token }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-thr-ex1
+          type: mcq
+          prompt: Quel avantage std::jthread apporte-t-il ?
+          choices: ['join automatique à la destruction et arrêt coopératif', 'Il est plus rapide', 'Il évite les data races', 'Il remplace les mutex']
+          answer: 0
+        - id: cpp-thr-ex2
+          type: mcq
+          prompt: Que donne std::thread::hardware_concurrency() ?
+          choices: ['Le nombre de threads matériels disponibles (indicatif)', 'Le nombre de threads créés', 'La fréquence CPU', 'La mémoire libre']
+          answer: 0
+        - id: cpp-thr-ex3
+          type: mcq
+          prompt: Que signifie thread_local ?
+          choices: ['Une instance distincte de la variable par thread', 'Une variable partagée par tous', 'Une constante', 'Une variable sur le tas']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-mutex
+    title: Mutex
+    summary: Protéger des données partagées — mutex, lock_guard, unique_lock, scoped_lock, shared_mutex et variables de condition.
+    minutes: 35
+    concepts: [concurrence]
+    sections:
+      - title: Verrouiller avec RAII
+        body: |
+          ```cpp
+          #include <mutex>
+          std::mutex m;
+          std::vector<int> partage;
+
+          void ajouter(int x) {
+              std::lock_guard<std::mutex> verrou(m);   // verrouille, déverrouille en fin de portée
+              partage.push_back(x);
+          }
+
+          std::scoped_lock tous(m1, m2);              // C++17 : plusieurs mutex sans deadlock
+          std::unique_lock<std::mutex> ul(m);          // déverrouillable, déplaçable (pour les conditions)
+
+          std::shared_mutex rw;                        // plusieurs lecteurs OU un écrivain
+          std::shared_lock lecture(rw);
+          std::unique_lock ecriture(rw);
+          ```
+
+          Ne jamais appeler `m.lock()` / `m.unlock()` à la main : une exception ou un `return` oublierait de déverrouiller.
+      - title: Variables de condition
+        body: |
+          Pour **attendre** qu’une condition devienne vraie sans boucle active :
+
+          ```cpp
+          std::condition_variable cv;
+          std::queue<int> file;
+          bool fini = false;
+
+          // Consommateur
+          std::unique_lock<std::mutex> lk(m);
+          cv.wait(lk, [&] { return !file.empty() || fini; });  // gère les réveils intempestifs
+
+          // Producteur
+          { std::lock_guard<std::mutex> g(m); file.push(42); }
+          cv.notify_one();
+          ```
+
+          Le prédicat passé à `wait` protège contre les **réveils intempestifs** (*spurious wakeups*).
+    exercises:
+      - id: cpp-mtx-q1
+        type: mcq
+        prompt: Pourquoi utiliser lock_guard plutôt que lock()/unlock() ?
+        choices: ['Le déverrouillage est garanti même en cas d’exception ou de return', 'C’est plus rapide', 'unlock n’existe pas', 'Pour plusieurs mutex']
+        answer: 0
+      - id: cpp-mtx-q2
+        type: mcq
+        prompt: Quel outil verrouille plusieurs mutex sans risque d’interblocage ?
+        choices: ['std::scoped_lock', 'std::lock_guard', 'std::unique_lock seul', 'std::atomic']
+        answer: 0
+      - id: cpp-mtx-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <mutex>
+          #include <thread>
+          #include <vector>
+          #include <algorithm>
+          int main() {
+              std::mutex m;
+              std::vector<int> v;
+              std::vector<std::thread> ts;
+              for (int i = 1; i <= 4; ++i) ts.emplace_back([&, i] { std::lock_guard<std::mutex> g(m); v.push_back(i * i); });
+              for (auto& t : ts) t.join();
+              std::sort(v.begin(), v.end());
+              for (int x : v) std::cout << x << " ";
+              std::cout << "\n";
+          }
+        output: 1 4 9 16
+      - id: cpp-mtx-code
+        type: code
+        title: Producteur et consommateur
+        prompt: |
+          Un thread producteur pousse dans une file (protégée par mutex) chaque entier lu, puis signale la fin. Un thread consommateur attend avec une `std::condition_variable`, retire les valeurs et accumule leur somme et leur maximum, jusqu’à ce que la file soit vide **et** la production terminée.
+
+          Affiche `reçus : N`, `somme : S`, `max : M` (`max : -` si aucun).
+        starter: |
+          #include <iostream>
+          #include <condition_variable>
+          #include <mutex>
+          #include <queue>
+          #include <thread>
+          #include <vector>
+
+          int main() {
+              std::vector<long long> donnees;
+              long long x;
+              while (std::cin >> x) donnees.push_back(x);
+          }
+        solution: |
+          #include <iostream>
+          #include <condition_variable>
+          #include <mutex>
+          #include <queue>
+          #include <thread>
+          #include <vector>
+          #include <optional>
+
+          int main() {
+              std::vector<long long> donnees;
+              long long x;
+              while (std::cin >> x) donnees.push_back(x);
+              std::mutex m;
+              std::condition_variable cv;
+              std::queue<long long> file;
+              bool fini = false;
+              long long somme = 0;
+              int recus = 0;
+              std::optional<long long> mx;
+              std::thread consommateur([&] {
+                  while (true) {
+                      std::unique_lock<std::mutex> lk(m);
+                      cv.wait(lk, [&] { return !file.empty() || fini; });
+                      if (file.empty() && fini) break;
+                      long long v = file.front();
+                      file.pop();
+                      lk.unlock();
+                      somme += v;
+                      ++recus;
+                      if (!mx || v > *mx) mx = v;
+                  }
+              });
+              std::thread producteur([&] {
+                  for (long long v : donnees) {
+                      { std::lock_guard<std::mutex> g(m); file.push(v); }
+                      cv.notify_one();
+                  }
+                  { std::lock_guard<std::mutex> g(m); fini = true; }
+                  cv.notify_one();
+              });
+              producteur.join();
+              consommateur.join();
+              std::cout << "reçus : " << recus << "\nsomme : " << somme << "\nmax : ";
+              if (mx) std::cout << *mx; else std::cout << "-";
+              std::cout << "\n";
+          }
+        tests:
+          - { input: 3 9 -2 5, output: "reçus : 4\nsomme : 15\nmax : 9" }
+          - { input: '', output: "reçus : 0\nsomme : 0\nmax : -", hidden: true }
+        require:
+          - { pattern: 'condition_variable', message: Utiliser une condition_variable }
+    project:
+      id: cpp-mtx-projet
+      type: code
+      title: Virements sans interblocage
+      difficulty: 3
+      prompt: |
+        Des comptes (chacun protégé par son propre `std::mutex`) subissent des virements simultanés. Première ligne : `n` comptes et leur solde initial commun. Lignes suivantes : `de vers montant`.
+
+        Exécute **chaque virement dans son propre thread** (tous lancés puis tous joints). Un virement verrouille les deux comptes avec `std::scoped_lock` (pas de deadlock même si A→B et B→A sont simultanés) ; il est ignoré si le solde est insuffisant, ou si `de == vers`. Affiche les soldes finaux séparés par des espaces puis le total (qui doit être conservé).
+
+        Les tests sont conçus pour que le résultat ne dépende pas de l’ordre d’exécution.
+      starter: |
+        #include <iostream>
+        #include <mutex>
+        #include <thread>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <memory>
+        #include <mutex>
+        #include <thread>
+        #include <vector>
+
+        struct Compte {
+            std::mutex m;
+            long long solde;
+        };
+
+        int main() {
+            int n;
+            long long initial;
+            std::cin >> n >> initial;
+            std::vector<std::unique_ptr<Compte>> comptes;
+            for (int i = 0; i < n; ++i) {
+                auto c = std::make_unique<Compte>();
+                c->solde = initial;
+                comptes.push_back(std::move(c));
+            }
+            std::vector<std::thread> ts;
+            int de, vers;
+            long long montant;
+            while (std::cin >> de >> vers >> montant) {
+                ts.emplace_back([&comptes, de, vers, montant] {
+                    if (de == vers) return;
+                    Compte& a = *comptes[de];
+                    Compte& b = *comptes[vers];
+                    std::scoped_lock verrou(a.m, b.m);
+                    if (a.solde >= montant) {
+                        a.solde -= montant;
+                        b.solde += montant;
+                    }
+                });
+            }
+            for (auto& t : ts) t.join();
+            long long total = 0;
+            for (int i = 0; i < n; ++i) {
+                std::cout << (i ? " " : "") << comptes[i]->solde;
+                total += comptes[i]->solde;
+            }
+            std::cout << "\n" << total << "\n";
+        }
+      tests:
+        - { input: "3 100\n0 1 30\n1 2 20\n2 0 10", output: "80 110 110\n300" }
+        - { input: "2 50\n0 1 10\n1 0 10\n0 0 5", output: "50 50\n100", hidden: true }
+      require:
+        - { pattern: 'scoped_lock', message: Utiliser std::scoped_lock }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-mtx-ex1
+          type: mcq
+          prompt: Pourquoi passer un prédicat à condition_variable::wait ?
+          choices: ['Pour se protéger des réveils intempestifs', 'Pour accélérer', 'C’est purement décoratif', 'Pour verrouiller deux mutex']
+          answer: 0
+        - id: cpp-mtx-ex2
+          type: mcq
+          prompt: Quel verrou permet plusieurs lecteurs simultanés ?
+          choices: ['std::shared_mutex avec shared_lock', 'std::mutex', 'std::lock_guard', 'std::recursive_mutex']
+          answer: 0
+        - id: cpp-mtx-ex3
+          type: mcq
+          prompt: Avec quel type de verrou faut-il utiliser condition_variable::wait ?
+          choices: ['std::unique_lock<std::mutex>', 'std::lock_guard', 'std::scoped_lock', 'Aucun']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-generique
+    title: Programmation générique
+    summary: Templates variadiques, fold expressions, if constexpr, traits de type, déduction de classes (CTAD) et polymorphisme statique (CRTP).
+    minutes: 35
+    concepts: [generiques]
+    sections:
+      - title: Variadiques et fold
+        body: |
+          ```cpp
+          template <typename... Ts>
+          auto somme(Ts... xs) { return (xs + ... + 0); }          // fold expression (C++17)
+
+          template <typename... Ts>
+          void afficherTout(const Ts&... xs) {
+              ((std::cout << xs << ' '), ...);                       // fold sur l’opérateur virgule
+              std::cout << '\n';
+          }
+
+          somme(1, 2, 3.5);           // 6.5
+          sizeof...(Ts);              // nombre d’arguments
+          ```
+      - title: if constexpr, traits et CRTP
+        body: |
+          ```cpp
+          #include <type_traits>
+          template <typename T>
+          std::string decrire(const T& x) {
+              if constexpr (std::is_integral_v<T>) return "entier " + std::to_string(x);
+              else if constexpr (std::is_floating_point_v<T>) return "réel";
+              else return "autre";              // les branches écartées ne sont pas compilées
+          }
+
+          std::pair p{1, 2.5};                  // CTAD : std::pair<int, double> déduit
+
+          // CRTP : polymorphisme statique, sans vtable
+          template <typename Derivee>
+          struct Forme {
+              double aire() const { return static_cast<const Derivee*>(this)->aireImpl(); }
+          };
+          struct Carre : Forme<Carre> { double c; double aireImpl() const { return c * c; } };
+          ```
+    exercises:
+      - id: cpp-gen-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <string>
+          #include <type_traits>
+          template <typename... Ts> auto produit(Ts... xs) { return (xs * ... * 1); }
+          template <typename... Ts> constexpr int compte() { return sizeof...(Ts); }
+          template <typename T> std::string type(T) {
+              if constexpr (std::is_same_v<T, bool>) return "bool";
+              else if constexpr (std::is_integral_v<T>) return "int";
+              else return "?";
+          }
+          int main() {
+              std::cout << produit(2, 3, 4) << " " << compte<int, char, double>() << " " << type(true) << type(5) << type(1.5) << "\n";
+          }
+        output: 24 3 boolint?
+        concepts: [generiques]
+      - id: cpp-gen-q1
+        type: mcq
+        prompt: Quel est l’intérêt de if constexpr ?
+        choices: ['Les branches écartées ne sont pas compilées pour ce type', 'Il est plus rapide à l’exécution qu’un if', 'Il permet les exceptions', 'Il crée des threads']
+        answer: 0
+      - id: cpp-gen-q2
+        type: mcq
+        prompt: Que permet le CRTP ?
+        choices: ['Un polymorphisme statique, résolu à la compilation, sans vtable', 'L’héritage multiple', 'La réflexion', 'La sérialisation']
+        answer: 0
+      - id: cpp-gen-code
+        type: code
+        title: Formatage générique
+        prompt: |
+          Écris `template <typename... Ts> std::string joindre(const std::string& sep, const Ts&... xs)` qui convertit chaque argument en texte (avec un `std::ostringstream`) et les joint avec `sep`, grâce à une fold expression.
+
+          Pour chaque ligne `a b c` (entier, réel, mot), affiche `joindre(" | ", a, b, c)` puis `joindre("-", c, a)`.
+        starter: |
+          #include <iostream>
+          #include <sstream>
+          #include <string>
+
+          int main() {
+              int a;
+              double b;
+              std::string c;
+              while (std::cin >> a >> b >> c) {
+                  std::cout << joindre(" | ", a, b, c) << "\n" << joindre("-", c, a) << "\n";
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <sstream>
+          #include <string>
+
+          template <typename... Ts>
+          std::string joindre(const std::string& sep, const Ts&... xs) {
+              std::ostringstream os;
+              bool premier = true;
+              ((os << (premier ? "" : sep) << xs, premier = false), ...);
+              return os.str();
+          }
+
+          int main() {
+              int a;
+              double b;
+              std::string c;
+              while (std::cin >> a >> b >> c) {
+                  std::cout << joindre(" | ", a, b, c) << "\n" << joindre("-", c, a) << "\n";
+              }
+          }
+        tests:
+          - { input: 3 2.5 kiri, output: "3 | 2.5 | kiri\nkiri-3" }
+          - { input: -1 0 x, output: "-1 | 0 | x\nx--1", hidden: true }
+        concepts: [generiques]
+    project:
+      id: cpp-gen-projet
+      type: code
+      title: Tuple d’accumulateurs
+      difficulty: 3
+      prompt: |
+        Écris trois accumulateurs (`Somme`, `Max`, `Compte`) qui ont chacun `void ajouter(long long)`, `long long valeur() const` et `static constexpr const char* nom`. Puis `template <typename... Acc> class Statistiques` qui stocke un `std::tuple<Acc...>`, avec `ajouter(x)` qui appelle `ajouter` sur **tous** les accumulateurs (`std::apply` + fold) et `rapport()` qui affiche `nom=valeur` séparés par des espaces.
+
+        Instancie `Statistiques<Somme, Max, Compte>`, ajoute tous les entiers lus et affiche le rapport. `Max` d’un ensemble vide vaut 0.
+      starter: |
+        #include <iostream>
+        #include <tuple>
+        #include <algorithm>
+        #include <climits>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <tuple>
+        #include <algorithm>
+        #include <climits>
+
+        struct Somme {
+            static constexpr const char* nom = "somme";
+            long long s = 0;
+            void ajouter(long long x) { s += x; }
+            long long valeur() const { return s; }
+        };
+        struct Max {
+            static constexpr const char* nom = "max";
+            long long m = LLONG_MIN;
+            void ajouter(long long x) { m = std::max(m, x); }
+            long long valeur() const { return m == LLONG_MIN ? 0 : m; }
+        };
+        struct Compte {
+            static constexpr const char* nom = "compte";
+            long long n = 0;
+            void ajouter(long long) { ++n; }
+            long long valeur() const { return n; }
+        };
+
+        template <typename... Acc>
+        class Statistiques {
+        public:
+            void ajouter(long long x) {
+                std::apply([x](auto&... a) { (a.ajouter(x), ...); }, accs_);
+            }
+            void rapport() const {
+                bool premier = true;
+                std::apply([&](const auto&... a) {
+                    ((std::cout << (premier ? "" : " ") << a.nom << "=" << a.valeur(), premier = false), ...);
+                }, accs_);
+                std::cout << "\n";
+            }
+        private:
+            std::tuple<Acc...> accs_;
+        };
+
+        int main() {
+            Statistiques<Somme, Max, Compte> st;
+            long long x;
+            while (std::cin >> x) st.ajouter(x);
+            st.rapport();
+        }
+      tests:
+        - { input: 4 -2 9 1, output: somme=12 max=9 compte=4 }
+        - { input: '', output: somme=0 max=0 compte=0, hidden: true }
+      require:
+        - { pattern: 'std::apply', message: Utiliser std::apply }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-gen-ex1
+          type: mcq
+          prompt: Que vaut sizeof...(Ts) ?
+          choices: ['Le nombre de types dans le paquet', 'La taille en octets des types', 'Toujours 1', 'Le nombre d’instances']
+          answer: 0
+        - id: cpp-gen-ex2
+          type: mcq
+          prompt: Qu’est-ce que la CTAD ?
+          choices: ['La déduction des arguments template de classe à partir du constructeur', 'Un type de thread', 'Un trait de type', 'Une macro']
+          answer: 0
+        - id: cpp-gen-ex3
+          type: mcq
+          prompt: Quel en-tête fournit std::is_integral_v ?
+          choices: ['<type_traits>', '<traits>', '<concepts>', '<typeinfo>']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-metaprogrammation
+    title: Métaprogrammation
+    summary: Calculer à la compilation avec constexpr et consteval, static_assert, templates récursifs, SFINAE et tables générées à la compilation.
+    minutes: 35
+    concepts: [macros, generiques]
+    sections:
+      - title: constexpr et consteval
+        body: |
+          ```cpp
+          constexpr long long factorielle(int n) { return n <= 1 ? 1 : n * factorielle(n - 1); }
+          static_assert(factorielle(5) == 120);       // vérifié À LA COMPILATION
+
+          consteval int carreCompil(int x) { return x * x; }   // C++20 : OBLIGATOIREMENT à la compilation
+          constexpr int c = carreCompil(9);
+
+          constexpr auto table = [] {
+              std::array<int, 10> t{};
+              for (int i = 0; i < 10; ++i) t[i] = i * i;
+              return t;
+          }();                                        // tableau calculé à la compilation
+          ```
+
+          En C++20, `constexpr` accepte boucles, `std::vector` et `std::string` temporaires, algorithmes : on peut calculer beaucoup de choses avant l’exécution, pour un coût nul au moment de l’exécution.
+      - title: Templates récursifs et SFINAE
+        body: |
+          La métaprogrammation « historique » utilise les templates comme un langage fonctionnel exécuté par le compilateur :
+
+          ```cpp
+          template <int N> struct Fib { static constexpr int valeur = Fib<N - 1>::valeur + Fib<N - 2>::valeur; };
+          template <> struct Fib<0> { static constexpr int valeur = 0; };
+          template <> struct Fib<1> { static constexpr int valeur = 1; };
+          ```
+
+          **SFINAE** (*Substitution Failure Is Not An Error*) : une surcharge dont la substitution échoue est ignorée silencieusement, ce qui permet de sélectionner une fonction selon des propriétés du type :
+
+          ```cpp
+          template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
+          T moitie(T x) { return x / 2; }
+          ```
+
+          Les **concepts** (chapitre suivant) remplacent avantageusement SFINAE.
+    exercises:
+      - id: cpp-meta-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <array>
+          template <int N> struct Puiss2 { static constexpr int v = 2 * Puiss2<N - 1>::v; };
+          template <> struct Puiss2<0> { static constexpr int v = 1; };
+          constexpr int somme(int n) { int s = 0; for (int i = 1; i <= n; ++i) s += i; return s; }
+          int main() {
+              constexpr auto t = [] { std::array<int, 4> a{}; for (int i = 0; i < 4; ++i) a[i] = i * 10; return a; }();
+              static_assert(somme(10) == 55);
+              std::cout << Puiss2<10>::v << " " << somme(4) << " " << t[3] << "\n";
+          }
+        output: 1024 10 30
+      - id: cpp-meta-q1
+        type: mcq
+        prompt: Quelle est la différence entre constexpr et consteval pour une fonction ?
+        choices: ['consteval impose l’évaluation à la compilation ; constexpr le permet sans l’imposer', 'Aucune', 'consteval est plus lent', 'constexpr est réservé aux variables']
+        answer: 0
+      - id: cpp-meta-q2
+        type: mcq
+        prompt: Que signifie SFINAE ?
+        choices: ['Un échec de substitution template n’est pas une erreur (la surcharge est ignorée)', 'Une erreur de syntaxe', 'Un type de pointeur', 'Une optimisation']
+        answer: 0
+      - id: cpp-meta-code
+        type: code
+        title: Table de nombres premiers à la compilation
+        prompt: |
+          Calcule **à la compilation** un crible d’Ératosthène jusqu’à 10 000 dans une fonction `constexpr` qui renvoie un `std::array<bool, 10001>`, stocké dans une variable `constexpr`. Vérifie avec un `static_assert` que 9973 est premier.
+
+          À l’exécution, pour chaque nombre lu (≤ 10 000), affiche `premier` ou `composé` (0 et 1 : `composé`).
+        starter: |
+          #include <iostream>
+          #include <array>
+
+          int main() {
+              int n;
+              while (std::cin >> n) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <array>
+
+          constexpr std::array<bool, 10001> crible() {
+              std::array<bool, 10001> p{};
+              for (auto& x : p) x = true;
+              p[0] = p[1] = false;
+              for (int i = 2; i * i <= 10000; ++i)
+                  if (p[i])
+                      for (int j = i * i; j <= 10000; j += i) p[j] = false;
+              return p;
+          }
+
+          constexpr auto PREMIERS = crible();
+          static_assert(PREMIERS[9973]);
+
+          int main() {
+              int n;
+              while (std::cin >> n) std::cout << (PREMIERS[n] ? "premier" : "composé") << "\n";
+          }
+        tests:
+          - { input: 7 8 9973, output: "premier\ncomposé\npremier" }
+          - { input: 0 1 2 10000, output: "composé\ncomposé\npremier\ncomposé", hidden: true }
+        require:
+          - { pattern: 'static_assert', message: Utiliser static_assert }
+          - { pattern: 'constexpr\s+auto\s+\w+\s*=|constexpr\s+std::array', message: Stocker la table dans une variable constexpr }
+    project:
+      id: cpp-meta-projet
+      type: code
+      title: Unités physiques vérifiées à la compilation
+      difficulty: 3
+      prompt: |
+        Modélise des grandeurs physiques avec leurs dimensions dans le **type** : `template <int M, int S> struct Grandeur { double v; };` (M = exposant des mètres, S = exposant des secondes).
+
+        - `+` n’est défini que pour des grandeurs de **mêmes** dimensions ;
+        - `*` et `/` combinent les exposants (`Grandeur<M1+M2, S1+S2>`) ;
+        - alias : `Longueur = Grandeur<1,0>`, `Duree = Grandeur<0,1>`, `Vitesse = Grandeur<1,-1>`, `Acceleration = Grandeur<1,-2>`.
+
+        Ajoute un `static_assert` qui vérifie que `Longueur / Duree` a le type `Vitesse`. Pour chaque ligne `d1 d2 t` (mètres, mètres, secondes), affiche (2 décimales) la vitesse `(d1 + d2) / t` puis l’accélération `vitesse / t`.
+      starter: |
+        #include <iostream>
+        #include <iomanip>
+        #include <type_traits>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <iomanip>
+        #include <type_traits>
+
+        template <int M, int S>
+        struct Grandeur {
+            double v;
+        };
+
+        template <int M, int S>
+        Grandeur<M, S> operator+(Grandeur<M, S> a, Grandeur<M, S> b) { return {a.v + b.v}; }
+
+        template <int M1, int S1, int M2, int S2>
+        Grandeur<M1 + M2, S1 + S2> operator*(Grandeur<M1, S1> a, Grandeur<M2, S2> b) { return {a.v * b.v}; }
+
+        template <int M1, int S1, int M2, int S2>
+        Grandeur<M1 - M2, S1 - S2> operator/(Grandeur<M1, S1> a, Grandeur<M2, S2> b) { return {a.v / b.v}; }
+
+        using Longueur = Grandeur<1, 0>;
+        using Duree = Grandeur<0, 1>;
+        using Vitesse = Grandeur<1, -1>;
+        using Acceleration = Grandeur<1, -2>;
+
+        static_assert(std::is_same_v<decltype(Longueur{} / Duree{}), Vitesse>);
+        static_assert(std::is_same_v<decltype(Vitesse{} / Duree{}), Acceleration>);
+
+        int main() {
+            double d1, d2, t;
+            std::cout << std::fixed << std::setprecision(2);
+            while (std::cin >> d1 >> d2 >> t) {
+                Longueur a{d1}, b{d2};
+                Duree duree{t};
+                Vitesse vit = (a + b) / duree;
+                Acceleration acc = vit / duree;
+                std::cout << vit.v << " " << acc.v << "\n";
+            }
+        }
+      tests:
+        - { input: 60 40 10, output: 10.00 1.00 }
+        - { input: "1 2 3\n0 0 1", output: "1.00 0.33\n0.00 0.00", hidden: true }
+      require:
+        - { pattern: 'static_assert', message: Utiliser static_assert pour vérifier les dimensions }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-meta-ex1
+          type: mcq
+          prompt: Quand est évalué un static_assert ?
+          choices: ['À la compilation', 'À l’exécution', 'Au chargement', 'Jamais en release']
+          answer: 0
+        - id: cpp-meta-ex2
+          type: mcq
+          prompt: Quel est l’avantage d’une table calculée en constexpr ?
+          choices: ['Aucun coût de calcul à l’exécution', 'Elle est modifiable', 'Elle est sur le tas', 'Elle compile plus vite']
+          answer: 0
+        - id: cpp-meta-ex3
+          type: mcq
+          prompt: Quelle fonctionnalité moderne remplace avantageusement SFINAE ?
+          choices: ['Les concepts (C++20)', 'Les macros', 'Les exceptions', 'Les coroutines']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-concepts
+    title: Concepts
+    summary: Contraindre les templates avec les concepts C++20 — requires, concepts standards, concepts personnalisés et messages d’erreur lisibles.
+    minutes: 30
+    concepts: [generiques, traits]
+    sections:
+      - title: Contraindre un template
+        body: |
+          ```cpp
+          #include <concepts>
+
+          template <std::integral T>                     // syntaxe courte
+          T pgcd(T a, T b) { return b == 0 ? a : pgcd(b, a % b); }
+
+          template <typename T>
+            requires std::floating_point<T>              // clause requires
+          T moyenne(T a, T b) { return (a + b) / 2; }
+
+          auto doubler(std::integral auto x) { return 2 * x; }   // abrégé (C++20)
+
+          pgcd(12, 18);      // ✅
+          // pgcd(1.5, 2.0); // ❌ erreur claire : « constraints not satisfied: std::integral<double> »
+          ```
+
+          Concepts standards : `std::integral`, `std::floating_point`, `std::same_as`, `std::convertible_to`, `std::derived_from`, `std::totally_ordered`, `std::invocable`, `std::ranges::range`…
+      - title: Écrire ses concepts
+        body: |
+          ```cpp
+          template <typename T>
+          concept Forme = requires(const T& f) {
+              { f.aire() } -> std::convertible_to<double>;
+              { f.nom() } -> std::convertible_to<std::string>;
+          };
+
+          template <typename T>
+          concept Additionnable = requires(T a, T b) { a + b; };
+
+          double totalAires(const std::vector<Carre>& v) requires Forme<Carre>;
+
+          template <Forme F>
+          void decrire(const F& f) { std::cout << f.nom() << " : " << f.aire() << "\n"; }
+          ```
+
+          Les concepts remplacent SFINAE et les classes de base abstraites quand le polymorphisme peut être **statique** : aucune vtable, et des erreurs de compilation compréhensibles.
+    exercises:
+      - id: cpp-concept-q1
+        type: mcq
+        prompt: Quel concept standard accepte int, long et char mais pas double ?
+        choices: ['std::integral', 'std::floating_point', 'std::totally_ordered', 'std::same_as<int>']
+        answer: 0
+      - id: cpp-concept-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <iostream>
+          #include <concepts>
+          #include <string>
+          template <typename T> concept Parlant = requires(T t) { { t.parler() } -> std::convertible_to<std::string>; };
+          struct Chat { std::string parler() const { return "miaou"; } };
+          struct Pierre {};
+          template <Parlant T> std::string dire(const T& t) { return t.parler(); }
+          std::string dire(...) { return "..."; }
+          auto triple(std::integral auto x) { return x * 3; }
+          int main() {
+              std::cout << dire(Chat{}) << " " << dire(Pierre{}) << " " << triple(7) << "\n";
+          }
+        output: miaou ... 21
+      - id: cpp-concept-fill
+        type: fill
+        prompt: Complète la clause qui contraint T aux types flottants.
+        code: |
+          #include <iostream>
+          #include <concepts>
+          template <typename T>
+            {{?}} std::floating_point<T>
+          T moitie(T x) { return x / 2; }
+          int main() { std::cout << moitie(5.0) << "\n"; }
+        blanks: [[requires]]
+        tests:
+          - { input: '', output: '2.5' }
+      - id: cpp-concept-code
+        type: code
+        title: Formes contraintes
+        prompt: |
+          Écris le concept `Forme` (exige `aire()` convertible en `double` et `nom()` convertible en `std::string`), deux structs `Carre` et `Disque` qui le satisfont, et une fonction `template <Forme F> void decrire(const F&)` qui affiche `nom : aire` (2 décimales). Ajoute `static_assert(!Forme<int>);`. Utilise π = 3.141592653589793.
+
+          Chaque ligne : `carre c` ou `disque r`.
+        starter: |
+          #include <iostream>
+          #include <concepts>
+          #include <iomanip>
+          #include <string>
+
+          int main() {
+              std::string type;
+              double x;
+              std::cout << std::fixed << std::setprecision(2);
+              while (std::cin >> type >> x) {
+              }
+          }
+        solution: |
+          #include <iostream>
+          #include <concepts>
+          #include <iomanip>
+          #include <string>
+
+          template <typename T>
+          concept Forme = requires(const T& f) {
+              { f.aire() } -> std::convertible_to<double>;
+              { f.nom() } -> std::convertible_to<std::string>;
+          };
+
+          struct Carre {
+              double c;
+              double aire() const { return c * c; }
+              std::string nom() const { return "carré"; }
+          };
+          struct Disque {
+              double r;
+              double aire() const { return 3.141592653589793 * r * r; }
+              std::string nom() const { return "disque"; }
+          };
+
+          static_assert(Forme<Carre> && Forme<Disque>);
+          static_assert(!Forme<int>);
+
+          template <Forme F>
+          void decrire(const F& f) { std::cout << f.nom() << " : " << f.aire() << "\n"; }
+
+          int main() {
+              std::string type;
+              double x;
+              std::cout << std::fixed << std::setprecision(2);
+              while (std::cin >> type >> x) {
+                  if (type == "carre") decrire(Carre{x});
+                  else decrire(Disque{x});
+              }
+          }
+        tests:
+          - { input: "carre 3\ndisque 1", output: "carré : 9.00\ndisque : 3.14" }
+          - { input: disque 2, output: 'disque : 12.57', hidden: true }
+        require:
+          - { pattern: 'concept\s+Forme', message: Définir le concept Forme }
+    project:
+      id: cpp-concept-projet
+      type: code
+      title: Algorithmes contraints
+      difficulty: 3
+      prompt: |
+        Écris deux fonctions génériques contraintes :
+
+        - `template <std::ranges::range R> requires std::totally_ordered<std::ranges::range_value_t<R>> auto maxElement(const R& r)` qui renvoie un `std::optional` (vide si la plage est vide) ;
+        - `template <typename T> requires std::integral<T> || std::floating_point<T> double moyenne(const std::vector<T>&)`.
+
+        Entrée : une ligne d’entiers puis une ligne de mots. Affiche le max des entiers, la moyenne des entiers (2 décimales), puis le max des mots (ordre lexicographique). Pour une plage vide, affiche `-`.
+      starter: |
+        #include <iostream>
+        #include <concepts>
+        #include <iomanip>
+        #include <optional>
+        #include <ranges>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <iostream>
+        #include <concepts>
+        #include <iomanip>
+        #include <optional>
+        #include <ranges>
+        #include <sstream>
+        #include <string>
+        #include <vector>
+
+        template <std::ranges::range R>
+            requires std::totally_ordered<std::ranges::range_value_t<R>>
+        auto maxElement(const R& r) {
+            std::optional<std::ranges::range_value_t<R>> m;
+            for (const auto& x : r) if (!m || x > *m) m = x;
+            return m;
+        }
+
+        template <typename T>
+            requires std::integral<T> || std::floating_point<T>
+        double moyenne(const std::vector<T>& v) {
+            double s = 0;
+            for (T x : v) s += x;
+            return v.empty() ? 0 : s / v.size();
+        }
+
+        template <typename T>
+        std::vector<T> lire(const std::string& l) {
+            std::istringstream is(l);
+            std::vector<T> v;
+            T x;
+            while (is >> x) v.push_back(x);
+            return v;
+        }
+
+        int main() {
+            std::string l1, l2;
+            std::getline(std::cin, l1);
+            std::getline(std::cin, l2);
+            auto entiers = lire<long long>(l1);
+            auto mots = lire<std::string>(l2);
+            auto m = maxElement(entiers);
+            if (m) std::cout << *m << "\n"; else std::cout << "-\n";
+            if (entiers.empty()) std::cout << "-\n";
+            else std::cout << std::fixed << std::setprecision(2) << moyenne(entiers) << "\n";
+            auto mm = maxElement(mots);
+            std::cout << (mm ? *mm : std::string("-")) << "\n";
+        }
+      tests:
+        - { input: "3 9 -2\npomme kiwi abricot", output: "9\n3.33\npomme" }
+        - { input: "\nzèbre", output: "-\n-\nzèbre", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-concept-ex1
+          type: mcq
+          prompt: Quel est le principal bénéfice des concepts ?
+          choices: ['Des contraintes explicites et des messages d’erreur lisibles', 'Des programmes plus rapides à l’exécution', 'Le polymorphisme dynamique', 'La gestion mémoire']
+          answer: 0
+        - id: cpp-concept-ex2
+          type: mcq
+          prompt: Que vérifie `{ f.aire() } -> std::convertible_to<double>;` ?
+          choices: ['Que f.aire() est valide et que son résultat est convertible en double', 'Que aire est virtuelle', 'Que f est un double', 'Rien à la compilation']
+          answer: 0
+        - id: cpp-concept-ex3
+          type: mcq
+          prompt: Quelle syntaxe abrégée déclare un paramètre contraint ?
+          choices: ['void f(std::integral auto x)', 'void f(integral x)', 'void f(auto<integral> x)', 'void f(x : integral)']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-coroutines
+    title: Coroutines
+    summary: Coroutines C++20 — co_yield, co_return, co_await, promise_type et écriture d’un générateur paresseux.
+    minutes: 40
+    concepts: [async, coroutines]
+    sections:
+      - title: Des fonctions qui se suspendent
+        body: |
+          Une **coroutine** peut **suspendre** son exécution et la **reprendre** plus tard, en conservant son état (variables locales). Elle se reconnaît à l’usage de `co_yield`, `co_return` ou `co_await`.
+
+          ```cpp
+          Generateur<int> naturels() {
+              for (int i = 0; ; ++i) co_yield i;   // produit une valeur puis se suspend
+          }
+
+          for (int x : naturels() | std::views::take(5)) std::cout << x;  // 01234
+          ```
+
+          Usages : générateurs paresseux, asynchrone sans callbacks (réseau, E/S), machines à états lisibles.
+
+          C++20 fournit le **mécanisme** (`<coroutine>`) mais pas (avant C++23 et `std::generator`) les types prêts à l’emploi : il faut écrire un type de retour avec un `promise_type`, ou utiliser une bibliothèque (cppcoro, Asio).
+      - title: Anatomie d’un générateur
+        body: |
+          ```cpp
+          #include <coroutine>
+          template <typename T>
+          struct Generateur {
+              struct promise_type {
+                  T valeur;
+                  Generateur get_return_object() { return Generateur{Handle::from_promise(*this)}; }
+                  std::suspend_always initial_suspend() { return {}; }   // démarre suspendue
+                  std::suspend_always final_suspend() noexcept { return {}; }
+                  std::suspend_always yield_value(T v) { valeur = v; return {}; }
+                  void return_void() {}
+                  void unhandled_exception() { throw; }
+              };
+              using Handle = std::coroutine_handle<promise_type>;
+              explicit Generateur(Handle h) : h(h) {}
+              ~Generateur() { if (h) h.destroy(); }
+              bool suivant() { h.resume(); return !h.done(); }
+              T valeur() const { return h.promise().valeur; }
+              Handle h;
+          };
+          ```
+
+          `resume()` relance la coroutine jusqu’au prochain `co_yield` ; `done()` indique qu’elle est terminée. L’état de la coroutine (sa « frame ») est alloué sur le tas et libéré par `destroy()`.
+    exercises:
+      - id: cpp-coro-q1
+        type: mcq
+        prompt: Quel mot-clé produit une valeur et suspend la coroutine ?
+        choices: ['co_yield', 'co_return', 'yield', 'co_await']
+        answer: 0
+      - id: cpp-coro-q2
+        type: mcq
+        prompt: Où est stocké l’état d’une coroutine suspendue ?
+        choices: ['Dans une frame allouée (généralement sur le tas)', 'Sur la pile de l’appelant', 'Dans un registre', 'Nulle part']
+        answer: 0
+      - id: cpp-coro-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #include <coroutine>
+          #include <iostream>
+          struct Gen {
+              struct promise_type {
+                  int v;
+                  Gen get_return_object() { return Gen{std::coroutine_handle<promise_type>::from_promise(*this)}; }
+                  std::suspend_always initial_suspend() { return {}; }
+                  std::suspend_always final_suspend() noexcept { return {}; }
+                  std::suspend_always yield_value(int x) { v = x; return {}; }
+                  void return_void() {}
+                  void unhandled_exception() {}
+              };
+              std::coroutine_handle<promise_type> h;
+              ~Gen() { h.destroy(); }
+          };
+          Gen carres(int n) { for (int i = 1; i <= n; ++i) co_yield i * i; }
+          int main() {
+              Gen g = carres(4);
+              int s = 0;
+              while (true) { g.h.resume(); if (g.h.done()) break; s += g.h.promise().v; std::cout << g.h.promise().v << " "; }
+              std::cout << "= " << s << "\n";
+          }
+        output: 1 4 9 16 = 30
+      - id: cpp-coro-code
+        type: code
+        title: Générateur de Fibonacci
+        prompt: |
+          Écris un type `Generateur<long long>` (voir le cours) et une coroutine **infinie** `Generateur<long long> fibonacci()` qui produit 0, 1, 1, 2, 3, 5…
+
+          Pour chaque `n` lu, crée un nouveau générateur et affiche les `n` premiers termes séparés par des espaces.
+        starter: |
+          #include <coroutine>
+          #include <iostream>
+
+          int main() {
+              int n;
+              while (std::cin >> n) {
+              }
+          }
+        solution: |
+          #include <coroutine>
+          #include <iostream>
+
+          template <typename T>
+          struct Generateur {
+              struct promise_type {
+                  T valeur{};
+                  Generateur get_return_object() { return Generateur{std::coroutine_handle<promise_type>::from_promise(*this)}; }
+                  std::suspend_always initial_suspend() { return {}; }
+                  std::suspend_always final_suspend() noexcept { return {}; }
+                  std::suspend_always yield_value(T v) { valeur = v; return {}; }
+                  void return_void() {}
+                  void unhandled_exception() { throw; }
+              };
+              explicit Generateur(std::coroutine_handle<promise_type> h) : h(h) {}
+              Generateur(const Generateur&) = delete;
+              ~Generateur() { if (h) h.destroy(); }
+              bool suivant() { h.resume(); return !h.done(); }
+              T valeur() const { return h.promise().valeur; }
+              std::coroutine_handle<promise_type> h;
+          };
+
+          Generateur<long long> fibonacci() {
+              long long a = 0, b = 1;
+              while (true) {
+                  co_yield a;
+                  long long c = a + b;
+                  a = b;
+                  b = c;
+              }
+          }
+
+          int main() {
+              int n;
+              while (std::cin >> n) {
+                  auto g = fibonacci();
+                  for (int i = 0; i < n && g.suivant(); ++i) std::cout << (i ? " " : "") << g.valeur();
+                  std::cout << "\n";
+              }
+          }
+        tests:
+          - { input: '8', output: 0 1 1 2 3 5 8 13 }
+          - { input: "1\n0\n12", output: "0\n\n0 1 1 2 3 5 8 13 21 34 55 89", hidden: true }
+        require:
+          - { pattern: 'co_yield', message: Utiliser co_yield }
+    project:
+      id: cpp-coro-projet
+      type: code
+      title: Lecteur de jetons paresseux
+      difficulty: 3
+      prompt: |
+        Écris un générateur (coroutine) `Generateur<std::string> jetons(const std::string& texte)` qui découpe un texte en **jetons** à la volée : nombres (suite de chiffres), identifiants (lettres ASCII), et opérateurs à un caractère parmi `+-*/()=` ; les espaces sont ignorés, tout autre caractère produit le jeton `?`.
+
+        Pour chaque ligne, affiche les jetons séparés par ` | `, puis le nombre de jetons entre crochets.
+      starter: |
+        #include <coroutine>
+        #include <iostream>
+        #include <string>
+
+        int main() {
+            std::string ligne;
+            while (std::getline(std::cin, ligne)) {
+            }
+        }
+      solution: |
+        #include <cctype>
+        #include <coroutine>
+        #include <iostream>
+        #include <string>
+
+        template <typename T>
+        struct Generateur {
+            struct promise_type {
+                T valeur{};
+                Generateur get_return_object() { return Generateur{std::coroutine_handle<promise_type>::from_promise(*this)}; }
+                std::suspend_always initial_suspend() { return {}; }
+                std::suspend_always final_suspend() noexcept { return {}; }
+                std::suspend_always yield_value(T v) { valeur = std::move(v); return {}; }
+                void return_void() {}
+                void unhandled_exception() { throw; }
+            };
+            explicit Generateur(std::coroutine_handle<promise_type> h) : h(h) {}
+            Generateur(const Generateur&) = delete;
+            ~Generateur() { if (h) h.destroy(); }
+            bool suivant() { h.resume(); return !h.done(); }
+            const T& valeur() const { return h.promise().valeur; }
+            std::coroutine_handle<promise_type> h;
+        };
+
+        Generateur<std::string> jetons(std::string texte) {
+            std::size_t i = 0;
+            while (i < texte.size()) {
+                unsigned char c = texte[i];
+                if (std::isspace(c)) { ++i; continue; }
+                if (std::isdigit(c)) {
+                    std::size_t j = i;
+                    while (j < texte.size() && std::isdigit(static_cast<unsigned char>(texte[j]))) ++j;
+                    co_yield texte.substr(i, j - i);
+                    i = j;
+                } else if (std::isalpha(c)) {
+                    std::size_t j = i;
+                    while (j < texte.size() && std::isalpha(static_cast<unsigned char>(texte[j]))) ++j;
+                    co_yield texte.substr(i, j - i);
+                    i = j;
+                } else if (std::string("+-*/()=").find(static_cast<char>(c)) != std::string::npos) {
+                    co_yield std::string(1, static_cast<char>(c));
+                    ++i;
+                } else {
+                    co_yield std::string("?");
+                    ++i;
+                }
+            }
+        }
+
+        int main() {
+            std::string ligne;
+            while (std::getline(std::cin, ligne)) {
+                auto g = jetons(ligne);
+                int n = 0;
+                while (g.suivant()) std::cout << (n++ ? " | " : "") << g.valeur();
+                std::cout << (n ? " " : "") << "[" << n << "]\n";
+            }
+        }
+      tests:
+        - { input: "x = 42 * (y+7)", output: 'x | = | 42 | * | ( | y | + | 7 | ) [9]' }
+        - { input: "a#1\n \nz", output: "a | ? | 1 [3]\n[0]\nz [1]", hidden: true }
+      require:
+        - { pattern: 'co_yield', message: Utiliser une coroutine avec co_yield }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-coro-ex1
+          type: mcq
+          prompt: Quel membre doit contenir le type de retour d’une coroutine ?
+          choices: ['Un type imbriqué promise_type', 'Une méthode run()', 'Un destructeur virtuel', 'Un operator()']
+          answer: 0
+        - id: cpp-coro-ex2
+          type: mcq
+          prompt: Que fait coroutine_handle::resume() ?
+          choices: ['Relance la coroutine jusqu’à sa prochaine suspension', 'La détruit', 'La copie', 'Lance un thread']
+          answer: 0
+        - id: cpp-coro-ex3
+          type: mcq
+          prompt: Quel type standard C++23 fournit un générateur prêt à l’emploi ?
+          choices: ['std::generator', 'std::coroutine', 'std::yield', 'std::lazy']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: cpp-memoire-avancee
+    title: Gestion avancée de la mémoire
+    summary: Alignement et disposition, allocateurs et PMR, placement new, pools d’objets, small buffer optimization et outils d’analyse.
+    minutes: 35
+    concepts: [memoire, performance]
+    sections:
+      - title: Disposition et alignement
+        body: |
+          ```cpp
+          struct Desordre { char a; double b; char c; };   // 24 octets (remplissage)
+          struct Ordonne  { double b; char a; char c; };   // 16 octets
+          static_assert(alignof(double) == 8);
+          struct alignas(64) LigneCache { int compteur; }; // évite le faux partage entre threads
+          ```
+
+          Le C++ **ne réordonne pas** les membres : les trier du plus grand au plus petit alignement réduit le remplissage. `sizeof`, `alignof`, `offsetof` permettent d’inspecter la disposition.
+      - title: Allocation sur mesure
+        body: |
+          **PMR** (*polymorphic memory resources*, C++17) : changer la stratégie d’allocation d’un conteneur sans changer son type d’élément.
+
+          ```cpp
+          #include <memory_resource>
+          std::array<std::byte, 4096> tampon;
+          std::pmr::monotonic_buffer_resource arene(tampon.data(), tampon.size());
+          std::pmr::vector<int> v(&arene);          // alloue dans le tampon local, sans malloc
+          ```
+
+          **Placement new** : construire un objet dans une mémoire déjà réservée :
+
+          ```cpp
+          alignas(Objet) std::byte zone[sizeof(Objet)];
+          Objet* p = new (zone) Objet(42);   // pas d’allocation
+          p->~Objet();                        // destruction explicite obligatoire
+          ```
+
+          Autres techniques : **pools** d’objets de taille fixe (réutilisation), **SSO** (*small string optimization* : `std::string` stocke les chaînes courtes sans allocation), éviter les allocations dans les boucles chaudes. Outils : AddressSanitizer, Valgrind/Massif, heaptrack.
+    exercises:
+      - id: cpp-memav-predict
+        type: predict
+        prompt: Que va afficher ce programme (x86-64) ?
+        code: |
+          #include <iostream>
+          struct A { char a; double b; char c; };
+          struct B { double b; char a; char c; };
+          struct alignas(64) C { int x; };
+          int main() {
+              std::cout << sizeof(A) << " " << sizeof(B) << " " << sizeof(C) << " " << alignof(C) << "\n";
+          }
+        output: 24 16 64 64
+      - id: cpp-memav-q1
+        type: mcq
+        prompt: Que faut-il faire après un placement new ?
+        choices: ['Appeler explicitement le destructeur (pas delete)', 'Appeler delete', 'Appeler free', 'Rien']
+        answer: 0
+      - id: cpp-memav-q2
+        type: mcq
+        prompt: Qu’est-ce que la small string optimization ?
+        choices: ['Stocker les chaînes courtes dans l’objet string lui-même, sans allocation', 'Compresser les chaînes', 'Limiter la taille des chaînes', 'Un algorithme de tri']
+        answer: 0
+      - id: cpp-memav-code
+        type: code
+        title: Arène monotone
+        prompt: |
+          Utilise une `std::pmr::monotonic_buffer_resource` sur un tampon local de 64 Ko, et un `std::pmr::vector<std::pmr::string>` qui l’utilise.
+
+          Pour chaque mot lu, ajoute-le au vecteur. Affiche le nombre de mots, le mot le plus long (premier en cas d’égalité), puis `arène OK`.
+        starter: |
+          #include <array>
+          #include <cstddef>
+          #include <iostream>
+          #include <memory_resource>
+          #include <string>
+          #include <vector>
+
+          int main() {
+          }
+        solution: |
+          #include <array>
+          #include <cstddef>
+          #include <iostream>
+          #include <memory_resource>
+          #include <string>
+          #include <vector>
+
+          int main() {
+              static std::array<std::byte, 65536> tampon;
+              std::pmr::monotonic_buffer_resource arene(tampon.data(), tampon.size());
+              std::pmr::vector<std::pmr::string> mots(&arene);
+              std::string m;
+              while (std::cin >> m) mots.emplace_back(m);
+              std::size_t idx = 0;
+              for (std::size_t i = 0; i < mots.size(); ++i) if (mots[i].size() > mots[idx].size()) idx = i;
+              std::cout << mots.size() << "\n";
+              if (!mots.empty()) std::cout << mots[idx] << "\n";
+              std::cout << "arène OK\n";
+          }
+        tests:
+          - { input: allocation polymorphe sur mesure, output: "4\nallocation\narène OK" }
+          - { input: '', output: "0\narène OK", hidden: true }
+        require:
+          - { pattern: 'monotonic_buffer_resource', message: Utiliser une monotonic_buffer_resource }
+    project:
+      id: cpp-memav-projet
+      type: code
+      title: Pool d’objets
+      difficulty: 3
+      prompt: |
+        Implémente `template <typename T, std::size_t N> class Pool` : un tableau de `N` emplacements alignés (`alignas(T) std::byte stockage[N][sizeof(T)]`) et une liste des emplacements libres. `template <typename... A> T* creer(A&&...)` construit un objet par **placement new** (renvoie `nullptr` si plein) ; `void detruire(T*)` appelle le destructeur et libère l’emplacement (réutilisé en priorité, ordre LIFO).
+
+        La classe `Particule(int id)` affiche `+id` à la construction et `-id` à la destruction. Commandes : `creer id` (affiche aussi `pool plein` si échec), `detruire id`, `libres`. Pool de capacité 3.
+      starter: |
+        #include <cstddef>
+        #include <iostream>
+        #include <map>
+        #include <new>
+        #include <string>
+        #include <utility>
+        #include <vector>
+
+        int main() {
+        }
+      solution: |
+        #include <cstddef>
+        #include <iostream>
+        #include <map>
+        #include <new>
+        #include <string>
+        #include <utility>
+        #include <vector>
+
+        template <typename T, std::size_t N>
+        class Pool {
+        public:
+            Pool() { for (std::size_t i = N; i-- > 0;) libres_.push_back(i); }
+            template <typename... A>
+            T* creer(A&&... args) {
+                if (libres_.empty()) return nullptr;
+                std::size_t i = libres_.back();
+                libres_.pop_back();
+                return new (stockage_[i]) T(std::forward<A>(args)...);
+            }
+            void detruire(T* p) {
+                p->~T();
+                std::size_t i = (reinterpret_cast<std::byte*>(p) - &stockage_[0][0]) / sizeof(T);
+                libres_.push_back(i);
+            }
+            std::size_t libres() const { return libres_.size(); }
+        private:
+            alignas(T) std::byte stockage_[N][sizeof(T)];
+            std::vector<std::size_t> libres_;
+        };
+
+        struct Particule {
+            int id;
+            explicit Particule(int i) : id(i) { std::cout << "+" << id << "\n"; }
+            ~Particule() { std::cout << "-" << id << "\n"; }
+        };
+
+        int main() {
+            Pool<Particule, 3> pool;
+            std::map<int, Particule*> vivantes;
+            std::string cmd;
+            while (std::cin >> cmd) {
+                if (cmd == "creer") {
+                    int id;
+                    std::cin >> id;
+                    if (auto* p = pool.creer(id)) vivantes[id] = p;
+                    else std::cout << "pool plein\n";
+                } else if (cmd == "detruire") {
+                    int id;
+                    std::cin >> id;
+                    if (auto it = vivantes.find(id); it != vivantes.end()) {
+                        pool.detruire(it->second);
+                        vivantes.erase(it);
+                    }
+                } else {
+                    std::cout << "libres : " << pool.libres() << "\n";
+                }
+            }
+            for (auto& [id, p] : vivantes) pool.detruire(p);
+        }
+      tests:
+        - { input: "creer 1\ncreer 2\ncreer 3\ncreer 4\nlibres\ndetruire 2\ncreer 5\nlibres", output: "+1\n+2\n+3\npool plein\nlibres : 0\n-2\n+5\nlibres : 0\n-1\n-3\n-5" }
+        - { input: libres, output: 'libres : 3', hidden: true }
+      require:
+        - { pattern: 'new\s*\(', message: Utiliser le placement new }
+    exam:
+      pass: 70
+      questions:
+        - id: cpp-memav-ex1
+          type: mcq
+          prompt: Le compilateur C++ réordonne-t-il les membres d’une struct pour réduire le remplissage ?
+          choices: ['Non, l’ordre de déclaration est conservé', 'Oui, toujours', 'Seulement en -O3', 'Seulement pour les classes']
+          answer: 0
+        - id: cpp-memav-ex2
+          type: mcq
+          prompt: Quel est l’intérêt d’une monotonic_buffer_resource ?
+          choices: ['Allocations très rapides dans un tampon, libérées en bloc à la fin', 'Libérer chaque objet individuellement', 'Partager la mémoire entre processus', 'Chiffrer la mémoire']
+          answer: 0
+        - id: cpp-memav-ex3
+          type: mcq
+          prompt: Pourquoi aligner une structure sur 64 octets dans un programme multithread ?
+          choices: ['Éviter le faux partage d’une ligne de cache', 'Réduire sa taille', 'La rendre atomique', 'C’est obligatoire']
+          answer: 0
