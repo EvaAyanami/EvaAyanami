@@ -331,8 +331,12 @@ export async function importContent(bundle: ContentBundle, { force = false, log 
   for (const l of bundle.languages) {
     await prisma.language.upsert({ where: { id: l.id }, create: l, update: l });
   }
+  const orderCounter = new Map<string, number>();
   for (const lvl of bundle.levels) {
-    for (const [i, ch] of lvl.chapters.entries()) {
+    for (const ch of lvl.chapters) {
+      const key = `${lvl.language}-${lvl.level}`;
+      const i = orderCounter.get(key) ?? 0;
+      orderCounter.set(key, i + 1);
       const existing = await prisma.chapter.findUnique({ where: { slug: ch.slug } });
       const data = {
         slug: ch.slug,
