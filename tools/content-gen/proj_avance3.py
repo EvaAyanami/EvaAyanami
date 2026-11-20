@@ -1,0 +1,1119 @@
+import sys
+sys.path.insert(0, __file__.rsplit('/', 1)[0])
+from projgen import project, step, T, dump
+
+P = []
+
+# ====================================================================== Système de fichiers virtuel
+FS_RUST = r'''
+use std::collections::BTreeMap;
+use std::io::{self, BufRead};
+
+/// Les nœuds sont rangés dans un tableau (« arène ») et se désignent par leur indice.
+struct Noeud {
+    nom: String,
+    parent: usize,
+    dossier: bool,
+    enfants: BTreeMap<String, usize>,
+    contenu: String,
+}
+
+struct Fs {
+    n: Vec<Noeud>,
+    cwd: usize,
+}
+
+impl Fs {
+    fn new() -> Self {
+        let racine = Noeud { nom: String::new(), parent: 0, dossier: true, enfants: BTreeMap::new(), contenu: String::new() };
+        Fs { n: vec![racine], cwd: 0 }
+    }
+
+    fn resoudre(&self, chemin: &str) -> Option<usize> {
+        let mut c = if chemin.starts_with('/') { 0 } else { self.cwd };
+        for s in chemin.split('/').filter(|s| !s.is_empty()) {
+            match s {
+                "." => {}
+                ".." => c = self.n[c].parent,
+                _ => c = *self.n[c].enfants.get(s)?,
+            }
+        }
+        Some(c)
+    }
+
+    /// Sépare « a/b/c » en (indice du dossier parent, nom).
+    fn parent_et_nom<'a>(&self, chemin: &'a str) -> Result<(usize, &'a str), String> {
+        let propre = chemin.trim_end_matches('/');
+        let (d, nom) = match propre.rsplit_once('/') {
+            Some((d, n)) => (if d.is_empty() { "/" } else { d }, n),
+            None => ("", propre),
+        };
+        if nom.is_empty() || nom == "." || nom == ".." {
+            return Err(format!("{} : nom invalide", chemin));
+        }
+        match self.resoudre(d) {
+            Some(p) if self.n[p].dossier => Ok((p, nom)),
+            _ => Err(format!("{} : dossier parent introuvable", chemin)),
+        }
+    }
+
+    fn creer(&mut self, p: usize, nom: &str, dossier: bool) -> usize {
+        let id = self.n.len();
+        self.n.push(Noeud { nom: nom.to_string(), parent: p, dossier, enfants: BTreeMap::new(), contenu: String::new() });
+        self.n[p].enfants.insert(nom.to_string(), id);
+        id
+    }
+
+    fn chemin(&self, mut c: usize) -> String {
+        let mut parts = vec![];
+        while c != 0 {
+            parts.push(self.n[c].nom.clone());
+            c = self.n[c].parent;
+        }
+        parts.reverse();
+        format!("/{}", parts.join("/"))
+    }
+
+    fn executer(&mut self, ligne: &str) -> Result<Vec<String>, String> {
+        let t: Vec<&str> = ligne.split_whitespace().collect();
+        let arg = t.get(1).copied().unwrap_or("");
+        match t.first().copied().unwrap_or("") {
+            "" => Ok(vec![]),
+            "pwd" => Ok(vec![self.chemin(self.cwd)]),
+            "mkdir" => {
+                let (p, nom) = self.parent_et_nom(arg)?;
+                if self.n[p].enfants.contains_key(nom) {
+                    return Err(format!("{} : existe déjà", arg));
+                }
+                self.creer(p, nom, true);
+                Ok(vec![])
+            }
+            "cd" => match self.resoudre(arg) {
+                Some(c) if self.n[c].dossier => {
+                    self.cwd = c;
+                    Ok(vec![])
+                }
+                _ => Err(format!("{} : dossier introuvable", arg)),
+            },
+            "ls" => {
+                let c = if arg.is_empty() { self.cwd } else { self.resoudre(arg).ok_or(format!("{} : introuvable", arg))? };
+                if !self.n[c].dossier {
+                    return Ok(vec![self.n[c].nom.clone()]);
+                }
+                let v: Vec<String> = self.n[c].enfants.iter().map(|(nom, &e)| format!("{}{}", nom, if self.n[e].dossier { "/" } else { "" })).collect();
+                Ok(if v.is_empty() { vec!["(vide)".into()] } else { v })
+            }
+            "touch" | "ecrire" => {
+                let (p, nom) = self.parent_et_nom(arg)?;
+                let existant = self.n[p].enfants.get(nom).copied();
+                let id = match existant {
+                    Some(e) => e,
+                    None => self.creer(p, nom, false),
+                };
+                if self.n[id].dossier {
+                    return if t[0] == "ecrire" { Err(format!("{} : est un dossier", arg)) } else { Ok(vec![]) };
+                }
+                if t[0] == "ecrire" {
+                    self.n[id].contenu = ligne.trim().splitn(3, ' ').nth(2).unwrap_or("").to_string();
+                }
+                Ok(vec![])
+            }
+            "cat" => {
+                let c = self.resoudre(arg).ok_or(format!("{} : introuvable", arg))?;
+                if self.n[c].dossier {
+                    Err(format!("{} : est un dossier", arg))
+                } else {
+                    Ok(vec![self.n[c].contenu.clone()])
+                }
+            }
+            //@@ETAPE2
+            autre => Err(format!("{} : commande inconnue", autre)),
+        }
+    }
+}
+
+//@@AIDES
+
+fn main() {
+    let mut fs = Fs::new();
+    for ligne in io::stdin().lock().lines() {
+        match fs.executer(&ligne.unwrap()) {
+            Ok(v) => v.iter().for_each(|l| println!("{}", l)),
+            Err(e) => println!("Erreur : {}", e),
+        }
+    }
+}
+'''
+
+FS2_RUST_CMDS = r'''            "rm" => {
+                let (recursif, cible) = if arg == "-r" { (true, t.get(2).copied().unwrap_or("")) } else { (false, arg) };
+                let c = self.resoudre(cible).ok_or(format!("{} : introuvable", cible))?;
+                if c == 0 {
+                    return Err("impossible de supprimer /".into());
+                }
+                if self.ancetre(c, self.cwd) {
+                    return Err(format!("{} : contient le dossier courant", cible));
+                }
+                if self.n[c].dossier && !self.n[c].enfants.is_empty() && !recursif {
+                    return Err(format!("{} : dossier non vide", cible));
+                }
+                let (p, nom) = (self.n[c].parent, self.n[c].nom.clone());
+                self.n[p].enfants.remove(&nom);
+                Ok(vec![])
+            }
+            "mv" => {
+                let dest = t.get(2).copied().unwrap_or("");
+                let src = self.resoudre(arg).ok_or(format!("{} : introuvable", arg))?;
+                if src == 0 {
+                    return Err("impossible de déplacer /".into());
+                }
+                let (p, nom) = match self.resoudre(dest) {
+                    Some(d) if self.n[d].dossier => (d, self.n[src].nom.clone()),
+                    _ => {
+                        let (p, n) = self.parent_et_nom(dest)?;
+                        (p, n.to_string())
+                    }
+                };
+                if self.ancetre(src, p) {
+                    return Err("impossible de déplacer un dossier dans lui-même".into());
+                }
+                if let Some(&e) = self.n[p].enfants.get(&nom) {
+                    if e != src {
+                        return Err(format!("{} : existe déjà", dest));
+                    }
+                }
+                let (ancien, ancien_nom) = (self.n[src].parent, self.n[src].nom.clone());
+                self.n[ancien].enfants.remove(&ancien_nom);
+                self.n[src].nom = nom.clone();
+                self.n[src].parent = p;
+                self.n[p].enfants.insert(nom, src);
+                Ok(vec![])
+            }
+            "tree" => {
+                let mut out = vec![];
+                self.arbre(self.cwd, 0, &mut out);
+                Ok(if out.is_empty() { vec!["(vide)".into()] } else { out })
+            }
+            "du" => {
+                let c = if arg.is_empty() { self.cwd } else { self.resoudre(arg).ok_or(format!("{} : introuvable", arg))? };
+                Ok(vec![format!("{} octet(s)", self.taille(c))])
+            }
+            "find" => {
+                let mut out = vec![];
+                self.chercher(self.cwd, arg, &mut out);
+                out.sort();
+                Ok(if out.is_empty() { vec!["(aucun)".into()] } else { out })
+            }
+'''
+
+FS2_RUST_AIDES = r'''impl Fs {
+    /// Vrai si a est b ou l'un de ses ancêtres.
+    fn ancetre(&self, a: usize, mut b: usize) -> bool {
+        loop {
+            if a == b {
+                return true;
+            }
+            if b == 0 {
+                return false;
+            }
+            b = self.n[b].parent;
+        }
+    }
+
+    fn taille(&self, c: usize) -> usize {
+        if self.n[c].dossier {
+            self.n[c].enfants.values().map(|&e| self.taille(e)).sum()
+        } else {
+            self.n[c].contenu.len()
+        }
+    }
+
+    fn arbre(&self, c: usize, prof: usize, out: &mut Vec<String>) {
+        for (nom, &e) in &self.n[c].enfants {
+            out.push(format!("{}{}{}", "  ".repeat(prof), nom, if self.n[e].dossier { "/" } else { "" }));
+            if self.n[e].dossier {
+                self.arbre(e, prof + 1, out);
+            }
+        }
+    }
+
+    fn chercher(&self, c: usize, nom: &str, out: &mut Vec<String>) {
+        for (n, &e) in &self.n[c].enfants {
+            if n == nom {
+                out.push(self.chemin(e));
+            }
+            self.chercher(e, nom, out);
+        }
+    }
+}
+'''
+
+FS1_RUST = FS_RUST.replace('            //@@ETAPE2\n', '').replace('//@@AIDES\n\n', '')
+FS2_RUST = FS_RUST.replace('            //@@ETAPE2\n', FS2_RUST_CMDS).replace('//@@AIDES\n', FS2_RUST_AIDES)
+
+FS_CPP = r'''
+#include <algorithm>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+using namespace std;
+
+// Les nœuds sont rangés dans un tableau (« arène ») et se désignent par leur indice.
+struct Noeud {
+    string nom;
+    int parent;
+    bool dossier;
+    map<string, int> enfants;
+    string contenu;
+};
+
+struct Erreur : runtime_error {
+    using runtime_error::runtime_error;
+};
+
+vector<Noeud> n{{"", 0, true, {}, ""}};
+int cwd = 0;
+
+int resoudre(const string& chemin) {  // -1 si introuvable
+    int c = !chemin.empty() && chemin[0] == '/' ? 0 : cwd;
+    stringstream ss(chemin);
+    for (string s; getline(ss, s, '/');) {
+        if (s.empty() || s == ".") continue;
+        if (s == "..") c = n[c].parent;
+        else {
+            auto it = n[c].enfants.find(s);
+            if (it == n[c].enfants.end()) return -1;
+            c = it->second;
+        }
+    }
+    return c;
+}
+
+// Sépare « a/b/c » en (indice du dossier parent, nom).
+pair<int, string> parentEtNom(const string& chemin) {
+    string propre = chemin;
+    while (propre.size() > 1 && propre.back() == '/') propre.pop_back();
+    size_t k = propre.rfind('/');
+    string d = k == string::npos ? "" : (k == 0 ? "/" : propre.substr(0, k));
+    string nom = k == string::npos ? propre : propre.substr(k + 1);
+    if (nom.empty() || nom == "." || nom == "..") throw Erreur(chemin + " : nom invalide");
+    int p = resoudre(d);
+    if (p < 0 || !n[p].dossier) throw Erreur(chemin + " : dossier parent introuvable");
+    return {p, nom};
+}
+
+int creer(int p, const string& nom, bool dossier) {
+    n.push_back({nom, p, dossier, {}, ""});
+    n[p].enfants[nom] = n.size() - 1;
+    return n.size() - 1;
+}
+
+string chemin(int c) {
+    vector<string> parts;
+    for (; c != 0; c = n[c].parent) parts.push_back(n[c].nom);
+    string r;
+    for (auto it = parts.rbegin(); it != parts.rend(); ++it) r += "/" + *it;
+    return r.empty() ? "/" : r;
+}
+
+int trouver(const string& p) {
+    int c = resoudre(p);
+    if (c < 0) throw Erreur(p + " : introuvable");
+    return c;
+}
+
+//@@AIDES
+
+vector<string> executer(const string& ligne) {
+    istringstream in(ligne);
+    vector<string> t;
+    for (string w; in >> w;) t.push_back(w);
+    if (t.empty()) return {};
+    string arg = t.size() > 1 ? t[1] : "";
+    const string& cmd = t[0];
+    if (cmd == "pwd") return {chemin(cwd)};
+    if (cmd == "mkdir") {
+        auto [p, nom] = parentEtNom(arg);
+        if (n[p].enfants.count(nom)) throw Erreur(arg + " : existe déjà");
+        creer(p, nom, true);
+        return {};
+    }
+    if (cmd == "cd") {
+        int c = resoudre(arg);
+        if (c < 0 || !n[c].dossier) throw Erreur(arg + " : dossier introuvable");
+        cwd = c;
+        return {};
+    }
+    if (cmd == "ls") {
+        int c = arg.empty() ? cwd : trouver(arg);
+        if (!n[c].dossier) return {n[c].nom};
+        vector<string> v;
+        for (auto& [nom, e] : n[c].enfants) v.push_back(nom + (n[e].dossier ? "/" : ""));
+        if (v.empty()) v.push_back("(vide)");
+        return v;
+    }
+    if (cmd == "touch" || cmd == "ecrire") {
+        auto [p, nom] = parentEtNom(arg);
+        auto it = n[p].enfants.find(nom);
+        int id = it != n[p].enfants.end() ? it->second : creer(p, nom, false);
+        if (n[id].dossier) {
+            if (cmd == "ecrire") throw Erreur(arg + " : est un dossier");
+            return {};
+        }
+        if (cmd == "ecrire") {
+            string texte;
+            istringstream reste(ligne);
+            string a, b;
+            reste >> a >> b;
+            getline(reste >> ws, texte);
+            n[id].contenu = texte;
+        }
+        return {};
+    }
+    if (cmd == "cat") {
+        int c = trouver(arg);
+        if (n[c].dossier) throw Erreur(arg + " : est un dossier");
+        return {n[c].contenu};
+    }
+    //@@ETAPE2
+    throw Erreur(cmd + " : commande inconnue");
+}
+
+int main() {
+    string ligne;
+    while (getline(cin, ligne)) {
+        try {
+            for (auto& l : executer(ligne)) cout << l << "\n";
+        } catch (const Erreur& e) {
+            cout << "Erreur : " << e.what() << "\n";
+        }
+    }
+}
+'''
+
+FS2_CPP_AIDES = r'''// Vrai si a est b ou l'un de ses ancêtres.
+bool ancetre(int a, int b) {
+    while (true) {
+        if (a == b) return true;
+        if (b == 0) return false;
+        b = n[b].parent;
+    }
+}
+
+size_t taille(int c) {
+    if (!n[c].dossier) return n[c].contenu.size();
+    size_t s = 0;
+    for (auto& [nom, e] : n[c].enfants) s += taille(e);
+    return s;
+}
+
+void arbre(int c, int prof, vector<string>& out) {
+    for (auto& [nom, e] : n[c].enfants) {
+        out.push_back(string(2 * prof, ' ') + nom + (n[e].dossier ? "/" : ""));
+        if (n[e].dossier) arbre(e, prof + 1, out);
+    }
+}
+
+void chercher(int c, const string& nom, vector<string>& out) {
+    for (auto& [nm, e] : n[c].enfants) {
+        if (nm == nom) out.push_back(chemin(e));
+        chercher(e, nom, out);
+    }
+}
+'''
+
+FS2_CPP_CMDS = r'''    if (cmd == "rm") {
+        bool recursif = arg == "-r";
+        string cible = recursif ? (t.size() > 2 ? t[2] : "") : arg;
+        int c = trouver(cible);
+        if (c == 0) throw Erreur("impossible de supprimer /");
+        if (ancetre(c, cwd)) throw Erreur(cible + " : contient le dossier courant");
+        if (n[c].dossier && !n[c].enfants.empty() && !recursif) throw Erreur(cible + " : dossier non vide");
+        n[n[c].parent].enfants.erase(n[c].nom);
+        return {};
+    }
+    if (cmd == "mv") {
+        string dest = t.size() > 2 ? t[2] : "";
+        int src = trouver(arg);
+        if (src == 0) throw Erreur("impossible de déplacer /");
+        int d = resoudre(dest), p;
+        string nom;
+        if (d >= 0 && n[d].dossier) { p = d; nom = n[src].nom; }
+        else tie(p, nom) = parentEtNom(dest);
+        if (ancetre(src, p)) throw Erreur("impossible de déplacer un dossier dans lui-même");
+        auto it = n[p].enfants.find(nom);
+        if (it != n[p].enfants.end() && it->second != src) throw Erreur(dest + " : existe déjà");
+        n[n[src].parent].enfants.erase(n[src].nom);
+        n[src].nom = nom;
+        n[src].parent = p;
+        n[p].enfants[nom] = src;
+        return {};
+    }
+    if (cmd == "tree") {
+        vector<string> out;
+        arbre(cwd, 0, out);
+        if (out.empty()) out.push_back("(vide)");
+        return out;
+    }
+    if (cmd == "du") return {to_string(taille(arg.empty() ? cwd : trouver(arg))) + " octet(s)"};
+    if (cmd == "find") {
+        vector<string> out;
+        chercher(cwd, arg, out);
+        sort(out.begin(), out.end());
+        if (out.empty()) out.push_back("(aucun)");
+        return out;
+    }
+'''
+
+FS1_CPP = FS_CPP.replace('    //@@ETAPE2\n', '').replace('//@@AIDES\n\n', '')
+FS2_CPP = FS_CPP.replace('    //@@ETAPE2\n', FS2_CPP_CMDS).replace('//@@AIDES\n', FS2_CPP_AIDES)
+
+FS_JAVA = r'''
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+public class Main {
+    /** Les nœuds sont rangés dans une liste (« arène ») et se désignent par leur indice. */
+    static class Noeud {
+        String nom;
+        int parent;
+        final boolean dossier;
+        final TreeMap<String, Integer> enfants = new TreeMap<>();
+        String contenu = "";
+        Noeud(String nom, int parent, boolean dossier) { this.nom = nom; this.parent = parent; this.dossier = dossier; }
+    }
+
+    static class Erreur extends Exception {
+        Erreur(String m) { super(m); }
+    }
+
+    static final List<Noeud> n = new ArrayList<>(List.of(new Noeud("", 0, true)));
+    static int cwd = 0;
+
+    static int resoudre(String chemin) { // -1 si introuvable
+        int c = chemin.startsWith("/") ? 0 : cwd;
+        for (String s : chemin.split("/")) {
+            if (s.isEmpty() || s.equals(".")) continue;
+            if (s.equals("..")) c = n.get(c).parent;
+            else {
+                Integer e = n.get(c).enfants.get(s);
+                if (e == null) return -1;
+                c = e;
+            }
+        }
+        return c;
+    }
+
+    record ParentNom(int parent, String nom) {}
+
+    /** Sépare « a/b/c » en (indice du dossier parent, nom). */
+    static ParentNom parentEtNom(String chemin) throws Erreur {
+        String propre = chemin.length() > 1 ? chemin.replaceAll("/+$", "") : chemin;
+        int k = propre.lastIndexOf('/');
+        String d = k < 0 ? "" : (k == 0 ? "/" : propre.substring(0, k));
+        String nom = k < 0 ? propre : propre.substring(k + 1);
+        if (nom.isEmpty() || nom.equals(".") || nom.equals("..")) throw new Erreur(chemin + " : nom invalide");
+        int p = resoudre(d);
+        if (p < 0 || !n.get(p).dossier) throw new Erreur(chemin + " : dossier parent introuvable");
+        return new ParentNom(p, nom);
+    }
+
+    static int creer(int p, String nom, boolean dossier) {
+        n.add(new Noeud(nom, p, dossier));
+        n.get(p).enfants.put(nom, n.size() - 1);
+        return n.size() - 1;
+    }
+
+    static String chemin(int c) {
+        Deque<String> parts = new ArrayDeque<>();
+        for (; c != 0; c = n.get(c).parent) parts.push(n.get(c).nom);
+        return "/" + String.join("/", parts);
+    }
+
+    static int trouver(String p) throws Erreur {
+        int c = resoudre(p);
+        if (c < 0) throw new Erreur(p + " : introuvable");
+        return c;
+    }
+
+    //@@AIDES
+
+    static List<String> executer(String ligne) throws Erreur {
+        String[] t = ligne.trim().split("\\s+");
+        if (t[0].isEmpty()) return List.of();
+        String arg = t.length > 1 ? t[1] : "";
+        String cmd = t[0];
+        switch (cmd) {
+            case "pwd": return List.of(chemin(cwd));
+            case "mkdir": {
+                ParentNom pn = parentEtNom(arg);
+                if (n.get(pn.parent()).enfants.containsKey(pn.nom())) throw new Erreur(arg + " : existe déjà");
+                creer(pn.parent(), pn.nom(), true);
+                return List.of();
+            }
+            case "cd": {
+                int c = resoudre(arg);
+                if (c < 0 || !n.get(c).dossier) throw new Erreur(arg + " : dossier introuvable");
+                cwd = c;
+                return List.of();
+            }
+            case "ls": {
+                int c = arg.isEmpty() ? cwd : trouver(arg);
+                if (!n.get(c).dossier) return List.of(n.get(c).nom);
+                List<String> v = new ArrayList<>();
+                n.get(c).enfants.forEach((nom, e) -> v.add(nom + (n.get(e).dossier ? "/" : "")));
+                return v.isEmpty() ? List.of("(vide)") : v;
+            }
+            case "touch", "ecrire": {
+                ParentNom pn = parentEtNom(arg);
+                Integer e = n.get(pn.parent()).enfants.get(pn.nom());
+                int id = e != null ? e : creer(pn.parent(), pn.nom(), false);
+                if (n.get(id).dossier) {
+                    if (cmd.equals("ecrire")) throw new Erreur(arg + " : est un dossier");
+                    return List.of();
+                }
+                if (cmd.equals("ecrire")) {
+                    String[] p = ligne.trim().split("\\s+", 3);
+                    n.get(id).contenu = p.length > 2 ? p[2] : "";
+                }
+                return List.of();
+            }
+            case "cat": {
+                int c = trouver(arg);
+                if (n.get(c).dossier) throw new Erreur(arg + " : est un dossier");
+                return List.of(n.get(c).contenu);
+            }
+            //@@ETAPE2
+            default: throw new Erreur(cmd + " : commande inconnue");
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        while (sc.hasNextLine()) {
+            try { executer(sc.nextLine()).forEach(System.out::println); }
+            catch (Erreur e) { System.out.println("Erreur : " + e.getMessage()); }
+        }
+    }
+}
+'''
+
+FS2_JAVA_AIDES = r'''/** Vrai si a est b ou l'un de ses ancêtres. */
+    static boolean ancetre(int a, int b) {
+        while (true) {
+            if (a == b) return true;
+            if (b == 0) return false;
+            b = n.get(b).parent;
+        }
+    }
+
+    static long taille(int c) {
+        Noeud x = n.get(c);
+        if (!x.dossier) return x.contenu.getBytes(StandardCharsets.UTF_8).length;
+        long s = 0;
+        for (int e : x.enfants.values()) s += taille(e);
+        return s;
+    }
+
+    static void arbre(int c, int prof, List<String> out) {
+        n.get(c).enfants.forEach((nom, e) -> {
+            out.add("  ".repeat(prof) + nom + (n.get(e).dossier ? "/" : ""));
+            if (n.get(e).dossier) arbre(e, prof + 1, out);
+        });
+    }
+
+    static void chercher(int c, String nom, List<String> out) {
+        n.get(c).enfants.forEach((nm, e) -> {
+            if (nm.equals(nom)) out.add(chemin(e));
+            chercher(e, nom, out);
+        });
+    }
+'''
+
+FS2_JAVA_CMDS = r'''            case "rm": {
+                boolean recursif = arg.equals("-r");
+                String cible = recursif ? (t.length > 2 ? t[2] : "") : arg;
+                int c = trouver(cible);
+                if (c == 0) throw new Erreur("impossible de supprimer /");
+                if (ancetre(c, cwd)) throw new Erreur(cible + " : contient le dossier courant");
+                if (n.get(c).dossier && !n.get(c).enfants.isEmpty() && !recursif) throw new Erreur(cible + " : dossier non vide");
+                n.get(n.get(c).parent).enfants.remove(n.get(c).nom);
+                return List.of();
+            }
+            case "mv": {
+                String dest = t.length > 2 ? t[2] : "";
+                int src = trouver(arg);
+                if (src == 0) throw new Erreur("impossible de déplacer /");
+                int d = resoudre(dest);
+                ParentNom pn = d >= 0 && n.get(d).dossier ? new ParentNom(d, n.get(src).nom) : parentEtNom(dest);
+                if (ancetre(src, pn.parent())) throw new Erreur("impossible de déplacer un dossier dans lui-même");
+                Integer e = n.get(pn.parent()).enfants.get(pn.nom());
+                if (e != null && e != src) throw new Erreur(dest + " : existe déjà");
+                n.get(n.get(src).parent).enfants.remove(n.get(src).nom);
+                n.get(src).nom = pn.nom();
+                n.get(src).parent = pn.parent();
+                n.get(pn.parent()).enfants.put(pn.nom(), src);
+                return List.of();
+            }
+            case "tree": {
+                List<String> out = new ArrayList<>();
+                arbre(cwd, 0, out);
+                return out.isEmpty() ? List.of("(vide)") : out;
+            }
+            case "du": return List.of(taille(arg.isEmpty() ? cwd : trouver(arg)) + " octet(s)");
+            case "find": {
+                List<String> out = new ArrayList<>();
+                chercher(cwd, arg, out);
+                Collections.sort(out);
+                return out.isEmpty() ? List.of("(aucun)") : out;
+            }
+'''
+
+FS1_JAVA = FS_JAVA.replace('            //@@ETAPE2\n', '').replace('    //@@AIDES\n\n', '')
+FS2_JAVA = FS_JAVA.replace('            //@@ETAPE2\n', FS2_JAVA_CMDS).replace('    //@@AIDES\n', '    ' + FS2_JAVA_AIDES)
+
+P.append(project(
+    'systeme-fichiers-virtuel', 4, 'Système de fichiers virtuel',
+    'Recréer un shell et son système de fichiers en mémoire : arborescence, chemins relatifs et absolus, déplacements, suppression récursive.',
+    '''
+    Tu vas implémenter un **système de fichiers en mémoire** piloté par des commandes de type Unix — un peu comme le cœur d’un shell.
+
+    Une arborescence est un **arbre** : la racine `/`, des dossiers qui contiennent des dossiers et des fichiers. Conseil d’architecture : range tous les nœuds dans un **tableau** (une « arène ») et fais-les se référencer par leur **indice** (parent, enfants). C’est simple, rapide, et cela évite bien des problèmes de pointeurs (notamment en Rust).
+
+    Chemins : absolus (`/docs/notes.txt`) ou relatifs au dossier courant (`notes.txt`, `../cours`) ; `.` désigne le dossier courant et `..` le parent (le parent de `/` est `/`).
+
+    Comme dans un vrai shell, une commande réussie n’affiche **rien** (sauf `pwd`, `ls`, `cat`…) ; les erreurs s’affichent `Erreur : message`. Les contenus des dossiers sont toujours triés par nom.
+    ''',
+    ['Modéliser un arbre avec une arène d’indices', 'Résoudre des chemins relatifs et absolus', 'Parcourir récursivement une arborescence', 'Garantir des invariants (pas de cycle, pas de doublon)'],
+    ['Noms triés par ordre alphabétique (octets)', 'Les tailles sont en octets (UTF-8)', 'Aucune commande ne doit faire planter le programme'],
+    [
+        step('vfs-base', 'Navigation et fichiers',
+             '''
+             Commandes :
+
+             - `pwd` — affiche le chemin absolu du dossier courant
+             - `mkdir CHEMIN` — erreurs : `CHEMIN : dossier parent introuvable`, `CHEMIN : existe déjà`
+             - `cd CHEMIN` — erreur : `CHEMIN : dossier introuvable` (inexistant ou fichier)
+             - `ls [CHEMIN]` — le contenu (dossiers suffixés par `/`), `(vide)`, ou le nom si c’est un fichier ; erreur `CHEMIN : introuvable`
+             - `touch CHEMIN` — crée un fichier vide s’il n’existe pas
+             - `ecrire CHEMIN TEXTE…` — remplace le contenu du fichier (créé si besoin) ; erreur `CHEMIN : est un dossier`
+             - `cat CHEMIN` — affiche le contenu ; erreurs `CHEMIN : introuvable`, `CHEMIN : est un dossier`
+             - autre → `NOM : commande inconnue`
+             ''',
+             [T('pwd\nmkdir docs\nmkdir docs/cours\nmkdir projets/rust\nmkdir docs\necrire docs/notes.txt Rust est génial\ntouch docs/vide.txt\ncd docs\npwd\nls\ncat notes.txt\ncd cours\nls\ncd ../..\npwd\nls /docs/notes.txt\ncat docs\ncd docs/notes.txt\ncat /inexistant\necrire docs Bonjour\nls',
+                '/\nErreur : projets/rust : dossier parent introuvable\nErreur : docs : existe déjà\n/docs\ncours/\nnotes.txt\nvide.txt\nRust est génial\n(vide)\n/\nnotes.txt\nErreur : docs : est un dossier\nErreur : docs/notes.txt : dossier introuvable\nErreur : /inexistant : introuvable\nErreur : docs : est un dossier\ndocs/'),
+              T('mkdir /a\nmkdir /a/./b\ncd a/b/../b\npwd\ncd ..\ncd ..\ncd ..\npwd\nformat C:', '/a/b\n/\nErreur : format : commande inconnue', hidden=True)],
+             rust=FS1_RUST, cpp=FS1_CPP, java=FS1_JAVA,
+             hints=['Résoudre un chemin : pars de la racine (chemin absolu) ou du dossier courant, puis suis chaque segment.', 'Pour créer, sépare le chemin en « dossier parent » + « nom » sur le dernier « / ».'],
+             xp=70),
+        step('vfs-avance', 'Suppression, déplacement, arbre et recherche',
+             '''
+             Ajoute :
+
+             - `rm [-r] CHEMIN` — erreurs : `impossible de supprimer /`, `CHEMIN : contient le dossier courant` (le dossier courant ou un de ses ancêtres), `CHEMIN : dossier non vide` (sans `-r`)
+             - `mv SOURCE DESTINATION` — si la destination est un dossier existant, la source y est déplacée ; sinon elle est déplacée/renommée vers ce chemin. Erreurs : `impossible de déplacer /`, `impossible de déplacer un dossier dans lui-même`, `DESTINATION : existe déjà`
+             - `tree` — l’arborescence du dossier courant, 2 espaces d’indentation par niveau, ou `(vide)`
+             - `du [CHEMIN]` — `N octet(s)` (taille totale des fichiers)
+             - `find NOM` — chemins absolus triés des éléments nommés NOM sous le dossier courant, ou `(aucun)`
+             ''',
+             [T('mkdir src\nmkdir src/modules\necrire src/main.rs fn main() {}\necrire src/modules/reseau.rs pub fn connecter() {}\necrire README.md Codemori\ntree\ndu\ndu src\nrm src\ncd src/modules\nrm -r /src\nfind reseau.rs\ncd /\nfind main.rs\nmv src/main.rs src/modules\nmv src/modules/main.rs lib.rs\nmv src src/modules\nmv README.md lib.rs\nrm -r src\nrm /\ntree\ndu lib.rs',
+                'README.md\nsrc/\n  main.rs\n  modules/\n    reseau.rs\n41 octet(s)\n33 octet(s)\nErreur : src : dossier non vide\nErreur : /src : contient le dossier courant\n/src/modules/reseau.rs\n/src/main.rs\nErreur : impossible de déplacer un dossier dans lui-même\nErreur : lib.rs : existe déjà\nErreur : impossible de supprimer /\nREADME.md\nlib.rs\n12 octet(s)'),
+              T('tree\nfind x\nrm nope\nmkdir a\nmkdir b\nmv a b\ntree\nmv b/a c\nls\ndu', '(vide)\n(aucun)\nErreur : nope : introuvable\nb/\n  a/\nb/\nc/\n0 octet(s)', hidden=True)],
+             rust=FS2_RUST, cpp=FS2_CPP, java=FS2_JAVA,
+             hints=['Déplacer = retirer l’entrée de l’ancien parent, changer le parent et le nom du nœud, l’ajouter au nouveau parent.', 'Un dossier ne peut pas aller dans lui-même : vérifie que la source n’est pas un ancêtre de la destination.'],
+             xp=80),
+    ]))
+
+# ====================================================================== Ordonnanceur
+SCHED_RUST_COMMON = r'''
+use std::collections::VecDeque;
+use std::io::{self, BufRead};
+
+struct Proc {
+    nom: String,
+    arrivee: u64,
+    duree: u64,
+}
+
+fn lire(lignes: impl Iterator<Item = String>) -> Vec<Proc> {
+    lignes
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let t: Vec<&str> = l.split_whitespace().collect();
+            Proc { nom: t[0].to_string(), arrivee: t[1].parse().unwrap(), duree: t[2].parse().unwrap() }
+        })
+        .collect()
+}
+
+fn statistiques(procs: &[Proc], fin: &[u64]) {
+    let (mut attente, mut rotation) = (0, 0);
+    for (i, p) in procs.iter().enumerate() {
+        let r = fin[i] - p.arrivee;
+        println!("{} : attente {}, rotation {}", p.nom, r - p.duree, r);
+        attente += r - p.duree;
+        rotation += r;
+    }
+    let n = procs.len() as f64;
+    println!("attente moyenne : {:.2}", attente as f64 / n);
+    println!("rotation moyenne : {:.2}", rotation as f64 / n);
+}
+'''
+
+SCHED1_RUST = SCHED_RUST_COMMON + r'''
+fn main() {
+    let procs = lire(io::stdin().lock().lines().map(|l| l.unwrap()));
+    // Premier arrivé, premier servi (tri stable : à arrivée égale, ordre de saisie).
+    let mut ordre: Vec<usize> = (0..procs.len()).collect();
+    ordre.sort_by_key(|&i| procs[i].arrivee);
+    let mut t = 0;
+    let mut fin = vec![0; procs.len()];
+    for &i in &ordre {
+        let p = &procs[i];
+        if t < p.arrivee {
+            println!("[{}-{}] inactif", t, p.arrivee);
+            t = p.arrivee;
+        }
+        println!("[{}-{}] {}", t, t + p.duree, p.nom);
+        t += p.duree;
+        fin[i] = t;
+    }
+    statistiques(&procs, &fin);
+    let _ = VecDeque::<u8>::new();
+}
+'''
+
+SCHED2_RUST = SCHED_RUST_COMMON + r'''
+fn main() {
+    let stdin = io::stdin();
+    let mut lignes = stdin.lock().lines().map(|l| l.unwrap());
+    let q: u64 = lignes.next().unwrap().split_whitespace().nth(1).unwrap().parse().unwrap();
+    let procs = lire(lignes);
+    let mut ordre: Vec<usize> = (0..procs.len()).collect();
+    ordre.sort_by_key(|&i| procs[i].arrivee);
+    let mut reste: Vec<u64> = procs.iter().map(|p| p.duree).collect();
+    let mut fin = vec![0; procs.len()];
+    let mut file: VecDeque<usize> = VecDeque::new();
+    // Tranches (début, fin, processus ; None = inactif), fusionnées si contiguës.
+    let mut tranches: Vec<(u64, u64, Option<usize>)> = vec![];
+    let mut ajouter = |debut: u64, f: u64, qui: Option<usize>| {
+        if let Some(d) = tranches.last_mut() {
+            if d.2 == qui && d.1 == debut {
+                d.1 = f;
+                return;
+            }
+        }
+        tranches.push((debut, f, qui));
+    };
+    let (mut t, mut k) = (0, 0);
+    loop {
+        while k < ordre.len() && procs[ordre[k]].arrivee <= t {
+            file.push_back(ordre[k]);
+            k += 1;
+        }
+        let Some(i) = file.pop_front() else {
+            if k == ordre.len() {
+                break;
+            }
+            let a = procs[ordre[k]].arrivee;
+            ajouter(t, a, None);
+            t = a;
+            continue;
+        };
+        let run = q.min(reste[i]);
+        ajouter(t, t + run, Some(i));
+        t += run;
+        reste[i] -= run;
+        // Les nouveaux arrivants passent avant le processus interrompu.
+        while k < ordre.len() && procs[ordre[k]].arrivee <= t {
+            file.push_back(ordre[k]);
+            k += 1;
+        }
+        if reste[i] > 0 {
+            file.push_back(i);
+        } else {
+            fin[i] = t;
+        }
+    }
+    for &(a, b, qui) in &tranches {
+        println!("[{}-{}] {}", a, b, qui.map_or("inactif", |i| procs[i].nom.as_str()));
+    }
+    statistiques(&procs, &fin);
+    println!("tranches : {}", tranches.iter().filter(|t| t.2.is_some()).count());
+}
+'''
+
+SCHED_CPP_COMMON = r'''
+#include <algorithm>
+#include <cstdio>
+#include <deque>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+using namespace std;
+
+struct Proc {
+    string nom;
+    long long arrivee, duree;
+};
+
+vector<Proc> lire() {
+    vector<Proc> v;
+    string l;
+    while (getline(cin, l)) {
+        istringstream in(l);
+        Proc p;
+        if (in >> p.nom >> p.arrivee >> p.duree) v.push_back(p);
+    }
+    return v;
+}
+
+void statistiques(const vector<Proc>& procs, const vector<long long>& fin) {
+    long long attente = 0, rotation = 0;
+    for (size_t i = 0; i < procs.size(); i++) {
+        long long r = fin[i] - procs[i].arrivee;
+        printf("%s : attente %lld, rotation %lld\n", procs[i].nom.c_str(), r - procs[i].duree, r);
+        attente += r - procs[i].duree;
+        rotation += r;
+    }
+    printf("attente moyenne : %.2f\n", (double)attente / procs.size());
+    printf("rotation moyenne : %.2f\n", (double)rotation / procs.size());
+}
+
+vector<int> parArrivee(const vector<Proc>& procs) {
+    vector<int> ordre(procs.size());
+    for (size_t i = 0; i < ordre.size(); i++) ordre[i] = i;
+    // stable_sort : à arrivée égale, ordre de saisie.
+    stable_sort(ordre.begin(), ordre.end(), [&](int a, int b) { return procs[a].arrivee < procs[b].arrivee; });
+    return ordre;
+}
+'''
+
+SCHED1_CPP = SCHED_CPP_COMMON + r'''
+int main() {
+    vector<Proc> procs = lire();
+    vector<long long> fin(procs.size());
+    long long t = 0;
+    for (int i : parArrivee(procs)) {
+        const Proc& p = procs[i];
+        if (t < p.arrivee) { printf("[%lld-%lld] inactif\n", t, p.arrivee); t = p.arrivee; }
+        printf("[%lld-%lld] %s\n", t, t + p.duree, p.nom.c_str());
+        t += p.duree;
+        fin[i] = t;
+    }
+    statistiques(procs, fin);
+}
+'''
+
+SCHED2_CPP = SCHED_CPP_COMMON + r'''
+struct Tranche {
+    long long debut, fin;
+    int qui;  // -1 = inactif
+};
+
+int main() {
+    string premiere, mot;
+    getline(cin, premiere);
+    long long q;
+    istringstream(premiere) >> mot >> q;
+    vector<Proc> procs = lire();
+    vector<int> ordre = parArrivee(procs);
+    vector<long long> reste(procs.size()), fin(procs.size());
+    for (size_t i = 0; i < procs.size(); i++) reste[i] = procs[i].duree;
+    deque<int> file;
+    vector<Tranche> tranches;
+    auto ajouter = [&](long long d, long long f, int qui) {
+        // Fusionne avec la tranche précédente si elle est contiguë et du même processus.
+        if (!tranches.empty() && tranches.back().qui == qui && tranches.back().fin == d) tranches.back().fin = f;
+        else tranches.push_back({d, f, qui});
+    };
+    long long t = 0;
+    size_t k = 0;
+    auto arrivees = [&] {
+        while (k < ordre.size() && procs[ordre[k]].arrivee <= t) file.push_back(ordre[k++]);
+    };
+    while (true) {
+        arrivees();
+        if (file.empty()) {
+            if (k == ordre.size()) break;
+            long long a = procs[ordre[k]].arrivee;
+            ajouter(t, a, -1);
+            t = a;
+            continue;
+        }
+        int i = file.front();
+        file.pop_front();
+        long long run = min(q, reste[i]);
+        ajouter(t, t + run, i);
+        t += run;
+        reste[i] -= run;
+        arrivees();  // les nouveaux arrivants passent avant le processus interrompu
+        if (reste[i] > 0) file.push_back(i);
+        else fin[i] = t;
+    }
+    int n = 0;
+    for (auto& tr : tranches) {
+        printf("[%lld-%lld] %s\n", tr.debut, tr.fin, tr.qui < 0 ? "inactif" : procs[tr.qui].nom.c_str());
+        n += tr.qui >= 0;
+    }
+    statistiques(procs, fin);
+    printf("tranches : %d\n", n);
+}
+'''
+
+SCHED_JAVA_COMMON = r'''
+import java.util.*;
+
+public class Main {
+    record Proc(String nom, long arrivee, long duree) {}
+
+    static List<Proc> lire(Scanner sc) {
+        List<Proc> v = new ArrayList<>();
+        while (sc.hasNextLine()) {
+            String l = sc.nextLine().trim();
+            if (l.isEmpty()) continue;
+            String[] t = l.split("\\s+");
+            v.add(new Proc(t[0], Long.parseLong(t[1]), Long.parseLong(t[2])));
+        }
+        return v;
+    }
+
+    static void statistiques(List<Proc> procs, long[] fin) {
+        long attente = 0, rotation = 0;
+        for (int i = 0; i < procs.size(); i++) {
+            long r = fin[i] - procs.get(i).arrivee();
+            System.out.println(procs.get(i).nom() + " : attente " + (r - procs.get(i).duree()) + ", rotation " + r);
+            attente += r - procs.get(i).duree();
+            rotation += r;
+        }
+        System.out.println(String.format(Locale.US, "attente moyenne : %.2f", (double) attente / procs.size()));
+        System.out.println(String.format(Locale.US, "rotation moyenne : %.2f", (double) rotation / procs.size()));
+    }
+
+    /** Indices triés par arrivée (tri stable : à arrivée égale, ordre de saisie). */
+    static List<Integer> parArrivee(List<Proc> procs) {
+        List<Integer> ordre = new ArrayList<>();
+        for (int i = 0; i < procs.size(); i++) ordre.add(i);
+        ordre.sort(Comparator.comparingLong(i -> procs.get(i).arrivee()));
+        return ordre;
+    }
+'''
+
+SCHED1_JAVA = SCHED_JAVA_COMMON + r'''
+    public static void main(String[] args) {
+        List<Proc> procs = lire(new Scanner(System.in));
+        long[] fin = new long[procs.size()];
+        long t = 0;
+        for (int i : parArrivee(procs)) {
+            Proc p = procs.get(i);
+            if (t < p.arrivee()) { System.out.println("[" + t + "-" + p.arrivee() + "] inactif"); t = p.arrivee(); }
+            System.out.println("[" + t + "-" + (t + p.duree()) + "] " + p.nom());
+            t += p.duree();
+            fin[i] = t;
+        }
+        statistiques(procs, fin);
+    }
+}
+'''
+
+SCHED2_JAVA = SCHED_JAVA_COMMON + r'''
+    /** qui = -1 : processeur inactif. */
+    record Tranche(long debut, long fin, int qui) {}
+
+    static final List<Tranche> tranches = new ArrayList<>();
+
+    static void ajouter(long d, long f, int qui) {
+        // Fusionne avec la tranche précédente si elle est contiguë et du même processus.
+        if (!tranches.isEmpty()) {
+            Tranche der = tranches.get(tranches.size() - 1);
+            if (der.qui() == qui && der.fin() == d) { tranches.set(tranches.size() - 1, new Tranche(der.debut(), f, qui)); return; }
+        }
+        tranches.add(new Tranche(d, f, qui));
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        long q = Long.parseLong(sc.nextLine().trim().split("\\s+")[1]);
+        List<Proc> procs = lire(sc);
+        List<Integer> ordre = parArrivee(procs);
+        long[] reste = procs.stream().mapToLong(Proc::duree).toArray(), fin = new long[procs.size()];
+        Deque<Integer> file = new ArrayDeque<>();
+        long t = 0;
+        int k = 0;
+        while (true) {
+            while (k < ordre.size() && procs.get(ordre.get(k)).arrivee() <= t) file.add(ordre.get(k++));
+            if (file.isEmpty()) {
+                if (k == ordre.size()) break;
+                long a = procs.get(ordre.get(k)).arrivee();
+                ajouter(t, a, -1);
+                t = a;
+                continue;
+            }
+            int i = file.poll();
+            long run = Math.min(q, reste[i]);
+            ajouter(t, t + run, i);
+            t += run;
+            reste[i] -= run;
+            // Les nouveaux arrivants passent avant le processus interrompu.
+            while (k < ordre.size() && procs.get(ordre.get(k)).arrivee() <= t) file.add(ordre.get(k++));
+            if (reste[i] > 0) file.add(i);
+            else fin[i] = t;
+        }
+        int n = 0;
+        for (Tranche tr : tranches) {
+            System.out.println("[" + tr.debut() + "-" + tr.fin() + "] " + (tr.qui() < 0 ? "inactif" : procs.get(tr.qui()).nom()));
+            if (tr.qui() >= 0) n++;
+        }
+        statistiques(procs, fin);
+        System.out.println("tranches : " + n);
+    }
+}
+'''
+
+P.append(project(
+    'ordonnanceur-processus', 4, 'Gestionnaire de processus',
+    'Simuler l’ordonnanceur d’un système d’exploitation : FCFS puis tourniquet (Round Robin), diagrammes de Gantt et métriques.',
+    '''
+    Un système d’exploitation doit partager le processeur entre de nombreux **processus**. C’est le rôle de l’**ordonnanceur** (*scheduler*).
+
+    Chaque ligne décrit un processus : `NOM ARRIVÉE DURÉE` (unités de temps entières). Le programme affiche le **diagramme de Gantt** — une ligne `[début-fin] NOM` par période d’exécution, `[début-fin] inactif` quand le processeur n’a rien à faire — puis les métriques de chaque processus, **dans l’ordre de saisie** :
+
+    - **rotation** (*turnaround*) = fin − arrivée ;
+    - **attente** = rotation − durée.
+
+    Enfin, les moyennes avec 2 décimales : `attente moyenne : X.XX` et `rotation moyenne : Y.YY`.
+    ''',
+    ['Simuler un algorithme d’ordonnancement', 'Utiliser une file (FIFO)', 'Gérer le temps simulé et les périodes d’inactivité', 'Calculer des métriques de performance'],
+    ['À arrivée égale, l’ordre de saisie départage', 'Les moyennes sont affichées avec 2 décimales'],
+    [
+        step('sched-fcfs', 'Premier arrivé, premier servi',
+             '''
+             Implémente l’algorithme **FCFS** (*First Come, First Served*) : les processus s’exécutent jusqu’au bout, par ordre d’arrivée.
+             ''',
+             [T('A 0 3\nB 1 5\nC 2 2\nD 10 1', '[0-3] A\n[3-8] B\n[8-10] C\n[10-11] D\nA : attente 0, rotation 3\nB : attente 2, rotation 7\nC : attente 6, rotation 8\nD : attente 0, rotation 1\nattente moyenne : 2.00\nrotation moyenne : 4.75'),
+              T('X 2 3\nY 0 1\nZ 2 1', '[0-1] Y\n[1-2] inactif\n[2-5] X\n[5-6] Z\nX : attente 0, rotation 3\nY : attente 0, rotation 1\nZ : attente 3, rotation 4\nattente moyenne : 1.00\nrotation moyenne : 2.67', hidden=True)],
+             rust=SCHED1_RUST, cpp=SCHED1_CPP, java=SCHED1_JAVA,
+             hints=['Trie les indices des processus par arrivée avec un tri STABLE.', 'Si le processeur est libre avant l’arrivée du prochain processus, affiche une période inactive.'],
+             xp=60),
+        step('sched-rr', 'Tourniquet (Round Robin)',
+             '''
+             Première ligne : `quantum Q`. Implémente le **tourniquet** : le processus en tête de la file s’exécute au plus Q unités, puis retourne en fin de file s’il n’a pas terminé.
+
+             Règles précises :
+
+             - un processus qui arrive pendant une tranche entre dans la file **avant** le processus interrompu ;
+             - deux tranches **consécutives** du même processus sont fusionnées dans le diagramme ;
+             - après les moyennes, affiche `tranches : N` (le nombre de tranches d’exécution affichées, hors inactivité).
+             ''',
+             [T('quantum 2\nA 0 5\nB 1 3\nC 2 1', '[0-2] A\n[2-4] B\n[4-5] C\n[5-7] A\n[7-8] B\n[8-9] A\nA : attente 4, rotation 9\nB : attente 4, rotation 7\nC : attente 2, rotation 3\nattente moyenne : 3.33\nrotation moyenne : 6.33\ntranches : 6'),
+              T('quantum 3\nX 0 7\nY 20 2', '[0-7] X\n[7-20] inactif\n[20-22] Y\nX : attente 0, rotation 7\nY : attente 0, rotation 2\nattente moyenne : 0.00\nrotation moyenne : 4.50\ntranches : 2', hidden=True),
+              T('quantum 4\nP 0 3\nQ 0 6\nR 1 4', '[0-3] P\n[3-7] Q\n[7-11] R\n[11-13] Q\nP : attente 0, rotation 3\nQ : attente 7, rotation 13\nR : attente 6, rotation 10\nattente moyenne : 4.33\nrotation moyenne : 8.67\ntranches : 4', hidden=True)],
+             rust=SCHED2_RUST, cpp=SCHED2_CPP, java=SCHED2_JAVA,
+             hints=['Garde, pour chaque processus, le temps restant à exécuter.', 'Après chaque tranche : ajoute d’abord les nouveaux arrivants à la file, puis le processus interrompu.'],
+             xp=70),
+    ]))
+
+dump(P, sys.argv[1], 'Projets — niveau avancé (3/3)')
