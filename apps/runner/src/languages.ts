@@ -58,7 +58,7 @@ export const LANGUAGES: Record<string, LanguageSpec> = {
     fileName: 'Main.java',
     image: env('RUNNER_IMAGE_JAVA', 'codemori/sandbox-java:latest'),
     compile: 'javac -encoding UTF-8 -Xlint:none -J-Xmx256m -J-XX:+UseSerialGC -d out Main.java',
-    run: 'java -Xmx192m -Xss8m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -cp out Main',
+    run: 'java -Xmx192m -Xss8m -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp out Main',
     memory: env('RUNNER_MEMORY_JAVA', '640m'),
     compileTimeout: 40,
     runTimeout: 8,

@@ -1,0 +1,1835 @@
+language: java
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: java-presentation
+    title: Présentation de Java
+    summary: Histoire, philosophie « write once, run anywhere » et domaines d’utilisation de Java, l’un des langages les plus utilisés au monde.
+    minutes: 15
+    concepts: [java]
+    sections:
+      - title: Un langage partout
+        body: |
+          **Java** a été créé par **James Gosling** chez Sun Microsystems et publié en **1995**. Sa promesse : *Write Once, Run Anywhere* — le même programme compilé s’exécute sur Windows, Linux, macOS… grâce à la **machine virtuelle Java** (JVM).
+
+          On le retrouve :
+
+          - dans les **applications d’entreprise** (banques, assurances, administrations) et les services backend (Spring) ;
+          - sur **Android** (avec Kotlin, qui tourne aussi sur la JVM) ;
+          - dans le **big data** (Hadoop, Kafka, Spark), les outils de développement (IntelliJ, Eclipse), et même les jeux (Minecraft).
+
+          Java est **orienté objet**, **fortement typé**, et sa mémoire est gérée automatiquement par un **ramasse-miettes** (*garbage collector*).
+      - title: Java moderne
+        body: |
+          Une nouvelle version sort tous les six mois, avec une version **LTS** (support long) tous les deux ans : Java 8, 11, 17, **21**, 25…
+
+          Le Java moderne est bien plus concis qu’autrefois : `var`, `record`, *text blocks*, `switch` avec flèches et motifs, streams et lambdas, threads virtuels.
+
+          ```java
+          record Point(int x, int y) {}
+          var p = new Point(3, 4);
+          System.out.println(p);   // Point[x=3, y=4]
+          ```
+
+          Sur Codemori, ton code est compilé avec `javac` et exécuté par un **OpenJDK 21** (LTS). La classe principale doit s’appeler `Main`.
+    exercises:
+      - id: java-pres-q1
+        type: mcq
+        prompt: Que signifie « Write Once, Run Anywhere » ?
+        choices: ['Un programme compilé s’exécute sur tout système disposant d’une JVM', 'On n’écrit le code qu’une fois par an', 'Java est interprété ligne par ligne', 'Java fonctionne sans ordinateur']
+        answer: 0
+      - id: java-pres-q2
+        type: mcq
+        prompt: Qui gère la mémoire en Java ?
+        choices: ['Le ramasse-miettes (garbage collector) de la JVM', 'Le programmeur avec free()', 'Le système d’exploitation uniquement', 'Personne']
+        answer: 0
+      - id: java-pres-q3
+        type: mcq
+        prompt: Qu’est-ce qu’une version LTS ?
+        choices: ['Une version maintenue sur une longue durée', 'Une version expérimentale', 'Une version pour Android uniquement', 'Une version payante']
+        answer: 0
+      - id: java-pres-code
+        type: code
+        title: Bonjour, Java !
+        prompt: |
+          Modifie le programme pour qu’il affiche exactement :
+
+          ```
+          Bonjour, Java !
+          ```
+        starter: |
+          public class Main {
+              public static void main(String[] args) {
+                  System.out.println("Hello");
+              }
+          }
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  System.out.println("Bonjour, Java !");
+              }
+          }
+        tests:
+          - { input: '', output: 'Bonjour, Java !' }
+        require:
+          - { pattern: 'System\.out\.print', message: Utiliser System.out.println }
+    project:
+      id: java-pres-projet
+      type: code
+      title: Carte de visite
+      difficulty: 1
+      prompt: |
+        Lis un prénom (une ligne) et affiche :
+
+        ```
+        ~~~~~~~~~~
+        Bonjour, <prénom> !
+        ~~~~~~~~~~
+        ```
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String prenom = sc.nextLine();
+                // À toi !
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String prenom = sc.nextLine();
+                System.out.println("~~~~~~~~~~");
+                System.out.println("Bonjour, " + prenom + " !");
+                System.out.println("~~~~~~~~~~");
+            }
+        }
+      tests:
+        - { input: Kiri, output: "~~~~~~~~~~\nBonjour, Kiri !\n~~~~~~~~~~" }
+        - { input: James, output: "~~~~~~~~~~\nBonjour, James !\n~~~~~~~~~~", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-pres-ex1
+          type: mcq
+          prompt: En quelle année Java a-t-il été publié ?
+          choices: ['1995', '1985', '2005', '2015']
+          answer: 0
+        - id: java-pres-ex2
+          type: mcq
+          prompt: Quel système mobile s’appuie historiquement sur Java ?
+          choices: ['Android', 'iOS', 'Symbian uniquement', 'Aucun']
+          answer: 0
+        - id: java-pres-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                public static void main(String[] args) {
+                    System.out.println("Java " + 21);
+                    System.out.println(2 + 3 + " ans");
+                }
+            }
+          output: "Java 21\n5 ans"
+
+  # ------------------------------------------------------------------
+  - slug: java-jvm-jdk
+    title: JVM et JDK
+    summary: JDK, JRE et JVM, bytecode, compilation avec javac, exécution avec java, et outils de l’écosystème.
+    minutes: 20
+    concepts: [jvm, build]
+    sections:
+      - title: Du code source au bytecode
+        body: |
+          1. Tu écris `Main.java` (code source).
+          2. `javac Main.java` le compile en **bytecode** : `Main.class`.
+          3. `java Main` lance la **JVM**, qui charge le bytecode, le vérifie, l’interprète puis compile à la volée (**JIT**) les parties chaudes en code machine.
+
+          | Sigle | Contenu |
+          |---|---|
+          | **JVM** | la machine virtuelle qui exécute le bytecode |
+          | **JRE** | JVM + bibliothèques standard (pour exécuter) |
+          | **JDK** | JRE + outils de développement (`javac`, `jar`, `jshell`, `javadoc`…) |
+
+          Depuis Java 11, `java Main.java` compile et exécute directement un fichier unique.
+      - title: Outils
+        body: |
+          ```bash
+          java -version            # version installée (ex. OpenJDK 21)
+          javac Main.java          # compile
+          java Main                # exécute la classe Main
+          jshell                   # console interactive pour expérimenter
+          jar cf app.jar *.class   # archive
+          ```
+
+          Distributions de l’OpenJDK : Eclipse **Temurin**, Amazon Corretto, Microsoft, Oracle. Gestionnaires de projets : **Maven** et **Gradle**. IDE : **IntelliJ IDEA**, Eclipse, VS Code.
+
+          Le JIT rend Java très rapide après une phase de « chauffe » ; d’autres langages profitent de la JVM : Kotlin, Scala, Groovy, Clojure.
+    exercises:
+      - id: java-jvm-q1
+        type: mcq
+        prompt: Que produit javac à partir de Main.java ?
+        choices: ['Du bytecode (Main.class)', 'Un exécutable natif .exe', 'Du code C', 'Rien, il interprète']
+        answer: 0
+      - id: java-jvm-q2
+        type: mcq
+        prompt: Que contient le JDK en plus du JRE ?
+        choices: ['Les outils de développement (javac, jar, jshell…)', 'Un navigateur', 'Rien de plus', 'Un système d’exploitation']
+        answer: 0
+      - id: java-jvm-order
+        type: order
+        prompt: Remets dans l’ordre la vie d’un programme Java.
+        lines:
+          - Écrire Main.java
+          - Compiler avec javac
+          - Obtenir Main.class (bytecode)
+          - Exécuter avec java Main sur la JVM
+      - id: java-jvm-bug
+        type: bugfix
+        prompt: Ce fichier Main.java ne compile pas. Trouve la ligne fautive.
+        code: |
+          public class Programme {
+              public static void main(String[] args) {
+                  System.out.println("Bonjour");
+              }
+          }
+        bugLines: [1]
+        choices:
+          - Une classe publique doit porter le nom du fichier (Main)
+          - main doit renvoyer int
+          - println doit s’écrire Println
+        answer: 0
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  System.out.println("Bonjour");
+              }
+          }
+        tests:
+          - { input: '', output: Bonjour }
+    project:
+      id: java-jvm-projet
+      type: code
+      title: Informations sur la JVM
+      difficulty: 1
+      prompt: |
+        Lis un nom de programme puis affiche les commandes pour le compiler et l’exécuter, et vérifie que la JVM fonctionne :
+
+        ```
+        javac <Nom>.java
+        java <Nom>
+        JVM opérationnelle : oui
+        ```
+
+        Pour la dernière ligne, affiche `oui` si `System.getProperty("java.version")` n’est pas `null`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String nom = sc.nextLine().trim();
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String nom = sc.nextLine().trim();
+                System.out.println("javac " + nom + ".java");
+                System.out.println("java " + nom);
+                System.out.println("JVM opérationnelle : " + (System.getProperty("java.version") != null ? "oui" : "non"));
+            }
+        }
+      tests:
+        - { input: Jeu, output: "javac Jeu.java\njava Jeu\nJVM opérationnelle : oui" }
+        - { input: Calculatrice, output: "javac Calculatrice.java\njava Calculatrice\nJVM opérationnelle : oui", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-jvm-ex1
+          type: mcq
+          prompt: Que fait le compilateur JIT ?
+          choices: ['Il compile en code machine les parties du bytecode souvent exécutées', 'Il compile le code source Java', 'Il supprime les objets inutiles', 'Il crée les fichiers .jar']
+          answer: 0
+        - id: java-jvm-ex2
+          type: mcq
+          prompt: Quel outil permet d’expérimenter du code Java de façon interactive ?
+          choices: ['jshell', 'javadoc', 'jar', 'javap']
+          answer: 0
+        - id: java-jvm-ex3
+          type: mcq
+          prompt: Lequel de ces langages s’exécute aussi sur la JVM ?
+          choices: ['Kotlin', 'C', 'Rust', 'Python (CPython)']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-premier-programme
+    title: Premier programme
+    summary: La classe Main, la méthode main, System.out.println et print, lire au clavier avec Scanner.
+    minutes: 20
+    concepts: [affichage, main]
+    sections:
+      - title: Anatomie
+        body: |
+          ```java
+          public class Main {                          // classe publique = nom du fichier
+              public static void main(String[] args) { // point d’entrée
+                  System.out.println("Bonjour !");     // affiche + retour à la ligne
+                  System.out.print("sans ");           // sans retour à la ligne
+                  System.out.println("retour");
+                  System.out.printf("%d + %d = %d%n", 2, 3, 5);  // format
+              }
+          }
+          ```
+
+          - En Java, **tout code est dans une classe**.
+          - `public static void main(String[] args)` : signature exacte du point d’entrée.
+          - Chaque instruction se termine par `;`, les blocs sont entre accolades.
+          - Java distingue majuscules et minuscules (`System` ≠ `system`).
+      - title: Lire au clavier
+        body: |
+          ```java
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int age = sc.nextInt();          // lit un entier
+                  sc.nextLine();                   // consomme la fin de ligne restante
+                  String nom = sc.nextLine();      // lit une ligne entière
+                  double taille = sc.nextDouble();
+                  System.out.println(nom + " a " + age + " ans");
+              }
+          }
+          ```
+
+          `sc.hasNextInt()` / `sc.hasNextLine()` testent s’il reste des données. Pour de gros volumes, `BufferedReader` est plus rapide.
+    exercises:
+      - id: java-pp-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  System.out.print("A");
+                  System.out.print("B");
+                  System.out.println("C");
+                  System.out.println(1 + 2 + "3" + 4 + 5);
+              }
+          }
+        output: "ABC\n3345"
+        explanation: '1 + 2 = 3 (addition), puis "3" fait passer en concaténation : "33", "334", "3345".'
+      - id: java-pp-q1
+        type: mcq
+        prompt: Quelle est la signature exacte de la méthode principale ?
+        choices: ['public static void main(String[] args)', 'public int main()', 'static main(args)', 'void main(String args)']
+        answer: 0
+      - id: java-pp-fill
+        type: fill
+        prompt: Complète pour lire un entier et afficher son double.
+        code: |
+          import java.util.Scanner;
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new {{?}}(System.in);
+                  int n = sc.{{?}}();
+                  System.out.println(n * 2);
+              }
+          }
+        blanks: [[Scanner], [nextInt]]
+        tests:
+          - { input: '21', output: '42' }
+      - id: java-pp-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  system.out.println("Bonjour");
+              }
+          }
+        bugLines: [3]
+        choices:
+          - Java est sensible à la casse ; il faut System avec une majuscule
+          - Il manque un import
+          - main doit être private
+        answer: 0
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  System.out.println("Bonjour");
+              }
+          }
+        tests:
+          - { input: '', output: Bonjour }
+      - id: java-pp-code
+        type: code
+        title: Addition
+        prompt: Lis deux entiers et affiche `a + b = résultat`.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  long a = sc.nextLong();
+                  long b = sc.nextLong();
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  long a = sc.nextLong();
+                  long b = sc.nextLong();
+                  System.out.println(a + " + " + b + " = " + (a + b));
+              }
+          }
+        tests:
+          - { input: 2 3, output: 2 + 3 = 5 }
+          - { input: "10\n-4", output: 10 + -4 = 6, hidden: true }
+        hints: ['Attention aux parenthèses : sans elles, `"…" + a + b` concatène au lieu d’additionner.']
+    project:
+      id: java-pp-projet
+      type: code
+      title: Ticket de caisse
+      difficulty: 1
+      prompt: |
+        Lis un nom d’article (ligne entière) puis un prix en centimes. Affiche :
+
+        ```
+        Article : <nom>
+        Prix : <prix> centimes
+        Merci de votre visite !
+        ```
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String nom = sc.nextLine();
+                int prix = sc.nextInt();
+                System.out.println("Article : " + nom);
+                System.out.println("Prix : " + prix + " centimes");
+                System.out.println("Merci de votre visite !");
+            }
+        }
+      tests:
+        - { input: "Pain au chocolat\n130", output: "Article : Pain au chocolat\nPrix : 130 centimes\nMerci de votre visite !" }
+        - { input: "Clé USB\n999", output: "Article : Clé USB\nPrix : 999 centimes\nMerci de votre visite !", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-pp-ex1
+          type: mcq
+          prompt: Quelle différence entre print et println ?
+          choices: ['println ajoute un retour à la ligne', 'print est plus rapide', 'println affiche en couleur', 'Aucune']
+          answer: 0
+        - id: java-pp-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                public static void main(String[] args) {
+                    System.out.printf("%d-%s-%.1f%n", 7, "kiri", 2.25);
+                }
+            }
+          output: 7-kiri-2.3
+        - id: java-pp-ex3
+          type: mcq
+          prompt: Pourquoi appeler sc.nextLine() après sc.nextInt() avant de lire une ligne ?
+          choices: ['Pour consommer la fin de ligne laissée par nextInt', 'Pour vider la mémoire', 'Pour fermer le Scanner', 'Ce n’est jamais nécessaire']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-variables
+    title: Variables
+    summary: Déclarer et initialiser des variables, var, final, portée, constantes et conventions de nommage.
+    minutes: 20
+    concepts: [variables]
+    sections:
+      - title: Déclarer
+        body: |
+          ```java
+          int age = 25;
+          double taille = 1.62;
+          String nom = "Kiri";
+          boolean actif = true;
+          var score = 100;          // type déduit (int), variables locales uniquement
+          final int VIES = 3;       // non modifiable après initialisation
+          ```
+
+          - Une variable **locale** doit être initialisée avant d’être lue (sinon erreur de compilation : *might not have been initialized*).
+          - `var` n’est pas un type dynamique : le type est fixé à la compilation.
+          - Constantes de classe : `static final double TVA = 0.2;` (en `MAJUSCULES_AVEC_UNDERSCORES`).
+      - title: Conventions et portée
+        body: |
+          | Élément | Convention | Exemple |
+          |---|---|---|
+          | variables, méthodes | camelCase | `nombreTotal`, `calculerPrix()` |
+          | classes | PascalCase | `CompteBancaire` |
+          | constantes | MAJUSCULES | `VITESSE_MAX` |
+          | packages | minuscules | `fr.codemori.jeu` |
+
+          Une variable n’existe que dans le bloc `{ }` où elle est déclarée. Java interdit de redéclarer une variable locale du même nom dans un bloc imbriqué (contrairement au C++).
+    exercises:
+      - id: java-var-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int a = 5;
+                  var b = a * 2;
+                  a += 1;
+                  int c = a++ + ++b;
+                  System.out.println(a + " " + b + " " + c);
+              }
+          }
+        output: 7 11 17
+      - id: java-var-q1
+        type: mcq
+        prompt: Que signifie final devant une variable ?
+        choices: ['Sa valeur ne peut plus être modifiée après initialisation', 'Elle est la dernière déclarée', 'Elle est globale', 'Elle est supprimée à la fin']
+        answer: 0
+      - id: java-var-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int total;
+                  for (int i = 1; i <= 3; i++) {
+                      total += i;
+                  }
+                  System.out.println(total);
+              }
+          }
+        bugLines: [3]
+        choices:
+          - total n’est pas initialisée avant d’être utilisée
+          - On ne peut pas additionner dans une boucle
+          - i doit être déclaré avant la boucle
+        answer: 0
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  int total = 0;
+                  for (int i = 1; i <= 3; i++) {
+                      total += i;
+                  }
+                  System.out.println(total);
+              }
+          }
+        tests:
+          - { input: '', output: '6' }
+      - id: java-var-code
+        type: code
+        title: Échange
+        prompt: Lis deux entiers `a` et `b`, échange-les avec une variable temporaire et affiche `a b`.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int a = sc.nextInt(), b = sc.nextInt();
+                  // échange
+                  System.out.println(a + " " + b);
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int a = sc.nextInt(), b = sc.nextInt();
+                  int tmp = a;
+                  a = b;
+                  b = tmp;
+                  System.out.println(a + " " + b);
+              }
+          }
+        tests:
+          - { input: 3 8, output: 8 3 }
+          - { input: -1 0, output: 0 -1, hidden: true }
+    project:
+      id: java-var-projet
+      type: code
+      title: Convertisseur de durée
+      difficulty: 2
+      prompt: Lis un nombre de secondes et affiche `H h M min S s` en utilisant des constantes `static final`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                long total = new Scanner(System.in).nextLong();
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            static final long SECONDES_PAR_MINUTE = 60;
+            static final long SECONDES_PAR_HEURE = 60 * SECONDES_PAR_MINUTE;
+
+            public static void main(String[] args) {
+                long total = new Scanner(System.in).nextLong();
+                long h = total / SECONDES_PAR_HEURE;
+                long m = total % SECONDES_PAR_HEURE / SECONDES_PAR_MINUTE;
+                long s = total % SECONDES_PAR_MINUTE;
+                System.out.println(h + " h " + m + " min " + s + " s");
+            }
+        }
+      tests:
+        - { input: '3725', output: 1 h 2 min 5 s }
+        - { input: '86399', output: 23 h 59 min 59 s, hidden: true }
+      require:
+        - { pattern: 'static\s+final', message: Utiliser des constantes static final }
+    exam:
+      pass: 70
+      questions:
+        - id: java-var-ex1
+          type: mcq
+          prompt: Où peut-on utiliser var ?
+          choices: ['Pour les variables locales avec initialiseur', 'Partout, y compris les attributs', 'Seulement pour les String', 'Nulle part en Java 21']
+          answer: 0
+        - id: java-var-ex2
+          type: mcq
+          prompt: Quel nom de constante respecte les conventions ?
+          choices: ['TAUX_MAX', 'tauxMax', 'TauxMax', 'taux_max']
+          answer: 0
+        - id: java-var-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                public static void main(String[] args) {
+                    int x = 10;
+                    x -= 3;
+                    x *= 2;
+                    x %= 5;
+                    System.out.println(x);
+                }
+            }
+          output: '4'
+
+  # ------------------------------------------------------------------
+  - slug: java-types
+    title: Types
+    summary: Types primitifs et types référence, tailles fixes, conversions, casts, classes enveloppes et pièges du dépassement.
+    minutes: 25
+    concepts: [types]
+    sections:
+      - title: Les 8 types primitifs
+        body: |
+          | Type | Taille | Exemple |
+          |---|---|---|
+          | `byte` | 8 bits | `(byte) 100` |
+          | `short` | 16 bits | `30000` |
+          | `int` | 32 bits | `42` |
+          | `long` | 64 bits | `9_000_000_000L` |
+          | `float` | 32 bits | `3.14f` |
+          | `double` | 64 bits | `3.14` |
+          | `char` | 16 bits (UTF-16) | `'K'` |
+          | `boolean` | — | `true` |
+
+          Les tailles sont **identiques sur toutes les plateformes**. Tout le reste (`String`, tableaux, objets) est un **type référence**.
+
+          Chaque primitif a une **classe enveloppe** : `Integer`, `Long`, `Double`, `Character`, `Boolean`… utilisée dans les collections (`List<Integer>`), avec conversion automatique (*autoboxing*).
+      - title: Conversions et pièges
+        body: |
+          ```java
+          int i = 42;
+          long l = i;              // élargissement implicite
+          double d = i;            // 42.0
+          int t = (int) 9.99;      // cast explicite : 9 (troncature)
+          int div = 7 / 2;         // 3
+          double vraie = 7 / 2.0;  // 3.5
+
+          int max = Integer.MAX_VALUE;
+          System.out.println(max + 1);        // -2147483648 : dépassement silencieux !
+          Math.addExact(max, 1);              // lève ArithmeticException
+
+          int n = Integer.parseInt("123");    // texte → nombre
+          String s = String.valueOf(3.5);     // nombre → texte
+          ```
+
+          ⚠️ Comparer des `Integer` avec `==` compare des **références** (vrai seulement entre -128 et 127 grâce à un cache) : utilise `.equals()`.
+    exercises:
+      - id: java-types-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  System.out.println(7 / 2 + " " + 7 / 2.0 + " " + (int) 3.99 + " " + 7 % 3);
+                  System.out.println(Integer.MAX_VALUE + 1);
+                  System.out.println((char) ('A' + 2));
+              }
+          }
+        output: "3 3.5 3 1\n-2147483648\nC"
+      - id: java-types-q1
+        type: mcq
+        prompt: Combien de bits occupe un int en Java ?
+        choices: ['32 sur toutes les plateformes', '16', '64', 'Cela dépend de la machine']
+        answer: 0
+      - id: java-types-q2
+        type: mcq
+        prompt: Comment comparer correctement deux objets Integer ?
+        choices: ['a.equals(b)', 'a == b', 'a.compare(b) == true', 'a === b']
+        answer: 0
+      - id: java-types-code
+        type: code
+        title: Moyenne de trois notes
+        prompt: Lis trois entiers et affiche leur moyenne avec deux décimales (`String.format("%.2f", …)` — attention, utilise `Locale.US` pour obtenir un point décimal).
+        starter: |
+          import java.util.Locale;
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int a = sc.nextInt(), b = sc.nextInt(), c = sc.nextInt();
+              }
+          }
+        solution: |
+          import java.util.Locale;
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int a = sc.nextInt(), b = sc.nextInt(), c = sc.nextInt();
+                  double moyenne = (a + b + c) / 3.0;
+                  System.out.println(String.format(Locale.US, "%.2f", moyenne));
+              }
+          }
+        tests:
+          - { input: 12 15 10, output: '12.33' }
+          - { input: 0 1 1, output: '0.67', hidden: true }
+    project:
+      id: java-types-projet
+      type: code
+      title: Calculatrice sûre
+      difficulty: 2
+      prompt: |
+        Pour chaque ligne `a b` (entiers int), affiche la somme et le produit avec `Math.addExact` et `Math.multiplyExact` ; en cas de dépassement, affiche `dépassement` pour l’opération concernée. Format : `somme=… produit=…`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextInt()) {
+                    int a = sc.nextInt(), b = sc.nextInt();
+                }
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            static String somme(int a, int b) {
+                try { return String.valueOf(Math.addExact(a, b)); } catch (ArithmeticException e) { return "dépassement"; }
+            }
+            static String produit(int a, int b) {
+                try { return String.valueOf(Math.multiplyExact(a, b)); } catch (ArithmeticException e) { return "dépassement"; }
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextInt()) {
+                    int a = sc.nextInt(), b = sc.nextInt();
+                    System.out.println("somme=" + somme(a, b) + " produit=" + produit(a, b));
+                }
+            }
+        }
+      tests:
+        - { input: "3 4\n2147483647 1\n100000 100000", output: "somme=7 produit=12\nsomme=dépassement produit=2147483647\nsomme=200000 produit=dépassement" }
+        - { input: -2147483648 -1, output: somme=dépassement produit=dépassement, hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-types-ex1
+          type: mcq
+          prompt: Que vaut (int) 9.99 ?
+          choices: ['9', '10', '9.99', 'Erreur']
+          answer: 0
+        - id: java-types-ex2
+          type: mcq
+          prompt: Comment convertir "42" en int ?
+          choices: ['Integer.parseInt("42")', '(int) "42"', '"42".toInt()', 'int.parse("42")']
+          answer: 0
+        - id: java-types-ex3
+          type: mcq
+          prompt: Qu’est-ce que l’autoboxing ?
+          choices: ['La conversion automatique entre primitif et classe enveloppe', 'Une compression mémoire', 'Un type de boucle', 'Une exception']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-operateurs
+    title: Opérateurs
+    summary: Opérateurs arithmétiques, incrémentation, comparaison, logiques, ternaire, priorités et concaténation de chaînes.
+    minutes: 20
+    concepts: [operateurs]
+    sections:
+      - title: Les opérateurs
+        body: |
+          | Catégorie | Opérateurs |
+          |---|---|
+          | Arithmétiques | `+ - * / %` |
+          | Incrémentation | `++ --` (pré et post) |
+          | Comparaison | `== != < <= > >=` |
+          | Logiques | `&& \|\| !` (paresseux) |
+          | Affectation | `= += -= *= /= %=` |
+          | Ternaire | `cond ? a : b` |
+
+          ```java
+          int a = 5;
+          int b = a++;    // b = 5, a = 6
+          int c = ++a;    // a = 7, c = 7
+          String parite = a % 2 == 0 ? "pair" : "impair";
+          ```
+      - title: Le piège de +
+        body: |
+          `+` additionne des nombres… mais **concatène** dès qu’un opérande est une `String`, de gauche à droite :
+
+          ```java
+          System.out.println(1 + 2 + "3");   // "33"
+          System.out.println("1" + 2 + 3);   // "123"
+          System.out.println("1" + (2 + 3)); // "15"
+          ```
+
+          `Math` fournit `Math.pow`, `Math.sqrt`, `Math.abs`, `Math.max`, `Math.round`, `Math.floorMod` (modulo toujours positif). Le `%` Java garde le signe du dividende : `-7 % 3 == -1`.
+    exercises:
+      - id: java-op-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int x = 4;
+                  int y = x++ * 2 + --x;
+                  System.out.println(x + " " + y + " " + (-7 % 3) + " " + Math.floorMod(-7, 3));
+              }
+          }
+        output: 4 12 -1 2
+      - id: java-op-q1
+        type: mcq
+        prompt: Que vaut "1" + 2 + 3 ?
+        choices: ['"123"', '6', '"15"', 'Erreur']
+        answer: 0
+      - id: java-op-fill
+        type: fill
+        prompt: Complète avec l’opérateur ternaire.
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int n = 7;
+                  String s = n > 0 {{?}} "positif" {{?}} "négatif ou nul";
+                  System.out.println(s);
+              }
+          }
+        blanks: [['?'], [':']]
+        tests:
+          - { input: '', output: positif }
+      - id: java-op-code
+        type: code
+        title: Calculatrice
+        prompt: Lis deux entiers `a` et `b` (b ≠ 0) et affiche sur cinq lignes `a + b = …`, `a - b = …`, `a * b = …`, `a / b = …`, `a % b = …`.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  long a = sc.nextLong(), b = sc.nextLong();
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  long a = sc.nextLong(), b = sc.nextLong();
+                  System.out.println(a + " + " + b + " = " + (a + b));
+                  System.out.println(a + " - " + b + " = " + (a - b));
+                  System.out.println(a + " * " + b + " = " + (a * b));
+                  System.out.println(a + " / " + b + " = " + (a / b));
+                  System.out.println(a + " % " + b + " = " + (a % b));
+              }
+          }
+        tests:
+          - { input: 17 5, output: "17 + 5 = 22\n17 - 5 = 12\n17 * 5 = 85\n17 / 5 = 3\n17 % 5 = 2" }
+          - { input: -9 4, output: "-9 + 4 = -5\n-9 - 4 = -13\n-9 * 4 = -36\n-9 / 4 = -2\n-9 % 4 = -1", hidden: true }
+    project:
+      id: java-op-projet
+      type: code
+      title: Années bissextiles
+      difficulty: 2
+      prompt: 'Pour chaque année lue, affiche `AAAA : bissextile (366 jours)` ou `AAAA : normale (365 jours)` avec une seule expression booléenne et l’opérateur ternaire.'
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextInt()) {
+                    int annee = sc.nextInt();
+                }
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextInt()) {
+                    int annee = sc.nextInt();
+                    boolean b = (annee % 4 == 0 && annee % 100 != 0) || annee % 400 == 0;
+                    System.out.println(annee + " : " + (b ? "bissextile (366 jours)" : "normale (365 jours)"));
+                }
+            }
+        }
+      tests:
+        - { input: 2024 2023, output: "2024 : bissextile (366 jours)\n2023 : normale (365 jours)" }
+        - { input: 1900 2000, output: "1900 : normale (365 jours)\n2000 : bissextile (366 jours)", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-op-ex1
+          type: mcq
+          prompt: Que vaut -7 % 3 en Java ?
+          choices: ['-1', '2', '1', '-2']
+          answer: 0
+        - id: java-op-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                public static void main(String[] args) {
+                    System.out.println("a" + 1 + 2 + " " + (1 + 2) + "b");
+                }
+            }
+          output: a12 3b
+        - id: java-op-ex3
+          type: mcq
+          prompt: Les opérateurs && et || sont…
+          choices: ['Paresseux : la partie droite n’est évaluée que si nécessaire', 'Toujours évalués entièrement', 'Réservés aux entiers', 'Bit à bit']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-conditions
+    title: Conditions
+    summary: if/else, switch classique et switch moderne avec flèches et expressions, comparaison de chaînes avec equals.
+    minutes: 25
+    concepts: [conditions]
+    sections:
+      - title: if et else
+        body: |
+          ```java
+          int t = 22;
+          if (t > 30) {
+              System.out.println("chaud");
+          } else if (t > 15) {
+              System.out.println("bon");
+          } else {
+              System.out.println("frais");
+          }
+          ```
+
+          La condition doit être un `boolean` (pas d’entier comme en C). Pour les **chaînes**, utilise `.equals()` et non `==` :
+
+          ```java
+          String r = sc.nextLine();
+          if (r.equals("oui")) { … }
+          if ("oui".equalsIgnoreCase(r)) { … }   // insensible à la casse, sûr si r est null
+          ```
+      - title: switch moderne
+        body: |
+          ```java
+          String jour = "samedi";
+          switch (jour) {                          // switch « flèche » : pas de fallthrough
+              case "samedi", "dimanche" -> System.out.println("week-end");
+              default -> System.out.println("semaine");
+          }
+
+          int note = 14;
+          String mention = switch (note / 2) {     // switch EXPRESSION (Java 14+)
+              case 10, 9, 8 -> "très bien";
+              case 7 -> "bien";
+              case 6 -> "assez bien";
+              default -> {
+                  String r = note >= 10 ? "passable" : "insuffisant";
+                  yield r;                         // yield renvoie une valeur d’un bloc
+              }
+          };
+          ```
+
+          Le `switch` classique avec `case X:` et `break;` existe toujours (attention au *fallthrough*). Java 21 ajoute le **filtrage par motif** dans `switch` (`case Integer i when i > 0 ->`).
+    exercises:
+      - id: java-cond-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int n = 3;
+                  String s = switch (n) {
+                      case 1 -> "un";
+                      case 2, 3 -> "deux ou trois";
+                      default -> "autre";
+                  };
+                  String a = new String("kiri");
+                  System.out.println(s + " " + (a == "kiri") + " " + a.equals("kiri"));
+              }
+          }
+        output: deux ou trois false true
+      - id: java-cond-q1
+        type: mcq
+        prompt: Comment comparer le contenu de deux String ?
+        choices: ['s1.equals(s2)', 's1 == s2', 's1.compareTo(s2) == true', 's1 = s2']
+        answer: 0
+      - id: java-cond-fill
+        type: fill
+        prompt: Complète le bloc du switch expression qui renvoie une valeur.
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int x = 5;
+                  String t = switch (x % 2) {
+                      case 0 -> "pair";
+                      default -> {
+                          String r = "impair";
+                          {{?}} r;
+                      }
+                  };
+                  System.out.println(t);
+              }
+          }
+        blanks: [[yield]]
+        tests:
+          - { input: '', output: impair }
+      - id: java-cond-code
+        type: code
+        title: Catégorie d’âge
+        prompt: Lis un âge et affiche `enfant` (< 13), `adolescent` (13–17), `adulte` (18–64) ou `senior` (≥ 65).
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  int age = new Scanner(System.in).nextInt();
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  int age = new Scanner(System.in).nextInt();
+                  if (age < 13) System.out.println("enfant");
+                  else if (age < 18) System.out.println("adolescent");
+                  else if (age < 65) System.out.println("adulte");
+                  else System.out.println("senior");
+              }
+          }
+        tests:
+          - { input: '8', output: enfant }
+          - { input: '17', output: adolescent, hidden: true }
+          - { input: '65', output: senior, hidden: true }
+    project:
+      id: java-cond-projet
+      type: code
+      title: Calculatrice à opérateur
+      difficulty: 2
+      prompt: 'Chaque ligne contient `a op b`. Avec un **switch expression** sur `op`, affiche le résultat, `erreur : division par zéro` ou `erreur : opérateur inconnu`.'
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNext()) {
+                    long a = sc.nextLong();
+                    String op = sc.next();
+                    long b = sc.nextLong();
+                }
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNext()) {
+                    long a = sc.nextLong();
+                    String op = sc.next();
+                    long b = sc.nextLong();
+                    String r = switch (op) {
+                        case "+" -> String.valueOf(a + b);
+                        case "-" -> String.valueOf(a - b);
+                        case "*" -> String.valueOf(a * b);
+                        case "/", "%" -> b == 0 ? "erreur : division par zéro" : String.valueOf(op.equals("/") ? a / b : a % b);
+                        default -> "erreur : opérateur inconnu";
+                    };
+                    System.out.println(r);
+                }
+            }
+        }
+      tests:
+        - { input: "6 * 7\n10 / 0\n9 % 4", output: "42\nerreur : division par zéro\n1" }
+        - { input: "1 ^ 2\n-5 + 3", output: "erreur : opérateur inconnu\n-2", hidden: true }
+      require:
+        - { pattern: 'switch\s*\(', message: Utiliser un switch }
+    exam:
+      pass: 70
+      questions:
+        - id: java-cond-ex1
+          type: mcq
+          prompt: Le switch avec flèches (->) a-t-il un fallthrough ?
+          choices: ['Non', 'Oui, comme le switch classique', 'Seulement avec default', 'Seulement pour les String']
+          answer: 0
+        - id: java-cond-ex2
+          type: mcq
+          prompt: Pourquoi écrire "oui".equals(r) plutôt que r.equals("oui") ?
+          choices: ['Pas de NullPointerException si r vaut null', 'C’est plus rapide', 'Par convention uniquement', 'Pour la casse']
+          answer: 0
+        - id: java-cond-ex3
+          type: mcq
+          prompt: Quel mot-clé renvoie une valeur depuis un bloc d’un switch expression ?
+          choices: ['yield', 'return', 'break', 'give']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-boucles
+    title: Boucles
+    summary: for, while, do…while, boucle for-each, break et continue, étiquettes et pièges classiques.
+    minutes: 25
+    concepts: [boucles]
+    sections:
+      - title: Les boucles
+        body: |
+          ```java
+          for (int i = 0; i < 5; i++) { System.out.print(i + " "); }   // 0 1 2 3 4
+
+          int n = 3;
+          while (n > 0) { System.out.println(n-- + "…"); }
+
+          int choix;
+          do { choix = sc.nextInt(); } while (choix < 1 || choix > 3);  // au moins une fois
+
+          int[] notes = {12, 17, 9};
+          for (int note : notes) { System.out.println(note); }          // for-each
+          ```
+
+          `break` sort de la boucle, `continue` passe au tour suivant. Une **étiquette** permet de sortir de boucles imbriquées : `externe: for (…) { for (…) { break externe; } }`.
+      - title: Pièges
+        body: |
+          - *Off-by-one* : `i <= n` fait un tour de trop pour un tableau de taille n.
+          - Boucle infinie : la variable de contrôle ne change jamais.
+          - Modifier une `List` pendant un for-each → `ConcurrentModificationException` (utiliser un `Iterator` et `remove()`, ou `removeIf`).
+          - Concaténer des `String` dans une grande boucle est lent : utiliser un `StringBuilder`.
+    exercises:
+      - id: java-loop-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int s = 0;
+                  externe:
+                  for (int i = 1; i <= 4; i++) {
+                      for (int j = 1; j <= 4; j++) {
+                          if (j > i) continue externe;
+                          if (i * j > 6) break externe;
+                          s += i * j;
+                      }
+                  }
+                  System.out.println(s);
+              }
+          }
+        output: '16'
+      - id: java-loop-q1
+        type: mcq
+        prompt: Quelle boucle parcourt directement les éléments d’un tableau ?
+        choices: ['for (int x : t)', 'foreach x in t', 'for x of t', 'loop t']
+        answer: 0
+      - id: java-loop-bug
+        type: bugfix
+        prompt: Ce programme lève une ArrayIndexOutOfBoundsException. Trouve la ligne fautive.
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  int[] t = {10, 20, 30};
+                  int s = 0;
+                  for (int i = 0; i <= t.length; i++) {
+                      s += t[i];
+                  }
+                  System.out.println(s);
+              }
+          }
+        bugLines: [5]
+        choices:
+          - La condition <= fait un tour de trop (il faut <)
+          - length doit s’écrire length()
+          - s doit être un long
+        answer: 0
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  int[] t = {10, 20, 30};
+                  int s = 0;
+                  for (int i = 0; i < t.length; i++) {
+                      s += t[i];
+                  }
+                  System.out.println(s);
+              }
+          }
+        tests:
+          - { input: '', output: '60' }
+      - id: java-loop-code
+        type: code
+        title: Table de multiplication
+        prompt: Lis `n` et affiche sa table de 1 à 10 au format `n x i = r`.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  int n = new Scanner(System.in).nextInt();
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  int n = new Scanner(System.in).nextInt();
+                  for (int i = 1; i <= 10; i++) System.out.println(n + " x " + i + " = " + n * i);
+              }
+          }
+        tests:
+          - { input: '3', output: "3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15\n3 x 6 = 18\n3 x 7 = 21\n3 x 8 = 24\n3 x 9 = 27\n3 x 10 = 30" }
+          - { input: '-2', output: "-2 x 1 = -2\n-2 x 2 = -4\n-2 x 3 = -6\n-2 x 4 = -8\n-2 x 5 = -10\n-2 x 6 = -12\n-2 x 7 = -14\n-2 x 8 = -16\n-2 x 9 = -18\n-2 x 10 = -20", hidden: true }
+    project:
+      id: java-loop-projet
+      type: code
+      title: FizzBuzz
+      difficulty: 2
+      prompt: Lis `n` et affiche les nombres de 1 à n en remplaçant les multiples de 3 par `Fizz`, de 5 par `Buzz` et de 15 par `FizzBuzz`. Construis toute la sortie dans un `StringBuilder` et affiche-la en une fois.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                int n = new Scanner(System.in).nextInt();
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                int n = new Scanner(System.in).nextInt();
+                StringBuilder sb = new StringBuilder();
+                for (int i = 1; i <= n; i++) {
+                    if (i % 15 == 0) sb.append("FizzBuzz");
+                    else if (i % 3 == 0) sb.append("Fizz");
+                    else if (i % 5 == 0) sb.append("Buzz");
+                    else sb.append(i);
+                    sb.append('\n');
+                }
+                System.out.print(sb);
+            }
+        }
+      tests:
+        - { input: '5', output: "1\n2\nFizz\n4\nBuzz" }
+        - { input: '15', output: "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz", hidden: true }
+      require:
+        - { pattern: 'StringBuilder', message: Utiliser un StringBuilder }
+    exam:
+      pass: 70
+      questions:
+        - id: java-loop-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                public static void main(String[] args) {
+                    int i = 10;
+                    do { System.out.print(i + " "); i -= 4; } while (i > 0);
+                    System.out.println();
+                }
+            }
+          output: 10 6 2
+        - id: java-loop-ex2
+          type: mcq
+          prompt: Que provoque la suppression d’éléments d’une ArrayList pendant un for-each ?
+          choices: ['ConcurrentModificationException', 'Rien de grave', 'Une erreur de compilation', 'La boucle repart du début']
+          answer: 0
+        - id: java-loop-ex3
+          type: mcq
+          prompt: Comment sortir de deux boucles imbriquées d’un coup ?
+          choices: ['break avec une étiquette', 'Deux return', 'exit', 'continue']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-methodes
+    title: Fonctions et méthodes
+    summary: Méthodes statiques, paramètres et valeur de retour, passage par valeur, surcharge, récursivité et varargs.
+    minutes: 30
+    concepts: [fonctions]
+    sections:
+      - title: Déclarer une méthode
+        body: |
+          ```java
+          public class Main {
+              static int carre(int x) {             // méthode de classe (static)
+                  return x * x;
+              }
+              static double moyenne(double... xs) { // varargs : nombre variable d’arguments
+                  double s = 0;
+                  for (double x : xs) s += x;
+                  return xs.length == 0 ? 0 : s / xs.length;
+              }
+              static void saluer(String nom) { System.out.println("Bonjour " + nom); }
+
+              public static void main(String[] args) {
+                  System.out.println(carre(7));          // 49
+                  System.out.println(moyenne(2, 4, 9));  // 5.0
+              }
+          }
+          ```
+
+          L’ordre des méthodes dans la classe n’a pas d’importance. `void` = ne renvoie rien.
+      - title: Passage par valeur et surcharge
+        body: |
+          Java passe **toujours par valeur** : pour un primitif, la valeur est copiée ; pour un objet, c’est la **référence** qui est copiée (la méthode peut donc modifier l’objet, mais pas faire pointer la variable de l’appelant ailleurs).
+
+          ```java
+          static void f(int x) { x = 99; }                    // sans effet pour l’appelant
+          static void g(int[] t) { t[0] = 99; }               // modifie le tableau partagé
+          static void h(int[] t) { t = new int[]{1}; }        // sans effet pour l’appelant
+          ```
+
+          **Surcharge** : plusieurs méthodes de même nom avec des paramètres différents : `max(int, int)` et `max(double, double)`.
+    exercises:
+      - id: java-fn-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              static void f(int x) { x += 10; }
+              static void g(int[] t) { t[0] += 10; }
+              static void h(int[] t) { t = new int[]{100}; }
+              public static void main(String[] args) {
+                  int a = 1;
+                  int[] t = {1};
+                  f(a); g(t); h(t);
+                  System.out.println(a + " " + t[0]);
+              }
+          }
+        output: 1 11
+        concepts: [fonctions]
+      - id: java-fn-q1
+        type: mcq
+        prompt: Comment Java passe-t-il les arguments ?
+        choices: ['Toujours par valeur (la référence est copiée pour les objets)', 'Par référence pour tout', 'Par pointeur', 'Par nom']
+        answer: 0
+      - id: java-fn-fill
+        type: fill
+        prompt: Complète la méthode qui renvoie le plus grand de deux entiers.
+        code: |
+          public class Main {
+              static {{?}} max(int a, int b) {
+                  {{?}} a > b ? a : b;
+              }
+              public static void main(String[] args) { System.out.println(max(3, 9)); }
+          }
+        blanks: [[int], [return]]
+        tests:
+          - { input: '', output: '9' }
+        concepts: [fonctions]
+      - id: java-fn-code
+        type: code
+        title: Nombres premiers
+        prompt: Écris `static boolean estPremier(long n)`. Pour chaque nombre lu, affiche `premier` ou `pas premier`.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLong()) {
+                      System.out.println(estPremier(sc.nextLong()) ? "premier" : "pas premier");
+                  }
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              static boolean estPremier(long n) {
+                  if (n < 2) return false;
+                  for (long d = 2; d * d <= n; d++) if (n % d == 0) return false;
+                  return true;
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLong()) {
+                      System.out.println(estPremier(sc.nextLong()) ? "premier" : "pas premier");
+                  }
+              }
+          }
+        tests:
+          - { input: 7 8, output: "premier\npas premier" }
+          - { input: 0 1 2 97 91 1000003, output: "pas premier\npas premier\npremier\npremier\npas premier\npremier", hidden: true }
+        concepts: [fonctions]
+    project:
+      id: java-fn-projet
+      type: code
+      title: Factorielle et Fibonacci
+      difficulty: 2
+      prompt: |
+        Écris une méthode **récursive** `long factorielle(int n)` et une méthode **itérative** `long fibonacci(int n)` (fib(0)=0, fib(1)=1). Pour chaque `n` lu, affiche `n! = …` puis `fib(n) = …`.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextInt()) {
+                    int n = sc.nextInt();
+                }
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            static long factorielle(int n) { return n <= 1 ? 1 : n * factorielle(n - 1); }
+            static long fibonacci(int n) {
+                long a = 0, b = 1;
+                for (int i = 0; i < n; i++) { long c = a + b; a = b; b = c; }
+                return a;
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextInt()) {
+                    int n = sc.nextInt();
+                    System.out.println(n + "! = " + factorielle(n));
+                    System.out.println("fib(" + n + ") = " + fibonacci(n));
+                }
+            }
+        }
+      tests:
+        - { input: '5', output: "5! = 120\nfib(5) = 5" }
+        - { input: 0 20, output: "0! = 1\nfib(0) = 0\n20! = 2432902008176640000\nfib(20) = 6765", hidden: true }
+      require:
+        - { pattern: 'factorielle\s*\(\s*n\s*-\s*1\s*\)', message: factorielle doit être récursive }
+      concepts: [fonctions, recursivite]
+    exam:
+      pass: 70
+      questions:
+        - id: java-fn-ex1
+          type: mcq
+          prompt: Qu’est-ce que la surcharge ?
+          choices: ['Plusieurs méthodes de même nom avec des paramètres différents', 'Une méthode trop longue', 'Une redéfinition dans une sous-classe', 'Une méthode récursive']
+          answer: 0
+        - id: java-fn-ex2
+          type: mcq
+          prompt: Que permet la syntaxe int... xs ?
+          choices: ['Recevoir un nombre variable d’arguments', 'Déclarer un tableau 3D', 'Un commentaire', 'Une boucle']
+          answer: 0
+        - id: java-fn-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                static int somme(int... xs) { int s = 0; for (int x : xs) s += x; return s; }
+                static String type(int x) { return "int"; }
+                static String type(double x) { return "double"; }
+                public static void main(String[] args) {
+                    System.out.println(somme() + " " + somme(1, 2, 3) + " " + type(2) + " " + type(2.0));
+                }
+            }
+          output: 0 6 int double
+
+  # ------------------------------------------------------------------
+  - slug: java-tableaux
+    title: Tableaux
+    summary: Déclaration, initialisation, parcours, Arrays.sort/toString/fill, tableaux à deux dimensions et limites des tableaux.
+    minutes: 25
+    concepts: [tableaux, collections]
+    sections:
+      - title: Tableaux
+        body: |
+          ```java
+          int[] notes = {12, 15, 9};          // initialisation directe
+          int[] zeros = new int[5];           // [0, 0, 0, 0, 0] (valeurs par défaut)
+          String[] noms = new String[3];      // [null, null, null]
+          notes[0] = 18;
+          System.out.println(notes.length);   // 3 (attribut, pas de parenthèses)
+
+          import java.util.Arrays;
+          Arrays.sort(notes);                         // tri
+          System.out.println(Arrays.toString(notes)); // [9, 15, 18]
+          Arrays.fill(zeros, 7);
+          int[] copie = Arrays.copyOf(notes, 5);      // [9, 15, 18, 0, 0]
+          int pos = Arrays.binarySearch(notes, 15);   // 1
+          ```
+
+          La taille d’un tableau est **fixe**. Pour une taille variable, on utilisera `ArrayList` (niveau Intermédiaire). Un indice invalide lève `ArrayIndexOutOfBoundsException`.
+      - title: Deux dimensions
+        body: |
+          ```java
+          int[][] grille = new int[3][4];         // 3 lignes, 4 colonnes
+          grille[1][2] = 7;
+          int[][] triangle = {{1}, {1, 1}, {1, 2, 1}};  // lignes de longueurs différentes
+          for (int[] ligne : triangle) {
+              System.out.println(Arrays.toString(ligne));
+          }
+          System.out.println(Arrays.deepToString(grille));
+          ```
+
+          ⚠️ `int[] b = a;` ne copie pas : `a` et `b` désignent le **même** tableau. Utilise `a.clone()` ou `Arrays.copyOf`. Pour comparer le contenu : `Arrays.equals(a, b)`.
+    exercises:
+      - id: java-tab-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          import java.util.Arrays;
+          public class Main {
+              public static void main(String[] args) {
+                  int[] a = {5, 3, 8};
+                  int[] b = a;
+                  int[] c = a.clone();
+                  b[0] = 1;
+                  Arrays.sort(c);
+                  System.out.println(Arrays.toString(a) + " " + Arrays.toString(c) + " " + Arrays.equals(a, b));
+              }
+          }
+        output: '[1, 3, 8] [3, 5, 8] true'
+      - id: java-tab-q1
+        type: mcq
+        prompt: Comment obtenir la taille d’un tableau t ?
+        choices: ['t.length', 't.length()', 't.size()', 'len(t)']
+        answer: 0
+      - id: java-tab-fill
+        type: fill
+        prompt: Complète pour afficher le tableau trié.
+        code: |
+          import java.util.Arrays;
+          public class Main {
+              public static void main(String[] args) {
+                  int[] t = {4, 1, 3};
+                  Arrays.{{?}}(t);
+                  System.out.println(Arrays.{{?}}(t));
+              }
+          }
+        blanks: [[sort], [toString]]
+        tests:
+          - { input: '', output: '[1, 3, 4]' }
+      - id: java-tab-code
+        type: code
+        title: Plus grande hausse
+        prompt: Lis `n` puis `n` températures et affiche la plus grande hausse entre deux jours consécutifs (0 sinon).
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int n = sc.nextInt();
+                  int[] t = new int[n];
+                  for (int i = 0; i < n; i++) t[i] = sc.nextInt();
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int n = sc.nextInt();
+                  int[] t = new int[n];
+                  for (int i = 0; i < n; i++) t[i] = sc.nextInt();
+                  int best = 0;
+                  for (int i = 1; i < n; i++) best = Math.max(best, t[i] - t[i - 1]);
+                  System.out.println(best);
+              }
+          }
+        tests:
+          - { input: "5\n12 15 11 19 18", output: '8' }
+          - { input: "3\n30 20 10", output: '0', hidden: true }
+    project:
+      id: java-tab-projet
+      type: code
+      title: Matrice transposée
+      difficulty: 2
+      prompt: Lis `l c` puis une matrice `l × c`. Affiche sa transposée (`c × l`), puis la somme de chaque ligne de la matrice d’origine séparées par des espaces.
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                int l = sc.nextInt(), c = sc.nextInt();
+                int[][] m = new int[l][c];
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                int l = sc.nextInt(), c = sc.nextInt();
+                int[][] m = new int[l][c];
+                for (int i = 0; i < l; i++) for (int j = 0; j < c; j++) m[i][j] = sc.nextInt();
+                StringBuilder sb = new StringBuilder();
+                for (int j = 0; j < c; j++) {
+                    for (int i = 0; i < l; i++) sb.append(i > 0 ? " " : "").append(m[i][j]);
+                    sb.append('\n');
+                }
+                for (int i = 0; i < l; i++) {
+                    long s = 0;
+                    for (int x : m[i]) s += x;
+                    sb.append(i > 0 ? " " : "").append(s);
+                }
+                System.out.println(sb);
+            }
+        }
+      tests:
+        - { input: "2 3\n1 2 3\n4 5 6", output: "1 4\n2 5\n3 6\n6 15" }
+        - { input: "1 1\n7", output: "7\n7", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-tab-ex1
+          type: mcq
+          prompt: Que contient new String[3] ?
+          choices: ['Trois null', 'Trois chaînes vides', 'Rien, erreur', 'Trois espaces']
+          answer: 0
+        - id: java-tab-ex2
+          type: mcq
+          prompt: Que fait int[] b = a; ?
+          choices: ['b désigne le même tableau que a', 'b est une copie de a', 'Erreur de compilation', 'b est vide']
+          answer: 0
+        - id: java-tab-ex3
+          type: mcq
+          prompt: Quelle exception signale un indice invalide ?
+          choices: ['ArrayIndexOutOfBoundsException', 'NullPointerException', 'IllegalStateException', 'ClassCastException']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-strings
+    title: Strings
+    summary: La classe String immuable, méthodes essentielles, StringBuilder, comparaisons, text blocks et formatage.
+    minutes: 30
+    concepts: [chaines]
+    sections:
+      - title: String est immuable
+        body: |
+          ```java
+          String s = "Bonjour";
+          s.length();                // 7
+          s.charAt(0);               // 'B'
+          s.substring(0, 3);         // "Bon"
+          s.indexOf("jour");         // 3 (-1 si absent)
+          s.toUpperCase();           // "BONJOUR" (nouvelle chaîne)
+          s.contains("jour");        // true
+          s.replace("o", "0");       // "B0nj0ur"
+          s.split(" ");              // tableau de mots
+          "  x ".strip();            // "x"
+          String.join("-", "a", "b"); // "a-b"
+          "ab".repeat(3);            // "ababab"
+          ```
+
+          Une `String` n’est **jamais modifiée** : chaque méthode renvoie une nouvelle chaîne. `s.toUpperCase();` seul ne change pas `s` !
+      - title: StringBuilder, comparaisons, text blocks
+        body: |
+          Pour construire une chaîne par morceaux (dans une boucle), `StringBuilder` évite de créer une chaîne à chaque étape :
+
+          ```java
+          StringBuilder sb = new StringBuilder();
+          for (int i = 0; i < 5; i++) sb.append(i).append(',');
+          sb.setLength(sb.length() - 1);   // retire la dernière virgule
+          sb.reverse();
+          String resultat = sb.toString();
+          ```
+
+          Comparaisons : `equals`, `equalsIgnoreCase`, `compareTo` (ordre lexicographique), `isEmpty`, `isBlank`.
+
+          **Text blocks** (Java 15) et formatage :
+
+          ```java
+          String json = """
+              { "nom": "Kiri", "age": 16 }
+              """;
+          String msg = "%s a %d ans".formatted("Kiri", 16);
+          ```
+    exercises:
+      - id: java-str-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  String s = "programmation";
+                  s.toUpperCase();
+                  System.out.println(s.length() + " " + s.substring(3, 7) + " " + s.indexOf('m') + " " + s);
+                  System.out.println(new StringBuilder("kiri").reverse() + " " + "ab".repeat(2) + " " + "b".compareTo("a"));
+              }
+          }
+        output: "13 gram 6 programmation\nirik abab 1"
+      - id: java-str-q1
+        type: mcq
+        prompt: Pourquoi utiliser StringBuilder dans une boucle ?
+        choices: ['Éviter de créer une nouvelle String à chaque concaténation', 'Parce que String n’a pas de +', 'Pour trier les caractères', 'Pour comparer des chaînes']
+        answer: 0
+      - id: java-str-bug
+        type: bugfix
+        prompt: Ce programme affiche le texte en minuscules au lieu de majuscules. Trouve la ligne fautive.
+        code: |
+          public class Main {
+              public static void main(String[] args) {
+                  String cri = "attention";
+                  cri.toUpperCase();
+                  System.out.println(cri);
+              }
+          }
+        bugLines: [4]
+        choices:
+          - Les String sont immuables ; il faut récupérer le résultat (cri = cri.toUpperCase())
+          - toUpperCase n’existe pas
+          - Il faut un StringBuilder
+        answer: 0
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  String cri = "attention";
+                  cri = cri.toUpperCase();
+                  System.out.println(cri);
+              }
+          }
+        tests:
+          - { input: '', output: ATTENTION }
+      - id: java-str-code
+        type: code
+        title: Palindrome
+        prompt: Pour chaque ligne, affiche `oui` si c’est un palindrome en ignorant les espaces et la casse, `non` sinon.
+        starter: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine();
+                  }
+              }
+          }
+        solution: |
+          import java.util.Scanner;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine().replace(" ", "").toLowerCase();
+                      String r = new StringBuilder(l).reverse().toString();
+                      System.out.println(l.equals(r) ? "oui" : "non");
+                  }
+              }
+          }
+        tests:
+          - { input: "Esope reste ici et se repose\nJava", output: "oui\nnon" }
+          - { input: "kayak\nÉté\nab", output: "oui\noui\nnon", hidden: true }
+    project:
+      id: java-str-projet
+      type: code
+      title: Formateur de noms
+      difficulty: 2
+      prompt: Chaque ligne contient un nom mal formaté (`   jEAN   dupont `). Affiche-le au format `Jean DUPONT` (dernier mot en majuscules, les autres capitalisés, un seul espace entre les mots).
+      starter: |
+        import java.util.Scanner;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                }
+            }
+        }
+      solution: |
+        import java.util.Scanner;
+
+        public class Main {
+            static String capitaliser(String m) {
+                return m.substring(0, 1).toUpperCase() + m.substring(1).toLowerCase();
+            }
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                    String[] mots = sc.nextLine().strip().split("\\s+");
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < mots.length; i++) {
+                        if (i > 0) sb.append(' ');
+                        sb.append(i == mots.length - 1 ? mots[i].toUpperCase() : capitaliser(mots[i]));
+                    }
+                    System.out.println(sb);
+                }
+            }
+        }
+      tests:
+        - { input: '   jEAN   dupont ', output: Jean DUPONT }
+        - { input: "ada lovelace\nmarie   sKLODOWSKA curie", output: "Ada LOVELACE\nMarie Sklodowska CURIE", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-str-ex1
+          type: mcq
+          prompt: Que renvoie "abc".indexOf("z") ?
+          choices: ['-1', '0', 'null', 'Une exception']
+          answer: 0
+        - id: java-str-ex2
+          type: mcq
+          prompt: Quelle méthode vérifie qu’une chaîne ne contient que des espaces (ou est vide) ?
+          choices: ['isBlank()', 'isEmpty()', 'isNull()', 'strip()']
+          answer: 0
+        - id: java-str-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            public class Main {
+                public static void main(String[] args) {
+                    String[] p = "un,deux,,trois".split(",");
+                    System.out.println(p.length + " " + String.join("|", p) + " " + "%d%%".formatted(50));
+                }
+            }
+          output: 4 un|deux||trois 50%
