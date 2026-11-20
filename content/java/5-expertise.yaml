@@ -1,0 +1,2045 @@
+language: java
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: java-architecture
+    title: Architecture logicielle
+    summary: Organiser une application — couches, architecture hexagonale, dépendances vers le domaine, modules et frontières.
+    minutes: 35
+    concepts: [architecture]
+    sections:
+      - title: Architecture en couches
+        body: |
+          La structure classique d’une application d’entreprise :
+
+          | Couche | Rôle | Exemple |
+          |---|---|---|
+          | Présentation | HTTP, JSON, validation des entrées | `CoursController` |
+          | Application / service | cas d’utilisation, transactions | `InscriptionService` |
+          | Domaine | règles métier pures | `Eleve`, `Progression` |
+          | Infrastructure | base de données, e-mail, files | `EleveRepositoryJdbc` |
+
+          Règle d’or : une couche ne dépend que des couches **inférieures**, et le **domaine ne dépend de rien** (pas de SQL ni de HTTP dans les règles métier).
+      - title: Hexagonale (ports et adaptateurs)
+        body: |
+          Le domaine définit des **ports** (interfaces) ; l’infrastructure fournit des **adaptateurs** qui les implémentent :
+
+          ```java
+          // domaine
+          public interface DepotEleves { Optional<Eleve> parId(long id); void sauver(Eleve e); }
+          public class InscriptionService {
+              private final DepotEleves depot;           // dépend d’une abstraction
+              public InscriptionService(DepotEleves depot) { this.depot = depot; }
+          }
+
+          // infrastructure
+          class DepotElevesPostgres implements DepotEleves { … }
+          class DepotElevesMemoire implements DepotEleves { … }   // pour les tests
+          ```
+
+          Avantages : domaine testable sans base de données, technologies remplaçables. Les **modules Java** (`module-info.java`) ou des modules Maven/Gradle séparés rendent ces frontières vérifiables par le compilateur. Outil de vérification automatique : ArchUnit.
+    exercises:
+      - id: java-arch-q1
+        type: mcq
+        prompt: Dans une architecture hexagonale, de quoi dépend le domaine ?
+        choices: ['De rien d’autre que lui-même (il définit des ports)', 'De la base de données', 'Du framework web', 'De l’infrastructure']
+        answer: 0
+      - id: java-arch-q2
+        type: mcq
+        prompt: Où placer une règle « un élève ne peut pas s’inscrire deux fois au même cours » ?
+        choices: ['Dans le domaine / service', 'Dans le contrôleur HTTP', 'Dans le CSS', 'Dans le script SQL uniquement']
+        answer: 0
+      - id: java-arch-code
+        type: code
+        title: Vérificateur de dépendances
+        prompt: |
+          Comme ArchUnit, vérifie les règles d’architecture. Couches de la plus haute à la plus basse : `presentation`, `application`, `domaine`, avec `infrastructure` qui peut dépendre de `domaine` et `application` uniquement. Le `domaine` ne dépend d’aucune autre couche.
+
+          Chaque ligne : `ClasseA couche -> ClasseB couche`. Une dépendance est autorisée si elle va vers une couche inférieure ou la même couche (`presentation → application → domaine`), ou de `infrastructure` vers `domaine`/`application`. Affiche `violation : A (couche) -> B (couche)` pour chaque infraction, puis `N violation(s)`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static final Map<String, Set<String>> AUTORISE = Map.of(
+                  "presentation", Set.of("presentation", "application", "domaine"),
+                  "application", Set.of("application", "domaine"),
+                  "domaine", Set.of("domaine"),
+                  "infrastructure", Set.of("infrastructure", "application", "domaine"));
+
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  int n = 0;
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine().trim();
+                      if (l.isEmpty()) continue;
+                      String[] p = l.split("\\s+");
+                      String a = p[0], ca = p[1], b = p[3], cb = p[4];
+                      if (!AUTORISE.get(ca).contains(cb)) {
+                          n++;
+                          System.out.println("violation : " + a + " (" + ca + ") -> " + b + " (" + cb + ")");
+                      }
+                  }
+                  System.out.println(n + " violation(s)");
+              }
+          }
+        tests:
+          - { input: "CoursController presentation -> InscriptionService application\nInscriptionService application -> Eleve domaine\nEleve domaine -> DepotPostgres infrastructure\nDepotPostgres infrastructure -> Eleve domaine\nInscriptionService application -> CoursController presentation", output: "violation : Eleve (domaine) -> DepotPostgres (infrastructure)\nviolation : InscriptionService (application) -> CoursController (presentation)\n2 violation(s)" }
+          - { input: A presentation -> B infrastructure, output: "violation : A (presentation) -> B (infrastructure)\n1 violation(s)", hidden: true }
+    project:
+      id: java-arch-projet
+      type: code
+      title: Inscriptions en architecture hexagonale
+      difficulty: 3
+      prompt: |
+        Implémente un mini-service d’inscription en séparant clairement :
+
+        - **domaine** : `record Inscription(String eleve, String cours)`, interface (port) `DepotInscriptions` (`boolean existe(String, String)`, `void ajouter(Inscription)`, `List<Inscription> duCours(String)`), interface `Notifieur` (`void notifier(String eleve, String message)`) ;
+        - **application** : `ServiceInscription` qui reçoit les ports par constructeur, refuse les doublons et les cours pleins (capacité 2 par cours), et notifie l’élève ;
+        - **infrastructure** : `DepotMemoire` et `NotifieurConsole` (affiche `[mail eleve] message`).
+
+        Commandes : `inscrire ELEVE COURS` → `inscrit`, `déjà inscrit` ou `cours complet` (la notification `Bienvenue en COURS` n’est envoyée qu’en cas de succès) ; `liste COURS` → élèves séparés par des virgules (ou `aucun`).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        // ---- domaine ----
+        record Inscription(String eleve, String cours) {}
+        interface DepotInscriptions {
+            boolean existe(String eleve, String cours);
+            void ajouter(Inscription i);
+            List<Inscription> duCours(String cours);
+        }
+        interface Notifieur { void notifier(String eleve, String message); }
+
+        // ---- application ----
+        class ServiceInscription {
+            static final int CAPACITE = 2;
+            private final DepotInscriptions depot;
+            private final Notifieur notifieur;
+            ServiceInscription(DepotInscriptions depot, Notifieur notifieur) { this.depot = depot; this.notifieur = notifieur; }
+            String inscrire(String eleve, String cours) {
+                if (depot.existe(eleve, cours)) return "déjà inscrit";
+                if (depot.duCours(cours).size() >= CAPACITE) return "cours complet";
+                depot.ajouter(new Inscription(eleve, cours));
+                notifieur.notifier(eleve, "Bienvenue en " + cours);
+                return "inscrit";
+            }
+            List<String> liste(String cours) { return depot.duCours(cours).stream().map(Inscription::eleve).toList(); }
+        }
+
+        // ---- infrastructure ----
+        class DepotMemoire implements DepotInscriptions {
+            private final List<Inscription> donnees = new ArrayList<>();
+            public boolean existe(String e, String c) { return donnees.contains(new Inscription(e, c)); }
+            public void ajouter(Inscription i) { donnees.add(i); }
+            public List<Inscription> duCours(String c) { return donnees.stream().filter(i -> i.cours().equals(c)).toList(); }
+        }
+        class NotifieurConsole implements Notifieur {
+            public void notifier(String eleve, String message) { System.out.println("[mail " + eleve + "] " + message); }
+        }
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                ServiceInscription s = new ServiceInscription(new DepotMemoire(), new NotifieurConsole());
+                while (sc.hasNext()) {
+                    if (sc.next().equals("inscrire")) System.out.println(s.inscrire(sc.next(), sc.next()));
+                    else {
+                        List<String> l = s.liste(sc.next());
+                        System.out.println(l.isEmpty() ? "aucun" : String.join(",", l));
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "inscrire ada rust\ninscrire ada rust\ninscrire bob rust\ninscrire zoe rust\nliste rust\nliste java", output: "[mail ada] Bienvenue en rust\ninscrit\ndéjà inscrit\n[mail bob] Bienvenue en rust\ninscrit\ncours complet\nada,bob\naucun" }
+        - { input: liste cpp, output: aucun, hidden: true }
+      require:
+        - { pattern: 'interface\s+DepotInscriptions', message: Définir le port DepotInscriptions }
+    exam:
+      pass: 70
+      questions:
+        - id: java-arch-ex1
+          type: mcq
+          prompt: Qu’est-ce qu’un « adaptateur » en architecture hexagonale ?
+          choices: ['Une implémentation technique d’un port défini par le domaine', 'Une classe du domaine', 'Un câble réseau', 'Un test unitaire']
+          answer: 0
+        - id: java-arch-ex2
+          type: mcq
+          prompt: Quel outil permet de tester automatiquement les règles d’architecture en Java ?
+          choices: ['ArchUnit', 'Mockito', 'Gson', 'Lombok']
+          answer: 0
+        - id: java-arch-ex3
+          type: mcq
+          prompt: Pourquoi garder le domaine indépendant de la base de données ?
+          choices: ['Pour le tester facilement et pouvoir changer de technologie', 'Pour la vitesse du réseau', 'Parce que SQL est interdit en Java', 'Pour réduire la taille du jar']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-design-patterns
+    title: Design patterns
+    summary: Les patrons de conception essentiels — Singleton, Factory, Builder, Strategy, Observer, Decorator, Adapter et Command.
+    minutes: 40
+    concepts: [patterns]
+    sections:
+      - title: Création et structure
+        body: |
+          **Builder** — construire un objet complexe lisiblement :
+
+          ```java
+          Requete r = Requete.builder().url("/cours").methode("GET").entete("Accept", "json").build();
+          ```
+
+          **Factory** — choisir l’implémentation sans exposer `new` :
+
+          ```java
+          static Forme creer(String type) { return switch (type) { case "cercle" -> new Cercle(); default -> new Carre(); }; }
+          ```
+
+          **Singleton** — une seule instance (préférer l’injection de dépendances ; sinon `enum Config { INSTANCE; }`).
+
+          **Decorator** — ajouter un comportement en enveloppant : `new BufferedReader(new InputStreamReader(in))`.
+
+          **Adapter** — rendre compatible une interface existante avec celle attendue.
+      - title: Comportement
+        body: |
+          **Strategy** — un algorithme interchangeable (souvent une lambda) :
+
+          ```java
+          interface Tarif { double prix(double base); }
+          Tarif etudiant = b -> b * 0.5;
+          ```
+
+          **Observer** — notifier des abonnés d’un changement (listeners, événements).
+
+          **Command** — encapsuler une action dans un objet (annulation, file d’attente, historique) :
+
+          ```java
+          interface Commande { void executer(); void annuler(); }
+          ```
+
+          **Template Method**, **State**, **Visitor** (avec les `sealed` + `switch` de Java 21, souvent remplacé par le pattern matching).
+
+          Un patron se justifie par un **problème réel** : ne pas en empiler « au cas où ».
+    exercises:
+      - id: java-pat-q1
+        type: mcq
+        prompt: Quel patron enveloppe un objet pour lui ajouter un comportement sans modifier sa classe ?
+        choices: ['Decorator', 'Singleton', 'Factory', 'Builder']
+        answer: 0
+      - id: java-pat-q2
+        type: mcq
+        prompt: Quel patron permet de mettre en œuvre un « annuler / refaire » ?
+        choices: ['Command', 'Adapter', 'Singleton', 'Factory']
+        answer: 0
+      - id: java-pat-predict
+        type: predict
+        prompt: Que va afficher ce programme (Decorator) ?
+        code: |
+          import java.util.function.*;
+          public class Main {
+              interface Texte { String rendu(); }
+              record Brut(String s) implements Texte { public String rendu() { return s; } }
+              record Gras(Texte t) implements Texte { public String rendu() { return "**" + t.rendu() + "**"; } }
+              record Majuscules(Texte t) implements Texte { public String rendu() { return t.rendu().toUpperCase(); } }
+              public static void main(String[] args) {
+                  Texte t = new Gras(new Majuscules(new Brut("kiri")));
+                  Texte u = new Majuscules(new Gras(new Brut("ok")));
+                  System.out.println(t.rendu() + " " + u.rendu());
+              }
+          }
+        output: '**KIRI** **OK**'
+      - id: java-pat-code
+        type: code
+        title: Éditeur avec annulation (Command)
+        prompt: |
+          Implémente un éditeur de texte avec le patron **Command** : interface `Commande { void executer(); void annuler(); }`, commandes `Ajouter(texte)` et `Effacer(n)` (efface les n derniers caractères, en mémorisant ce qui a été effacé). Une pile d’historique permet `annuler` et une pile de rétablissement permet `refaire` (vidée par toute nouvelle commande).
+
+          Entrée : `ajouter TEXTE` (le texte peut contenir des espaces : prends le reste de la ligne), `effacer N`, `annuler`, `refaire`, `afficher` (affiche `[contenu]`).
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              interface Commande { void executer(); void annuler(); }
+              static StringBuilder doc = new StringBuilder();
+
+              record Ajouter(String texte) implements Commande {
+                  public void executer() { doc.append(texte); }
+                  public void annuler() { doc.setLength(doc.length() - texte.length()); }
+              }
+              static class Effacer implements Commande {
+                  private final int n;
+                  private String efface = "";
+                  Effacer(int n) { this.n = n; }
+                  public void executer() {
+                      int k = Math.min(n, doc.length());
+                      efface = doc.substring(doc.length() - k);
+                      doc.setLength(doc.length() - k);
+                  }
+                  public void annuler() { doc.append(efface); }
+              }
+
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Deque<Commande> historique = new ArrayDeque<>(), refaire = new ArrayDeque<>();
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine();
+                      if (l.isBlank()) continue;
+                      String cmd = l.split(" ", 2)[0];
+                      switch (cmd) {
+                          case "ajouter", "effacer" -> {
+                              Commande c = cmd.equals("ajouter") ? new Ajouter(l.substring(8)) : new Effacer(Integer.parseInt(l.substring(8).trim()));
+                              c.executer();
+                              historique.push(c);
+                              refaire.clear();
+                          }
+                          case "annuler" -> { if (!historique.isEmpty()) { Commande c = historique.pop(); c.annuler(); refaire.push(c); } }
+                          case "refaire" -> { if (!refaire.isEmpty()) { Commande c = refaire.pop(); c.executer(); historique.push(c); } }
+                          default -> System.out.println("[" + doc + "]");
+                      }
+                  }
+              }
+          }
+        tests:
+          - { input: "ajouter Bonjour\najouter  Kiri\nafficher\neffacer 4\nafficher\nannuler\nafficher\nannuler\nannuler\nafficher\nrefaire\nafficher", output: "[Bonjour Kiri]\n[Bonjour ]\n[Bonjour Kiri]\n[]\n[Bonjour]" }
+          - { input: "ajouter ab\nannuler\najouter c\nrefaire\nafficher", output: '[c]', hidden: true }
+        require:
+          - { pattern: 'interface\s+Commande', message: Définir l’interface Commande }
+    project:
+      id: java-pat-projet
+      type: code
+      title: Boutique — Builder, Strategy et Observer
+      difficulty: 3
+      prompt: |
+        Combine trois patrons :
+
+        - **Builder** : `Commande.builder().client(nom).article(nom, prix, qte)….build()` ;
+        - **Strategy** : `Remise` — `aucune`, `etudiant` (−20 %), `fidelite` (−5 € si total ≥ 50, sinon rien) ;
+        - **Observer** : des observateurs `Journal` (affiche `[journal] commande de CLIENT : TOTAL`) et `Stock` (affiche `[stock] -QTE ARTICLE` pour chaque article) notifiés à la validation.
+
+        Entrée : des blocs `client NOM`, lignes `article NOM PRIX QTE`, `remise TYPE`, `valider`. À la validation, notifie les observateurs (journal d’abord, puis stock) avec le total remisé formaté `%.2f` (Locale.US).
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.function.*;
+
+        public class Main {
+            record Article(String nom, double prix, int qte) {}
+            record Commande(String client, List<Article> articles) {
+                double brut() { return articles.stream().mapToDouble(a -> a.prix() * a.qte()).sum(); }
+                static Builder builder() { return new Builder(); }
+                static class Builder {
+                    private String client;
+                    private final List<Article> articles = new ArrayList<>();
+                    Builder client(String c) { client = c; return this; }
+                    Builder article(String n, double p, int q) { articles.add(new Article(n, p, q)); return this; }
+                    Commande build() { return new Commande(client, List.copyOf(articles)); }
+                }
+            }
+            interface Remise extends DoubleUnaryOperator {}
+            interface Observateur { void commandeValidee(Commande c, double total); }
+
+            static Remise remise(String type) {
+                return switch (type) {
+                    case "etudiant" -> t -> t * 0.8;
+                    case "fidelite" -> t -> t >= 50 ? t - 5 : t;
+                    default -> t -> t;
+                };
+            }
+
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                List<Observateur> obs = List.of(
+                    (c, t) -> System.out.println(String.format(Locale.US, "[journal] commande de %s : %.2f", c.client(), t)),
+                    (c, t) -> c.articles().forEach(a -> System.out.println("[stock] -" + a.qte() + " " + a.nom())));
+                Commande.Builder b = Commande.builder();
+                Remise r = remise("aucune");
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "client" -> { b = Commande.builder().client(sc.next()); r = remise("aucune"); }
+                        case "article" -> b.article(sc.next(), sc.nextDouble(), sc.nextInt());
+                        case "remise" -> r = remise(sc.next());
+                        default -> {
+                            Commande c = b.build();
+                            double total = r.applyAsDouble(c.brut());
+                            obs.forEach(o -> o.commandeValidee(c, total));
+                        }
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "client ada\narticle livre 30 2\narticle stylo 1.5 4\nremise fidelite\nvalider\nclient bob\narticle cahier 3 2\nremise etudiant\nvalider", output: "[journal] commande de ada : 61.00\n[stock] -2 livre\n[stock] -4 stylo\n[journal] commande de bob : 4.80\n[stock] -2 cahier" }
+        - { input: "client z\narticle a 10 1\nremise fidelite\nvalider", output: "[journal] commande de z : 10.00\n[stock] -1 a", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-pat-ex1
+          type: mcq
+          prompt: Quel patron est le plus adapté pour un objet avec de nombreux paramètres optionnels ?
+          choices: ['Builder', 'Observer', 'Adapter', 'Command']
+          answer: 0
+        - id: java-pat-ex2
+          type: mcq
+          prompt: En Java moderne, comment implémente-t-on souvent une Strategy simple ?
+          choices: ['Avec une lambda implémentant une interface fonctionnelle', 'Avec un Singleton', 'Avec l’héritage multiple', 'Avec la réflexion']
+          answer: 0
+        - id: java-pat-ex3
+          type: mcq
+          prompt: Quelle est la façon la plus sûre d’écrire un Singleton en Java ?
+          choices: ['Un enum à une seule valeur', 'Un attribut public static non final', 'Un constructeur public', 'Une variable globale']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-solid
+    title: SOLID
+    summary: Les cinq principes SOLID illustrés en Java — responsabilité unique, ouvert/fermé, Liskov, ségrégation des interfaces, inversion des dépendances.
+    minutes: 35
+    concepts: [patterns, architecture]
+    sections:
+      - title: Les cinq principes
+        body: |
+          | Lettre | Principe | En pratique |
+          |---|---|---|
+          | **S** | Responsabilité unique | une classe = une raison de changer (calcul ≠ affichage ≠ persistance) |
+          | **O** | Ouvert/fermé | ajouter un comportement par une **nouvelle classe**, sans modifier l’existant |
+          | **L** | Substitution de Liskov | une sous-classe doit pouvoir remplacer sa mère sans surprise |
+          | **I** | Ségrégation des interfaces | plusieurs petites interfaces plutôt qu’une énorme |
+          | **D** | Inversion des dépendances | dépendre d’abstractions injectées, pas d’implémentations concrètes |
+      - title: Exemples
+        body: |
+          **O** — plutôt qu’un `switch` sur le type à modifier à chaque nouvelle forme :
+
+          ```java
+          sealed interface Forme permits Cercle, Carre { double aire(); }
+          record Cercle(double r) implements Forme { public double aire() { return Math.PI * r * r; } }
+          ```
+
+          **L** — l’exemple classique : `Carre extends Rectangle` viole Liskov si `setLargeur` modifie aussi la hauteur. Un code qui attend un `Rectangle` (« largeur × hauteur après avoir changé la largeur ») sera surpris.
+
+          **D** :
+
+          ```java
+          class Rapport {
+              private final Sortie sortie;                 // abstraction
+              Rapport(Sortie sortie) { this.sortie = sortie; }   // injectée
+          }
+          ```
+
+          SOLID est un guide, pas un dogme : l’objectif est un code **facile à faire évoluer et à tester**.
+    exercises:
+      - id: java-solid-q1
+        type: mcq
+        prompt: Une classe Facture calcule le total, génère un PDF et l’envoie par e-mail. Quel principe est violé ?
+        choices: ['Responsabilité unique (S)', 'Liskov (L)', 'Ségrégation des interfaces (I)', 'Aucun']
+        answer: 0
+      - id: java-solid-q2
+        type: mcq
+        prompt: Une interface Imprimante impose scanner() et faxer() à une imprimante basique qui lève UnsupportedOperationException. Quel principe est violé ?
+        choices: ['Ségrégation des interfaces (I)', 'Responsabilité unique (S)', 'Ouvert/fermé (O)', 'Inversion des dépendances (D)']
+        answer: 0
+      - id: java-solid-bug
+        type: bugfix
+        prompt: Ce code viole le principe de Liskov et affiche un résultat surprenant. Quelle ligne est la cause ?
+        code: |
+          public class Main {
+              static class Rectangle {
+                  protected int l, h;
+                  void setLargeur(int x) { l = x; }
+                  void setHauteur(int x) { h = x; }
+                  int aire() { return l * h; }
+              }
+              static class Carre extends Rectangle {
+                  @Override void setLargeur(int x) { l = x; h = x; }
+                  @Override void setHauteur(int x) { l = x; h = x; }
+              }
+              static int test(Rectangle r) { r.setHauteur(4); r.setLargeur(5); return r.aire(); }
+              public static void main(String[] args) {
+                  System.out.println(test(new Rectangle()) + " " + test(new Carre()));
+              }
+          }
+        bugLines: [8]
+        choices:
+          - Carre ne doit pas hériter de Rectangle (comportement incompatible) ; mieux vaut deux implémentations d’une interface Forme
+          - aire() doit être static
+          - setLargeur doit être private
+        answer: 0
+        solution: |
+          public class Main {
+              interface Forme { int aire(); }
+              static class Rectangle implements Forme {
+                  protected int l, h;
+                  void setLargeur(int x) { l = x; }
+                  void setHauteur(int x) { h = x; }
+                  public int aire() { return l * h; }
+              }
+              record Carre(int cote) implements Forme { public int aire() { return cote * cote; } }
+              static int test(Rectangle r) { r.setHauteur(4); r.setLargeur(5); return r.aire(); }
+              public static void main(String[] args) {
+                  System.out.println(test(new Rectangle()) + " " + new Carre(4).aire());
+              }
+          }
+        tests:
+          - { input: '', output: 20 16 }
+      - id: java-solid-code
+        type: code
+        title: Calcul de primes ouvert/fermé
+        prompt: |
+          Refactorise un calcul de prime selon **O** et **D** : interface `RegleDePrime { boolean s’applique(Employe e); double montant(Employe e); }`, des règles indépendantes, et un `CalculateurPrime` qui reçoit la **liste des règles** par constructeur et additionne les montants des règles applicables.
+
+          Règles : `anciennete` (≥ 5 ans → 500), `objectifs` (ventes ≥ 100 000 → 1 % des ventes), `manager` (rôle manager → 1000). Chaque ligne : `nom role annees ventes`. Affiche `nom : prime` (2 décimales, Locale.US).
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              record Employe(String nom, String role, int annees, double ventes) {}
+
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              record Employe(String nom, String role, int annees, double ventes) {}
+              interface RegleDePrime { boolean sApplique(Employe e); double montant(Employe e); }
+              static class Anciennete implements RegleDePrime {
+                  public boolean sApplique(Employe e) { return e.annees() >= 5; }
+                  public double montant(Employe e) { return 500; }
+              }
+              static class Objectifs implements RegleDePrime {
+                  public boolean sApplique(Employe e) { return e.ventes() >= 100_000; }
+                  public double montant(Employe e) { return e.ventes() * 0.01; }
+              }
+              static class Manager implements RegleDePrime {
+                  public boolean sApplique(Employe e) { return e.role().equals("manager"); }
+                  public double montant(Employe e) { return 1000; }
+              }
+              static class CalculateurPrime {
+                  private final List<RegleDePrime> regles;
+                  CalculateurPrime(List<RegleDePrime> regles) { this.regles = regles; }
+                  double calculer(Employe e) { return regles.stream().filter(r -> r.sApplique(e)).mapToDouble(r -> r.montant(e)).sum(); }
+              }
+
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  CalculateurPrime calc = new CalculateurPrime(List.of(new Anciennete(), new Objectifs(), new Manager()));
+                  while (sc.hasNext()) {
+                      Employe e = new Employe(sc.next(), sc.next(), sc.nextInt(), sc.nextDouble());
+                      System.out.println(String.format(Locale.US, "%s : %.2f", e.nom(), calc.calculer(e)));
+                  }
+              }
+          }
+        tests:
+          - { input: "ada manager 6 150000\nbob vendeur 2 120000\nzoe vendeur 1 5000", output: "ada : 3000.00\nbob : 1200.00\nzoe : 0.00" }
+          - { input: kiri manager 5 0, output: 'kiri : 1500.00', hidden: true }
+        require:
+          - { pattern: 'interface\s+RegleDePrime', message: Définir l’interface RegleDePrime }
+        forbid:
+          - { pattern: 'switch', message: 'Pas de switch : chaque règle est une classe' }
+    project:
+      id: java-solid-projet
+      type: code
+      title: Générateur de rapports découplé
+      difficulty: 3
+      prompt: |
+        Sépare les responsabilités d’un générateur de rapports :
+
+        - `SourceDonnees` (abstraction) → `SourceTexte` qui lit les lignes `categorie montant` de l’entrée (après la première ligne) ;
+        - `Agregateur` → totaux par catégorie triés ;
+        - `Formateur` (abstraction) → `FormateurTexte` (`categorie : total`, puis `TOTAL : t`), `FormateurCsv` (`categorie;total` avec l’en-tête `categorie;total`) et `FormateurJson` (`{"categorie":total,…}` sur une ligne) ;
+        - `Rapport` qui reçoit source, agrégateur et formateur par constructeur.
+
+        La première ligne indique le format (`texte`, `csv`, `json`). Montants entiers.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            interface SourceDonnees { List<String[]> lignes(); }
+            interface Formateur { String formater(SortedMap<String, Long> totaux); }
+
+            static class SourceTexte implements SourceDonnees {
+                private final Scanner sc;
+                SourceTexte(Scanner sc) { this.sc = sc; }
+                public List<String[]> lignes() {
+                    List<String[]> l = new ArrayList<>();
+                    while (sc.hasNextLine()) { String s = sc.nextLine().trim(); if (!s.isEmpty()) l.add(s.split("\\s+")); }
+                    return l;
+                }
+            }
+            static class Agregateur {
+                SortedMap<String, Long> agreger(List<String[]> lignes) {
+                    SortedMap<String, Long> m = new TreeMap<>();
+                    for (String[] l : lignes) m.merge(l[0], Long.parseLong(l[1]), Long::sum);
+                    return m;
+                }
+            }
+            static class FormateurTexte implements Formateur {
+                public String formater(SortedMap<String, Long> t) {
+                    StringBuilder sb = new StringBuilder();
+                    t.forEach((k, v) -> sb.append(k).append(" : ").append(v).append('\n'));
+                    return sb.append("TOTAL : ").append(t.values().stream().mapToLong(Long::longValue).sum()).toString();
+                }
+            }
+            static class FormateurCsv implements Formateur {
+                public String formater(SortedMap<String, Long> t) {
+                    StringJoiner j = new StringJoiner("\n");
+                    j.add("categorie;total");
+                    t.forEach((k, v) -> j.add(k + ";" + v));
+                    return j.toString();
+                }
+            }
+            static class FormateurJson implements Formateur {
+                public String formater(SortedMap<String, Long> t) {
+                    StringJoiner j = new StringJoiner(",", "{", "}");
+                    t.forEach((k, v) -> j.add("\"" + k + "\":" + v));
+                    return j.toString();
+                }
+            }
+            static class Rapport {
+                private final SourceDonnees source;
+                private final Agregateur agregateur;
+                private final Formateur formateur;
+                Rapport(SourceDonnees s, Agregateur a, Formateur f) { source = s; agregateur = a; formateur = f; }
+                String produire() { return formateur.formater(agregateur.agreger(source.lignes())); }
+            }
+
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                String format = sc.nextLine().trim();
+                Formateur f = switch (format) { case "csv" -> new FormateurCsv(); case "json" -> new FormateurJson(); default -> new FormateurTexte(); };
+                System.out.println(new Rapport(new SourceTexte(sc), new Agregateur(), f).produire());
+            }
+        }
+      tests:
+        - { input: "texte\nloyer 800\ncourses 120\ncourses 80", output: "courses : 200\nloyer : 800\nTOTAL : 1000" }
+        - { input: "json\nb 2\na 1\nb 3", output: '{"a":1,"b":5}' }
+        - { input: "csv\nx 5", output: "categorie;total\nx;5", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-solid-ex1
+          type: mcq
+          prompt: Que dit le principe ouvert/fermé ?
+          choices: ['Ouvert à l’extension, fermé à la modification', 'Les classes doivent être publiques', 'Les attributs doivent être privés', 'Un fichier par classe']
+          answer: 0
+        - id: java-solid-ex2
+          type: mcq
+          prompt: Que signifie l’inversion des dépendances ?
+          choices: ['Dépendre d’abstractions plutôt que d’implémentations concrètes', 'Inverser l’ordre des imports', 'Hériter à l’envers', 'Supprimer les dépendances Maven']
+          answer: 0
+        - id: java-solid-ex3
+          type: mcq
+          prompt: Que garantit le respect du principe de Liskov ?
+          choices: ['Une sous-classe peut remplacer sa classe mère sans casser le programme', 'Une classe a une seule méthode', 'Les interfaces sont petites', 'Le code est plus rapide']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-spring-boot
+    title: Spring Boot
+    summary: Le framework phare de Java — conteneur IoC, beans, injection par constructeur, auto-configuration, profils et starters.
+    minutes: 40
+    concepts: [framework, architecture]
+    sections:
+      - title: Une application Spring Boot
+        body: |
+          ```java
+          @SpringBootApplication
+          public class CodemoriApplication {
+              public static void main(String[] args) { SpringApplication.run(CodemoriApplication.class, args); }
+          }
+
+          @Service
+          public class CoursService {
+              private final CoursRepository repo;
+              public CoursService(CoursRepository repo) { this.repo = repo; }   // injection par constructeur
+              public List<Cours> tous() { return repo.findAll(); }
+          }
+
+          @RestController
+          @RequestMapping("/api/cours")
+          class CoursController {
+              private final CoursService service;
+              CoursController(CoursService service) { this.service = service; }
+              @GetMapping List<Cours> liste() { return service.tous(); }
+          }
+          ```
+
+          Le **conteneur IoC** (inversion de contrôle) crée les *beans* (`@Component`, `@Service`, `@Repository`, `@Controller`, méthodes `@Bean`), résout leurs dépendances et gère leur cycle de vie (singletons par défaut).
+      - title: Auto-configuration et configuration
+        body: |
+          Les **starters** (`spring-boot-starter-web`, `-data-jpa`, `-security`, `-test`) apportent dépendances et configuration par défaut : un serveur Tomcat embarqué démarre tout seul.
+
+          ```yaml
+          # application.yml
+          server:
+            port: 8080
+          spring:
+            datasource:
+              url: jdbc:postgresql://db:5432/codemori
+          codemori:
+            xp-par-exercice: 10
+          ```
+
+          ```java
+          @ConfigurationProperties(prefix = "codemori")
+          record CodemoriProps(int xpParExercice) {}
+          ```
+
+          **Profils** : `application-dev.yml`, `application-prod.yml`, activés par `SPRING_PROFILES_ACTIVE=prod`. **Actuator** expose `/actuator/health`, des métriques…
+
+          > 💡 Spring n’est pas disponible dans le bac à sable : les exercices te font recréer ses mécanismes (conteneur, cycle de vie, propriétés) en Java pur.
+    exercises:
+      - id: java-spring-q1
+        type: mcq
+        prompt: Quelle forme d’injection Spring recommande-t-on ?
+        choices: ['Par constructeur', 'Par attribut @Autowired privé', 'Par variable statique', 'Par réflexion manuelle']
+        answer: 0
+      - id: java-spring-q2
+        type: mcq
+        prompt: Quelle est la portée (scope) par défaut d’un bean Spring ?
+        choices: ['singleton', 'prototype', 'request', 'session']
+        answer: 0
+      - id: java-spring-q3
+        type: mcq
+        prompt: Comment active-t-on le profil prod ?
+        choices: ['SPRING_PROFILES_ACTIVE=prod', '@Prod sur la classe main', 'mvn prod', 'En renommant le jar']
+        answer: 0
+      - id: java-spring-code
+        type: code
+        title: Propriétés avec profils
+        prompt: |
+          Recrée la résolution des propriétés de Spring Boot. L’entrée contient des sections `[defaut]`, `[dev]`, `[prod]` avec des lignes `cle=valeur`, puis une ligne `profil=NOM`, puis des lignes `? cle`.
+
+          La valeur d’une clé est celle du profil actif si elle y est définie, sinon celle de `[defaut]`. Une valeur peut référencer une autre clé avec `${autre}` (résolution récursive, mêmes règles ; une clé inconnue reste `${autre}`). Affiche `cle = valeur` ou `cle = <non définie>`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+          import java.util.regex.*;
+
+          public class Main {
+              static Map<String, Map<String, String>> sections = new HashMap<>();
+              static String profil = "defaut";
+
+              static String brute(String cle) {
+                  String v = sections.getOrDefault(profil, Map.of()).get(cle);
+                  return v != null ? v : sections.getOrDefault("defaut", Map.of()).get(cle);
+              }
+              static String resoudre(String v, int profondeur) {
+                  if (profondeur > 10) return v;
+                  Matcher m = Pattern.compile("\\$\\{([^}]+)}").matcher(v);
+                  StringBuilder sb = new StringBuilder();
+                  while (m.find()) {
+                      String r = brute(m.group(1));
+                      m.appendReplacement(sb, Matcher.quoteReplacement(r == null ? m.group() : resoudre(r, profondeur + 1)));
+                  }
+                  m.appendTail(sb);
+                  return sb.toString();
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  String courante = "defaut";
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine().trim();
+                      if (l.isEmpty()) continue;
+                      if (l.startsWith("[")) courante = l.substring(1, l.length() - 1);
+                      else if (l.startsWith("profil=")) profil = l.substring(7);
+                      else if (l.startsWith("? ")) {
+                          String cle = l.substring(2).trim(), v = brute(cle);
+                          System.out.println(cle + " = " + (v == null ? "<non définie>" : resoudre(v, 0)));
+                      } else {
+                          int i = l.indexOf('=');
+                          sections.computeIfAbsent(courante, k -> new HashMap<>()).put(l.substring(0, i).trim(), l.substring(i + 1).trim());
+                      }
+                  }
+              }
+          }
+        tests:
+          - { input: "[defaut]\nhote=localhost\nport=8080\nurl=http://${hote}:${port}/api\n[prod]\nhote=codemori.fr\nport=443\nprofil=prod\n? url\n? port\n? secret", output: "url = http://codemori.fr:443/api\nport = 443\nsecret = <non définie>" }
+          - { input: "[defaut]\na=${b}-${c}\nb=1\nprofil=dev\n? a", output: 'a = 1-${c}', hidden: true }
+    project:
+      id: java-spring-projet
+      type: code
+      title: Mini conteneur IoC avec cycle de vie
+      difficulty: 3
+      prompt: |
+        Recrée le cœur de Spring : des annotations `@Composant` (sur les classes) et `@ApresConstruction` (sur une méthode à appeler après création, comme `@PostConstruct`). Le conteneur reçoit une liste de classes, crée les beans **à la demande** par injection de constructeur (singletons), appelle les méthodes `@ApresConstruction`, et refuse une classe non annotée (`erreur : X n’est pas un composant`).
+
+        Classes fournies : `Horloge` (composant, sans dépendance), `DepotCours(Horloge)` (avec `@ApresConstruction` qui affiche `DepotCours prêt`), `ServiceCours(DepotCours, Horloge)`, et `Intrus` (non annoté). L’entrée liste les beans demandés ; affiche `création X` à chaque instanciation et `bean X` pour chaque demande réussie, puis `beans : N`.
+      starter: |
+        import java.lang.annotation.*;
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.lang.annotation.*;
+        import java.lang.reflect.*;
+        import java.util.*;
+
+        @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE) @interface Composant {}
+        @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.METHOD) @interface ApresConstruction {}
+
+        public class Main {
+            @Composant public static class Horloge { public Horloge() {} }
+            @Composant public static class DepotCours {
+                public DepotCours(Horloge h) {}
+                @ApresConstruction void init() { System.out.println("DepotCours prêt"); }
+            }
+            @Composant public static class ServiceCours { public ServiceCours(DepotCours d, Horloge h) {} }
+            public static class Intrus { public Intrus() {} }
+
+            static class Conteneur {
+                private final Map<Class<?>, Object> beans = new LinkedHashMap<>();
+                Object obtenir(Class<?> c) throws ReflectiveOperationException {
+                    if (beans.containsKey(c)) return beans.get(c);
+                    if (!c.isAnnotationPresent(Composant.class)) throw new IllegalArgumentException(c.getSimpleName() + " n’est pas un composant");
+                    Constructor<?> k = c.getConstructors()[0];
+                    Object[] args = new Object[k.getParameterCount()];
+                    for (int i = 0; i < args.length; i++) args[i] = obtenir(k.getParameterTypes()[i]);
+                    Object o = k.newInstance(args);
+                    System.out.println("création " + c.getSimpleName());
+                    for (Method m : c.getDeclaredMethods()) {
+                        if (m.isAnnotationPresent(ApresConstruction.class)) { m.setAccessible(true); m.invoke(o); }
+                    }
+                    beans.put(c, o);
+                    return o;
+                }
+                int taille() { return beans.size(); }
+            }
+
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+                Conteneur ct = new Conteneur();
+                while (sc.hasNext()) {
+                    Class<?> c = Class.forName("Main$" + sc.next());
+                    try { ct.obtenir(c); System.out.println("bean " + c.getSimpleName()); }
+                    catch (IllegalArgumentException e) { System.out.println("erreur : " + e.getMessage()); }
+                }
+                System.out.println("beans : " + ct.taille());
+            }
+        }
+      tests:
+        - { input: ServiceCours Intrus Horloge, output: "création Horloge\ncréation DepotCours\nDepotCours prêt\ncréation ServiceCours\nbean ServiceCours\nerreur : Intrus n’est pas un composant\nbean Horloge\nbeans : 3" }
+        - { input: Horloge, output: "création Horloge\nbean Horloge\nbeans : 1", hidden: true }
+      require:
+        - { pattern: '@interface\s+Composant', message: Définir l’annotation @Composant }
+    exam:
+      pass: 70
+      questions:
+        - id: java-spring-ex1
+          type: mcq
+          prompt: Que fait @SpringBootApplication ?
+          choices: ['Active la configuration, l’auto-configuration et le scan des composants', 'Démarre une base de données', 'Compile le projet', 'Crée un test']
+          answer: 0
+        - id: java-spring-ex2
+          type: mcq
+          prompt: Quel starter apporte un serveur web embarqué et Spring MVC ?
+          choices: ['spring-boot-starter-web', 'spring-boot-starter-test', 'spring-boot-starter-data-jpa', 'spring-boot-starter-mail']
+          answer: 0
+        - id: java-spring-ex3
+          type: mcq
+          prompt: Qu’expose Spring Boot Actuator ?
+          choices: ['Des points de supervision (health, metrics…)', 'Le code source', 'La base de données', 'Le compilateur']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-api-rest
+    title: API REST
+    summary: Concevoir une API REST — ressources, verbes HTTP, codes de statut, JSON, validation, pagination et versionnement.
+    minutes: 35
+    concepts: [reseau, framework]
+    sections:
+      - title: Principes REST
+        body: |
+          | Verbe | URL | Action | Statut succès |
+          |---|---|---|---|
+          | GET | `/api/cours` | lister | 200 |
+          | GET | `/api/cours/42` | lire | 200 (404 si absent) |
+          | POST | `/api/cours` | créer | 201 + en-tête `Location` |
+          | PUT | `/api/cours/42` | remplacer | 200 / 204 |
+          | PATCH | `/api/cours/42` | modifier partiellement | 200 |
+          | DELETE | `/api/cours/42` | supprimer | 204 |
+
+          Codes d’erreur : **400** requête invalide, **401** non authentifié, **403** interdit, **404** introuvable, **409** conflit, **422** validation, **500** erreur serveur.
+
+          GET, PUT et DELETE sont **idempotents** : les répéter ne change pas le résultat.
+      - title: Avec Spring
+        body: |
+          ```java
+          @RestController
+          @RequestMapping("/api/v1/cours")
+          class CoursController {
+              @GetMapping("/{id}")
+              ResponseEntity<CoursDto> lire(@PathVariable long id) {
+                  return service.parId(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+              }
+              @PostMapping
+              ResponseEntity<CoursDto> creer(@Valid @RequestBody NouveauCours req) {
+                  CoursDto c = service.creer(req);
+                  return ResponseEntity.created(URI.create("/api/v1/cours/" + c.id())).body(c);
+              }
+              @GetMapping
+              Page<CoursDto> liste(@RequestParam(defaultValue = "0") int page) { … }
+          }
+          ```
+
+          Bonnes pratiques : des **DTO** distincts des entités, des erreurs au format standard (RFC 9457 *Problem Details*), la pagination, le versionnement (`/v1`), une documentation OpenAPI (springdoc).
+    exercises:
+      - id: java-rest-q1
+        type: mcq
+        prompt: Quel code de statut renvoyer après la création réussie d’une ressource ?
+        choices: ['201 Created', '200 OK', '204 No Content', '302 Found']
+        answer: 0
+      - id: java-rest-q2
+        type: mcq
+        prompt: Lequel de ces verbes n’est PAS idempotent ?
+        choices: ['POST', 'GET', 'PUT', 'DELETE']
+        answer: 0
+      - id: java-rest-q3
+        type: mcq
+        prompt: Un utilisateur connecté tente d’accéder à une ressource d’un autre utilisateur. Quel code ?
+        choices: ['403 Forbidden', '401 Unauthorized', '404 Not Found obligatoirement', '500']
+        answer: 0
+      - id: java-rest-code
+        type: code
+        title: Mini JSON
+        prompt: |
+          Écris un sérialiseur JSON minimal : `static String json(Object o)` qui gère `null`, `String` (avec échappement de `"` et `\`), `Number`, `Boolean`, `List` (→ tableau), `Map` (→ objet, clés triées) et les **records** (→ objet avec les composants dans l’ordre de déclaration, via `getRecordComponents()`).
+
+          Le programme fourni construit un objet à partir de l’entrée et l’affiche.
+        starter: |
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          public class Main {
+              record Lecon(String titre, int minutes, boolean faite) {}
+              record Cours(long id, String nom, List<Lecon> lecons, Map<String, Object> meta) {}
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  long id = sc.nextLong(); sc.nextLine();
+                  String nom = sc.nextLine();
+                  List<Lecon> lecons = new ArrayList<>();
+                  while (sc.hasNext()) lecons.add(new Lecon(sc.next(), sc.nextInt(), sc.nextBoolean()));
+                  Map<String, Object> meta = new HashMap<>();
+                  meta.put("niveau", 2);
+                  meta.put("auteur", null);
+                  System.out.println(json(new Cours(id, nom, lecons, meta)));
+              }
+          }
+        solution: |
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          public class Main {
+              record Lecon(String titre, int minutes, boolean faite) {}
+              record Cours(long id, String nom, List<Lecon> lecons, Map<String, Object> meta) {}
+
+              static String json(Object o) throws ReflectiveOperationException {
+                  if (o == null) return "null";
+                  if (o instanceof String s) return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+                  if (o instanceof Number || o instanceof Boolean) return o.toString();
+                  if (o instanceof List<?> l) {
+                      StringJoiner j = new StringJoiner(",", "[", "]");
+                      for (Object x : l) j.add(json(x));
+                      return j.toString();
+                  }
+                  if (o instanceof Map<?, ?> m) {
+                      StringJoiner j = new StringJoiner(",", "{", "}");
+                      for (Object k : new TreeSet<>(m.keySet())) j.add(json(k.toString()) + ":" + json(m.get(k)));
+                      return j.toString();
+                  }
+                  if (o.getClass().isRecord()) {
+                      StringJoiner j = new StringJoiner(",", "{", "}");
+                      for (RecordComponent rc : o.getClass().getRecordComponents()) {
+                          Method acc = rc.getAccessor();
+                          acc.setAccessible(true);
+                          j.add(json(rc.getName()) + ":" + json(acc.invoke(o)));
+                      }
+                      return j.toString();
+                  }
+                  return json(o.toString());
+              }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  long id = sc.nextLong(); sc.nextLine();
+                  String nom = sc.nextLine();
+                  List<Lecon> lecons = new ArrayList<>();
+                  while (sc.hasNext()) lecons.add(new Lecon(sc.next(), sc.nextInt(), sc.nextBoolean()));
+                  Map<String, Object> meta = new HashMap<>();
+                  meta.put("niveau", 2);
+                  meta.put("auteur", null);
+                  System.out.println(json(new Cours(id, nom, lecons, meta)));
+              }
+          }
+        tests:
+          - { input: "42\nJava \"pro\"\nintro 10 true\nstreams 25 false", output: '{"id":42,"nom":"Java \"pro\"","lecons":[{"titre":"intro","minutes":10,"faite":true},{"titre":"streams","minutes":25,"faite":false}],"meta":{"auteur":null,"niveau":2}}' }
+          - { input: "1\nA\\B", output: '{"id":1,"nom":"A\\B","lecons":[],"meta":{"auteur":null,"niveau":2}}', hidden: true }
+    project:
+      id: java-rest-projet
+      type: code
+      title: API REST en mémoire
+      difficulty: 3
+      prompt: |
+        Implémente le traitement des requêtes d’une API de tâches (sans réseau). Chaque requête tient sur une ligne : `VERBE /chemin [corps]` ; le corps est un titre (texte libre).
+
+        - `GET /taches` → `200 [id:titre:etat, …]` (triés par id, `[]` si vide ; etat = `a_faire` ou `faite`)
+        - `GET /taches/ID` → `200 id:titre:etat` ou `404`
+        - `POST /taches TITRE` → `201 Location: /taches/ID` (ids à partir de 1) ; titre vide → `422 titre requis`
+        - `PATCH /taches/ID` → marque faite, `200 id:titre:faite` ou `404`
+        - `DELETE /taches/ID` → `204` ou `404`
+        - ID non numérique → `400` ; autre chemin → `404` ; verbe non supporté sur un chemin existant → `405`
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            record Tache(long id, String titre, boolean faite) {
+                public String toString() { return id + ":" + titre + ":" + (faite ? "faite" : "a_faire"); }
+            }
+            static TreeMap<Long, Tache> taches = new TreeMap<>();
+            static long prochainId = 1;
+
+            static String traiter(String verbe, String chemin, String corps) {
+                String[] seg = chemin.replaceAll("/+$", "").split("/");
+                if (seg.length < 2 || !seg[1].equals("taches") || seg.length > 3) return "404";
+                if (seg.length == 2) {
+                    switch (verbe) {
+                        case "GET": return "200 " + taches.values();
+                        case "POST":
+                            if (corps.isBlank()) return "422 titre requis";
+                            long id = prochainId++;
+                            taches.put(id, new Tache(id, corps.trim(), false));
+                            return "201 Location: /taches/" + id;
+                        default: return "405";
+                    }
+                }
+                long id;
+                try { id = Long.parseLong(seg[2]); } catch (NumberFormatException e) { return "400"; }
+                if (!List.of("GET", "PATCH", "DELETE").contains(verbe)) return "405";
+                Tache t = taches.get(id);
+                if (t == null) return "404";
+                switch (verbe) {
+                    case "GET": return "200 " + t;
+                    case "PATCH":
+                        Tache f = new Tache(id, t.titre(), true);
+                        taches.put(id, f);
+                        return "200 " + f;
+                    default:
+                        taches.remove(id);
+                        return "204";
+                }
+            }
+
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                while (sc.hasNextLine()) {
+                    String l = sc.nextLine().trim();
+                    if (l.isEmpty()) continue;
+                    String[] p = l.split(" ", 3);
+                    System.out.println(traiter(p[0], p.length > 1 ? p[1] : "/", p.length > 2 ? p[2] : ""));
+                }
+            }
+        }
+      tests:
+        - { input: "GET /taches\nPOST /taches Apprendre les streams\nPOST /taches Réviser SOLID\nPOST /taches\nPATCH /taches/1\nGET /taches/1\nDELETE /taches/2\nDELETE /taches/2\nGET /taches/abc\nPUT /taches/1\nGET /cours\nGET /taches", output: "200 []\n201 Location: /taches/1\n201 Location: /taches/2\n422 titre requis\n200 1:Apprendre les streams:faite\n200 1:Apprendre les streams:faite\n204\n404\n400\n405\n404\n200 [1:Apprendre les streams:faite]" }
+        - { input: "DELETE /taches\nGET /taches/9", output: "405\n404", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-rest-ex1
+          type: mcq
+          prompt: Quel verbe HTTP pour une modification partielle d’une ressource ?
+          choices: ['PATCH', 'PUT', 'POST', 'GET']
+          answer: 0
+        - id: java-rest-ex2
+          type: mcq
+          prompt: Pourquoi utiliser des DTO plutôt que d’exposer les entités JPA ?
+          choices: ['Pour découpler l’API du modèle de données et éviter de fuiter des champs', 'Parce que JSON l’exige', 'Pour la vitesse du GC', 'Ce n’est pas recommandé']
+          answer: 0
+        - id: java-rest-ex3
+          type: mcq
+          prompt: Quel format standard décrit une API REST et permet de générer sa documentation ?
+          choices: ['OpenAPI', 'WSDL uniquement', 'YAML Ain’t Markup', 'JavaDoc']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-hibernate
+    title: Hibernate
+    summary: ORM avec JPA/Hibernate — entités, relations, cycle de vie, requêtes JPQL, Spring Data, problème N+1 et chargement paresseux.
+    minutes: 40
+    concepts: [base-de-donnees, framework]
+    sections:
+      - title: Entités JPA
+        body: |
+          ```java
+          @Entity
+          @Table(name = "cours")
+          public class Cours {
+              @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+              private Long id;
+
+              @Column(nullable = false, length = 100)
+              private String titre;
+
+              @OneToMany(mappedBy = "cours", cascade = CascadeType.ALL, orphanRemoval = true)
+              private List<Chapitre> chapitres = new ArrayList<>();
+          }
+
+          @Entity
+          public class Chapitre {
+              @Id @GeneratedValue private Long id;
+              @ManyToOne(fetch = FetchType.LAZY) private Cours cours;
+          }
+          ```
+
+          Avec Spring Data JPA, une interface suffit :
+
+          ```java
+          interface CoursRepository extends JpaRepository<Cours, Long> {
+              List<Cours> findByTitreContainingIgnoreCase(String motCle);     // requête dérivée du nom
+              @Query("select c from Cours c join fetch c.chapitres where c.id = :id")
+              Optional<Cours> avecChapitres(long id);
+          }
+          ```
+      - title: Cycle de vie et pièges
+        body: |
+          États d’une entité : **transient** (nouvelle), **managed** (suivie par le contexte de persistance : ses modifications sont détectées et écrites au `flush`/commit), **detached**, **removed**.
+
+          **Problème N+1** : charger 100 cours puis accéder à `cours.getChapitres()` pour chacun déclenche 1 + 100 requêtes. Solutions : `join fetch`, `@EntityGraph`, `@BatchSize`.
+
+          Autres pièges : `LazyInitializationException` (accès paresseux hors transaction), `equals/hashCode` sur des entités, `FetchType.EAGER` généralisé. Toujours regarder le SQL généré (`spring.jpa.show-sql=true`) et gérer le schéma avec **Flyway**/**Liquibase**.
+    exercises:
+      - id: java-hib-q1
+        type: mcq
+        prompt: Qu’est-ce que le problème N+1 ?
+        choices: ['Une requête pour la liste puis une requête par élément pour ses relations', 'Une erreur de clé primaire', 'Un dépassement d’entier', 'Une jointure en trop']
+        answer: 0
+      - id: java-hib-q2
+        type: mcq
+        prompt: Que se passe-t-il quand on modifie une entité managed dans une transaction ?
+        choices: ['La modification est détectée et écrite automatiquement au commit (dirty checking)', 'Rien sans appel explicite à update()', 'L’entité est supprimée', 'Une exception est levée']
+        answer: 0
+      - id: java-hib-q3
+        type: mcq
+        prompt: Quelle requête Spring Data génère findByEmailAndActifTrue(String email) ?
+        choices: ['WHERE email = ? AND actif = true', 'WHERE email LIKE ?', 'SELECT * sans filtre', 'Elle ne compile pas']
+        answer: 0
+      - id: java-hib-code
+        type: code
+        title: Générateur de SQL d’entité
+        prompt: |
+          Recrée le cœur d’un ORM : annotations `@Table(String nom)`, `@Id` et `@Colonne(String nom)` (RUNTIME). Écris `static String insert(Object o)` qui génère `INSERT INTO table (col1, col2) VALUES (v1, v2)` (sans la colonne `@Id`, chaînes entre apostrophes avec `'` doublé, colonnes dans l’ordre alphabétique des **noms de colonnes**), et `static String select(Class<?> c, Object id)` → `SELECT id, col1, col2 FROM table WHERE id = v` (colonne @Id en premier).
+
+          Applique-les à la classe `Eleve` (à annoter : table `eleves`, `id` → `@Id`, `nom` → colonne `nom_complet`, `niveau` → `niveau`, `email` → `email`) avec les données lues : `id nom niveau email`.
+        starter: |
+          import java.lang.annotation.*;
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          public class Main {
+              static class Eleve {
+                  long id; String nom; int niveau; String email;
+                  Eleve(long id, String nom, int niveau, String email) { this.id = id; this.nom = nom; this.niveau = niveau; this.email = email; }
+              }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  Eleve e = new Eleve(sc.nextLong(), sc.next(), sc.nextInt(), sc.next());
+              }
+          }
+        solution: |
+          import java.lang.annotation.*;
+          import java.lang.reflect.*;
+          import java.util.*;
+
+          @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE) @interface Table { String value(); }
+          @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.FIELD) @interface Id {}
+          @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.FIELD) @interface Colonne { String value(); }
+
+          public class Main {
+              @Table("eleves")
+              static class Eleve {
+                  @Id long id;
+                  @Colonne("nom_complet") String nom;
+                  @Colonne("niveau") int niveau;
+                  @Colonne("email") String email;
+                  Eleve(long id, String nom, int niveau, String email) { this.id = id; this.nom = nom; this.niveau = niveau; this.email = email; }
+              }
+
+              static String sql(Object v) { return v instanceof String s ? "'" + s.replace("'", "''") + "'" : String.valueOf(v); }
+
+              static TreeMap<String, Field> colonnes(Class<?> c) {
+                  TreeMap<String, Field> m = new TreeMap<>();
+                  for (Field f : c.getDeclaredFields()) {
+                      Colonne col = f.getAnnotation(Colonne.class);
+                      if (col != null) { f.setAccessible(true); m.put(col.value(), f); }
+                  }
+                  return m;
+              }
+              static Field champId(Class<?> c) {
+                  for (Field f : c.getDeclaredFields()) if (f.isAnnotationPresent(Id.class)) { f.setAccessible(true); return f; }
+                  throw new IllegalStateException("pas d’@Id");
+              }
+              static String insert(Object o) throws IllegalAccessException {
+                  Class<?> c = o.getClass();
+                  StringJoiner cols = new StringJoiner(", "), vals = new StringJoiner(", ");
+                  for (var e : colonnes(c).entrySet()) { cols.add(e.getKey()); vals.add(sql(e.getValue().get(o))); }
+                  return "INSERT INTO " + c.getAnnotation(Table.class).value() + " (" + cols + ") VALUES (" + vals + ")";
+              }
+              static String select(Class<?> c, Object id) {
+                  String nomId = champId(c).getName();
+                  StringJoiner cols = new StringJoiner(", ");
+                  cols.add(nomId);
+                  colonnes(c).keySet().forEach(cols::add);
+                  return "SELECT " + cols + " FROM " + c.getAnnotation(Table.class).value() + " WHERE " + nomId + " = " + sql(id);
+              }
+
+              public static void main(String[] args) throws Exception {
+                  Scanner sc = new Scanner(System.in);
+                  Eleve e = new Eleve(sc.nextLong(), sc.next(), sc.nextInt(), sc.next());
+                  System.out.println(insert(e));
+                  System.out.println(select(Eleve.class, e.id));
+              }
+          }
+        tests:
+          - { input: 7 Ada 3 ada@ex.fr, output: "INSERT INTO eleves (email, niveau, nom_complet) VALUES ('ada@ex.fr', 3, 'Ada')\nSELECT id, email, niveau, nom_complet FROM eleves WHERE id = 7" }
+          - { input: 1 O'Neil 5 o@x.fr, output: "INSERT INTO eleves (email, niveau, nom_complet) VALUES ('o@x.fr', 5, 'O''Neil')\nSELECT id, email, niveau, nom_complet FROM eleves WHERE id = 1", hidden: true }
+        require:
+          - { pattern: '@interface\s+Colonne', message: Définir l’annotation @Colonne }
+    project:
+      id: java-hib-projet
+      type: code
+      title: Détecteur de N+1
+      difficulty: 3
+      prompt: |
+        Simule un contexte de persistance avec chargement paresseux. Données : `cours ID TITRE` et `chapitre ID COURS_ID TITRE`. Puis un mode : `mode lazy` ou `mode fetch`, et la commande `lister` qui affiche chaque cours (`TITRE : n chapitres`, trié par id).
+
+        Compte les « requêtes SQL » : en mode `lazy`, 1 requête pour les cours + 1 par cours pour ses chapitres (au premier accès, mis en cache dans le contexte) ; en mode `fetch`, 1 seule requête (jointure). Après chaque `lister`, affiche `requêtes : N` et, en mode lazy avec plus d’un cours, `⚠ N+1 détecté`. Le contexte (cache) est vidé à chaque changement de mode.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                TreeMap<Integer, String> cours = new TreeMap<>();
+                Map<Integer, List<String>> chapitres = new HashMap<>();
+                String mode = "lazy";
+                Map<Integer, List<String>> cache = new HashMap<>();
+                while (sc.hasNext()) {
+                    switch (sc.next()) {
+                        case "cours" -> cours.put(sc.nextInt(), sc.next());
+                        case "chapitre" -> { sc.nextInt(); chapitres.computeIfAbsent(sc.nextInt(), k -> new ArrayList<>()).add(sc.next()); }
+                        case "mode" -> { mode = sc.next(); cache.clear(); }
+                        default -> {
+                            int requetes = 1;
+                            for (var e : cours.entrySet()) {
+                                List<String> ch;
+                                if (mode.equals("fetch")) ch = chapitres.getOrDefault(e.getKey(), List.of());
+                                else {
+                                    if (!cache.containsKey(e.getKey())) { requetes++; cache.put(e.getKey(), chapitres.getOrDefault(e.getKey(), List.of())); }
+                                    ch = cache.get(e.getKey());
+                                }
+                                System.out.println(e.getValue() + " : " + ch.size() + " chapitres");
+                            }
+                            System.out.println("requêtes : " + requetes);
+                            if (mode.equals("lazy") && cours.size() > 1 && requetes > 1) System.out.println("⚠ N+1 détecté");
+                        }
+                    }
+                }
+            }
+        }
+      tests:
+        - { input: "cours 1 Rust\ncours 2 Java\ncours 3 Cpp\nchapitre 10 1 intro\nchapitre 11 1 ownership\nchapitre 12 2 jvm\nmode lazy\nlister\nlister\nmode fetch\nlister", output: "Rust : 2 chapitres\nJava : 1 chapitres\nCpp : 0 chapitres\nrequêtes : 4\n⚠ N+1 détecté\nRust : 2 chapitres\nJava : 1 chapitres\nCpp : 0 chapitres\nrequêtes : 1\nRust : 2 chapitres\nJava : 1 chapitres\nCpp : 0 chapitres\nrequêtes : 1" }
+        - { input: "cours 1 A\nmode lazy\nlister", output: "A : 0 chapitres\nrequêtes : 2", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-hib-ex1
+          type: mcq
+          prompt: Comment résoudre un problème N+1 avec JPA ?
+          choices: ['join fetch ou @EntityGraph', 'Ajouter des index uniquement', 'Utiliser FetchType.EAGER partout', 'Augmenter la mémoire']
+          answer: 0
+        - id: java-hib-ex2
+          type: mcq
+          prompt: Quand survient une LazyInitializationException ?
+          choices: ['Quand on accède à une relation paresseuse hors de la session/transaction', 'Quand une entité n’a pas d’@Id', 'Quand la base est vide', 'Au démarrage de la JVM']
+          answer: 0
+        - id: java-hib-ex3
+          type: mcq
+          prompt: Quel outil gère les migrations de schéma de base de données ?
+          choices: ['Flyway ou Liquibase', 'Mockito', 'Jackson', 'Lombok']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-securite
+    title: Sécurité
+    summary: Sécuriser une application Java — mots de passe hachés, authentification, autorisation, injections, XSS, CSRF, secrets et dépendances.
+    minutes: 40
+    concepts: [securite]
+    sections:
+      - title: Authentification et mots de passe
+        body: |
+          - Ne **jamais** stocker un mot de passe en clair ni avec un simple SHA-256 : utiliser un algorithme lent et salé — **Argon2**, **bcrypt** ou **PBKDF2** (`BCryptPasswordEncoder`, `Argon2PasswordEncoder` de Spring Security).
+          - Comparer les secrets en **temps constant** (`MessageDigest.isEqual`) pour éviter les attaques temporelles.
+          - Sessions : cookies `HttpOnly`, `Secure`, `SameSite`. JWT : signature vérifiée, durée courte, pas de données sensibles dedans.
+          - Générer les jetons avec `SecureRandom`, jamais `Random`.
+
+          ```java
+          @Bean SecurityFilterChain securite(HttpSecurity http) throws Exception {
+              return http.authorizeHttpRequests(a -> a
+                      .requestMatchers("/api/public/**").permitAll()
+                      .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                      .anyRequest().authenticated())
+                  .formLogin(Customizer.withDefaults())
+                  .build();
+          }
+          ```
+      - title: OWASP Top 10 en Java
+        body: |
+          | Risque | Protection |
+          |---|---|
+          | Injection SQL | `PreparedStatement`, JPA avec paramètres |
+          | XSS | échapper les sorties HTML (Thymeleaf le fait par défaut), CSP |
+          | CSRF | jeton CSRF (activé par défaut dans Spring Security) |
+          | Contrôle d’accès défaillant | vérifier **côté serveur** que l’utilisateur possède la ressource |
+          | Désérialisation non sûre | éviter `ObjectInputStream` sur des données externes |
+          | Dépendances vulnérables | OWASP Dependency-Check, Dependabot |
+          | Secrets dans le code | variables d’environnement, coffre-fort (Vault) |
+
+          Principe du **moindre privilège** et **défense en profondeur** : plusieurs couches de protection indépendantes.
+    exercises:
+      - id: java-sec-q1
+        type: mcq
+        prompt: Quel algorithme utiliser pour stocker des mots de passe ?
+        choices: ['Argon2 ou bcrypt', 'SHA-256 sans sel', 'MD5', 'Base64']
+        answer: 0
+      - id: java-sec-q2
+        type: mcq
+        prompt: Quelle classe utiliser pour générer un jeton de session ?
+        choices: ['SecureRandom', 'Random', 'Math.random', 'System.nanoTime']
+        answer: 0
+      - id: java-sec-q3
+        type: mcq
+        prompt: Pourquoi vérifier les droits côté serveur même si l’interface masque le bouton ?
+        choices: ['Un attaquant peut appeler l’API directement', 'Pour la performance', 'Ce n’est pas nécessaire', 'Pour le référencement']
+        answer: 0
+      - id: java-sec-code
+        type: code
+        title: Échappement HTML anti-XSS
+        prompt: |
+          Écris `static String echapper(String s)` qui remplace `&`, `<`, `>`, `"` et `'` par `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`. Pour chaque ligne (un commentaire d’utilisateur), affiche `<p>` + commentaire échappé + `</p>`, puis, si le commentaire contenait `<script` (insensible à la casse), `⚠ tentative XSS bloquée`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String c = sc.nextLine();
+                  }
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              static String echapper(String s) {
+                  StringBuilder sb = new StringBuilder();
+                  for (char c : s.toCharArray()) {
+                      switch (c) {
+                          case '&' -> sb.append("&amp;");
+                          case '<' -> sb.append("&lt;");
+                          case '>' -> sb.append("&gt;");
+                          case '"' -> sb.append("&quot;");
+                          case '\'' -> sb.append("&#39;");
+                          default -> sb.append(c);
+                      }
+                  }
+                  return sb.toString();
+              }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  while (sc.hasNextLine()) {
+                      String c = sc.nextLine();
+                      System.out.println("<p>" + echapper(c) + "</p>");
+                      if (c.toLowerCase().contains("<script")) System.out.println("⚠ tentative XSS bloquée");
+                  }
+              }
+          }
+        tests:
+          - { input: "Super cours & merci !\n<SCRIPT>alert('x')</script>", output: "<p>Super cours &amp; merci !</p>\n<p>&lt;SCRIPT&gt;alert(&#39;x&#39;)&lt;/script&gt;</p>\n⚠ tentative XSS bloquée" }
+          - { input: a "b" <i>, output: '<p>a &quot;b&quot; &lt;i&gt;</p>', hidden: true }
+    project:
+      id: java-sec-projet
+      type: code
+      title: Authentification sécurisée
+      difficulty: 3
+      prompt: |
+        Implémente un service d’authentification :
+
+        - mots de passe hachés avec **PBKDF2** (`SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")`, 10 000 itérations, 256 bits) et un **sel aléatoire** de 16 octets (`SecureRandom`) par utilisateur ;
+        - comparaison en temps constant (`MessageDigest.isEqual`) ;
+        - politique : mot de passe ≥ 8 caractères avec au moins un chiffre, sinon `refusé : mot de passe trop faible` ;
+        - verrouillage après **3 échecs consécutifs** (`compte verrouillé`), un succès remet le compteur à zéro.
+
+        Commandes : `inscrire NOM MDP` (`inscrit` / `refusé : nom déjà pris` / politique), `connexion NOM MDP` (`bienvenue NOM`, `identifiants invalides` — aussi pour un nom inconnu — ou `compte verrouillé`). Enfin affiche `hachés distincts : true/false` : vrai si deux utilisateurs inscrits avec le même mot de passe ont des hachés différents (grâce au sel), ou s’il n’y a pas de tel couple.
+      starter: |
+        import java.security.*;
+        import java.security.spec.*;
+        import java.util.*;
+        import javax.crypto.*;
+        import javax.crypto.spec.*;
+
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.security.*;
+        import java.security.spec.*;
+        import java.util.*;
+        import javax.crypto.*;
+        import javax.crypto.spec.*;
+
+        public class Main {
+            static class Compte { byte[] sel, hache; String mdpTest; int echecs; }
+            static final SecureRandom ALEA = new SecureRandom();
+
+            static byte[] hacher(String mdp, byte[] sel) throws GeneralSecurityException {
+                PBEKeySpec spec = new PBEKeySpec(mdp.toCharArray(), sel, 10_000, 256);
+                return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();
+            }
+
+            public static void main(String[] args) throws Exception {
+                Scanner sc = new Scanner(System.in);
+                Map<String, Compte> comptes = new LinkedHashMap<>();
+                Map<String, List<byte[]>> parMdp = new HashMap<>();
+                while (sc.hasNext()) {
+                    String cmd = sc.next(), nom = sc.next(), mdp = sc.next();
+                    if (cmd.equals("inscrire")) {
+                        if (comptes.containsKey(nom)) { System.out.println("refusé : nom déjà pris"); continue; }
+                        if (mdp.length() < 8 || !mdp.matches(".*\\d.*")) { System.out.println("refusé : mot de passe trop faible"); continue; }
+                        Compte c = new Compte();
+                        c.sel = new byte[16];
+                        ALEA.nextBytes(c.sel);
+                        c.hache = hacher(mdp, c.sel);
+                        comptes.put(nom, c);
+                        parMdp.computeIfAbsent(mdp, k -> new ArrayList<>()).add(c.hache);
+                        System.out.println("inscrit");
+                    } else {
+                        Compte c = comptes.get(nom);
+                        if (c == null) { System.out.println("identifiants invalides"); continue; }
+                        if (c.echecs >= 3) { System.out.println("compte verrouillé"); continue; }
+                        if (MessageDigest.isEqual(c.hache, hacher(mdp, c.sel))) { c.echecs = 0; System.out.println("bienvenue " + nom); }
+                        else {
+                            c.echecs++;
+                            System.out.println(c.echecs >= 3 ? "compte verrouillé" : "identifiants invalides");
+                        }
+                    }
+                }
+                boolean distincts = true;
+                for (List<byte[]> l : parMdp.values())
+                    for (int i = 0; i < l.size(); i++)
+                        for (int j = i + 1; j < l.size(); j++) if (Arrays.equals(l.get(i), l.get(j))) distincts = false;
+                System.out.println("hachés distincts : " + distincts);
+            }
+        }
+      tests:
+        - { input: "inscrire ada secret\ninscrire ada motdepasse1\ninscrire bob motdepasse1\ninscrire ada x1234567\nconnexion ada motdepasse1\nconnexion ada faux\nconnexion ada faux\nconnexion ada motdepasse1\nconnexion bob faux\nconnexion bob faux\nconnexion bob faux\nconnexion bob motdepasse1\nconnexion zoe abc", output: "refusé : mot de passe trop faible\ninscrit\ninscrit\nrefusé : nom déjà pris\nbienvenue ada\nidentifiants invalides\nidentifiants invalides\nbienvenue ada\nidentifiants invalides\nidentifiants invalides\ncompte verrouillé\ncompte verrouillé\nidentifiants invalides\nhachés distincts : true" }
+        - { input: connexion x y, output: "identifiants invalides\nhachés distincts : true", hidden: true }
+      require:
+        - { pattern: 'SecureRandom', message: Utiliser SecureRandom pour le sel }
+        - { pattern: 'MessageDigest\.isEqual', message: Comparer en temps constant }
+    exam:
+      pass: 70
+      questions:
+        - id: java-sec-ex1
+          type: mcq
+          prompt: À quoi sert le sel dans le hachage d’un mot de passe ?
+          choices: ['Rendre unique le haché de mots de passe identiques et contrer les tables précalculées', 'Accélérer le hachage', 'Chiffrer le mot de passe de façon réversible', 'Compresser le haché']
+          answer: 0
+        - id: java-sec-ex2
+          type: mcq
+          prompt: Quelle protection Spring Security active-t-il par défaut pour les formulaires ?
+          choices: ['La protection CSRF', 'Le chiffrement de la base', 'L’anti-virus', 'La compression']
+          answer: 0
+        - id: java-sec-ex3
+          type: mcq
+          prompt: Où stocker une clé d’API en production ?
+          choices: ['Dans une variable d’environnement ou un coffre-fort de secrets', 'En dur dans le code', 'Dans le README', 'Dans un commentaire']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-microservices
+    title: Microservices
+    summary: Découper un système en services — frontières, communication synchrone et asynchrone, résilience, observabilité et compromis.
+    minutes: 35
+    concepts: [architecture, reseau]
+    sections:
+      - title: Monolithe ou microservices ?
+        body: |
+          | | Monolithe modulaire | Microservices |
+          |---|---|---|
+          | Déploiement | un seul artefact | un par service |
+          | Équipe | une équipe | plusieurs équipes autonomes |
+          | Complexité | faible | réseau, données distribuées, observabilité |
+          | Montée en charge | globale | par service |
+
+          Commencer par un **monolithe bien modulaire** est souvent le meilleur choix ; on extrait un service quand une frontière claire (un *bounded context* du DDD) et un besoin réel apparaissent. Chaque service possède **sa propre base de données**.
+      - title: Communication et résilience
+        body: |
+          - **Synchrone** : HTTP/REST, gRPC — simple mais couple les disponibilités.
+          - **Asynchrone** : messages et événements (Kafka, RabbitMQ) — découplage, cohérence **à terme**.
+
+          Patrons de résilience (Resilience4j) :
+
+          - **timeout** sur chaque appel réseau ;
+          - **retry** avec backoff exponentiel (pour les opérations idempotentes) ;
+          - **circuit breaker** : après trop d’échecs, on « ouvre » le circuit et on échoue immédiatement pendant un temps, puis on teste à nouveau (« demi-ouvert ») ;
+          - **bulkhead** : isoler les ressources ;
+          - **saga** pour les transactions distribuées (actions compensatoires).
+
+          Observabilité : logs structurés avec identifiant de corrélation, métriques (Micrometer/Prometheus), traces distribuées (OpenTelemetry).
+    exercises:
+      - id: java-micro-q1
+        type: mcq
+        prompt: Pourquoi chaque microservice doit-il avoir sa propre base de données ?
+        choices: ['Pour rester autonome et ne pas coupler les services par le schéma', 'Pour la sauvegarde', 'Parce que PostgreSQL l’impose', 'Ce n’est pas recommandé']
+        answer: 0
+      - id: java-micro-q2
+        type: mcq
+        prompt: Que fait un circuit breaker ouvert ?
+        choices: ['Il fait échouer immédiatement les appels pendant un délai', 'Il relance indéfiniment', 'Il coupe le serveur', 'Il chiffre les messages']
+        answer: 0
+      - id: java-micro-code
+        type: code
+        title: Circuit breaker
+        prompt: |
+          Implémente un circuit breaker à temps simulé : états `FERME`, `OUVERT`, `DEMI_OUVERT`. Seuil : 3 échecs consécutifs → `OUVERT` pendant 10 unités de temps. Après ce délai, l’appel suivant passe en `DEMI_OUVERT` : un succès referme le circuit, un échec le rouvre (nouveau délai de 10).
+
+          Chaque ligne : `t resultat` (temps croissant, `ok` ou `ko` = ce que renverrait le service). Affiche pour chaque appel `t : appel ok|appel ko|rejeté` puis ` [ETAT]` (état après l’appel). Un appel rejeté n’atteint pas le service.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              enum Etat { FERME, OUVERT, DEMI_OUVERT }
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Etat etat = Etat.FERME;
+                  int echecs = 0;
+                  long ouvertA = 0;
+                  while (sc.hasNext()) {
+                      long t = sc.nextLong();
+                      boolean ok = sc.next().equals("ok");
+                      if (etat == Etat.OUVERT) {
+                          if (t - ouvertA < 10) { System.out.println(t + " : rejeté [" + etat + "]"); continue; }
+                          etat = Etat.DEMI_OUVERT;
+                      }
+                      if (ok) { echecs = 0; etat = Etat.FERME; }
+                      else {
+                          echecs++;
+                          if (etat == Etat.DEMI_OUVERT || echecs >= 3) { etat = Etat.OUVERT; ouvertA = t; }
+                      }
+                      System.out.println(t + " : appel " + (ok ? "ok" : "ko") + " [" + etat + "]");
+                  }
+              }
+          }
+        tests:
+          - { input: "1 ok\n2 ko\n3 ko\n4 ko\n5 ok\n13 ok\n14 ko\n20 ko\n24 ko\n30 ok", output: "1 : appel ok [FERME]\n2 : appel ko [FERME]\n3 : appel ko [FERME]\n4 : appel ko [OUVERT]\n5 : rejeté [OUVERT]\n13 : rejeté [OUVERT]\n14 : appel ko [OUVERT]\n20 : rejeté [OUVERT]\n24 : appel ko [OUVERT]\n30 : rejeté [OUVERT]" }
+          - { input: "1 ko\n2 ko\n3 ko\n13 ok\n14 ko", output: "1 : appel ko [FERME]\n2 : appel ko [FERME]\n3 : appel ko [OUVERT]\n13 : appel ok [FERME]\n14 : appel ko [FERME]", hidden: true }
+    project:
+      id: java-micro-projet
+      type: code
+      title: Saga de commande
+      difficulty: 3
+      prompt: |
+        Une commande traverse trois services : `stock` (réserver), `paiement` (débiter), `livraison` (planifier). Si une étape échoue, la **saga** exécute les actions compensatoires des étapes déjà réussies, **dans l’ordre inverse** (`libérer stock`, `rembourser`).
+
+        Chaque ligne : `commande ID` puis trois résultats `ok`/`ko` (stock, paiement, livraison). Affiche les étapes au format `ID > réserver stock : ok`… puis `ID > compensation : rembourser`… puis `ID : CONFIRMÉE` ou `ID : ANNULÉE`. Termine par `confirmées : C, annulées : A`.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            record Etape(String action, String compensation) {}
+            static final List<Etape> ETAPES = List.of(
+                new Etape("réserver stock", "libérer stock"),
+                new Etape("débiter paiement", "rembourser"),
+                new Etape("planifier livraison", "annuler livraison"));
+
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                int conf = 0, ann = 0;
+                while (sc.hasNext()) {
+                    sc.next();
+                    String id = sc.next();
+                    String[] r = {sc.next(), sc.next(), sc.next()};
+                    Deque<Etape> faites = new ArrayDeque<>();
+                    boolean ok = true;
+                    for (int i = 0; i < 3; i++) {
+                        System.out.println(id + " > " + ETAPES.get(i).action() + " : " + r[i]);
+                        if (r[i].equals("ok")) faites.push(ETAPES.get(i));
+                        else { ok = false; break; }
+                    }
+                    if (!ok) while (!faites.isEmpty()) System.out.println(id + " > compensation : " + faites.pop().compensation());
+                    System.out.println(id + " : " + (ok ? "CONFIRMÉE" : "ANNULÉE"));
+                    if (ok) conf++; else ann++;
+                }
+                System.out.println("confirmées : " + conf + ", annulées : " + ann);
+            }
+        }
+      tests:
+        - { input: "commande A1 ok ok ok\ncommande B2 ok ok ko\ncommande C3 ko ok ok", output: "A1 > réserver stock : ok\nA1 > débiter paiement : ok\nA1 > planifier livraison : ok\nA1 : CONFIRMÉE\nB2 > réserver stock : ok\nB2 > débiter paiement : ok\nB2 > planifier livraison : ko\nB2 > compensation : rembourser\nB2 > compensation : libérer stock\nB2 : ANNULÉE\nC3 > réserver stock : ko\nC3 : ANNULÉE\nconfirmées : 1, annulées : 2" }
+        - { input: commande Z ok ko ok, output: "Z > réserver stock : ok\nZ > débiter paiement : ko\nZ > compensation : libérer stock\nZ : ANNULÉE\nconfirmées : 0, annulées : 1", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-micro-ex1
+          type: mcq
+          prompt: Qu’est-ce qu’une saga ?
+          choices: ['Une suite de transactions locales avec actions compensatoires', 'Un verrou distribué', 'Un type de base NoSQL', 'Un framework de test']
+          answer: 0
+        - id: java-micro-ex2
+          type: mcq
+          prompt: Quand faut-il éviter un retry automatique ?
+          choices: ['Pour une opération non idempotente (ex. paiement sans clé d’idempotence)', 'Pour un GET', 'Pour une lecture de cache', 'Jamais']
+          answer: 0
+        - id: java-micro-ex3
+          type: mcq
+          prompt: Quel standard sert aux traces distribuées ?
+          choices: ['OpenTelemetry', 'JUnit', 'JPA', 'JDBC']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-tests-automatises
+    title: Tests automatisés
+    summary: Stratégie de test — pyramide, tests unitaires, doublures (mocks, stubs, fakes), tests d’intégration, Testcontainers, TDD et CI.
+    minutes: 35
+    concepts: [tests]
+    sections:
+      - title: La pyramide des tests
+        body: |
+          - **Base** : beaucoup de tests **unitaires** rapides (JUnit 5, AssertJ) ;
+          - **Milieu** : tests d’**intégration** (base réelle avec **Testcontainers**, `@SpringBootTest`, `@DataJpaTest`, `MockMvc`) ;
+          - **Sommet** : quelques tests **de bout en bout** (Playwright, Selenium).
+
+          **Doublures de test** :
+
+          | Type | Rôle |
+          |---|---|
+          | Stub | renvoie des réponses préprogrammées |
+          | Mock | vérifie les interactions (`verify(mailer).envoyer(...)`) |
+          | Fake | implémentation simplifiée fonctionnelle (dépôt en mémoire) |
+          | Spy | enveloppe un vrai objet en enregistrant les appels |
+
+          ```java
+          DepotEleves depot = mock(DepotEleves.class);
+          when(depot.parId(1L)).thenReturn(Optional.of(new Eleve(1L, "Ada")));
+          service.inscrire(1L, "rust");
+          verify(notifieur).notifier(eq("Ada"), contains("rust"));
+          ```
+      - title: TDD et intégration continue
+        body: |
+          **TDD** (*Test-Driven Development*) : **Rouge** (écrire un test qui échoue) → **Vert** (le code minimal qui passe) → **Refactoriser**.
+
+          Un bon test est **FIRST** : *Fast, Independent, Repeatable, Self-validating, Timely*.
+
+          En **CI** (GitHub Actions, GitLab CI) : chaque push lance `mvn verify`, avec rapport de couverture (JaCoCo) et analyse statique (SpotBugs, SonarQube). Les tests de mutation (PIT) mesurent la **qualité** des tests : si on modifie le code et qu’aucun test n’échoue, les tests sont trop faibles.
+    exercises:
+      - id: java-tauto-q1
+        type: mcq
+        prompt: Quelle doublure vérifie qu’une méthode a bien été appelée avec certains arguments ?
+        choices: ['Un mock', 'Un stub', 'Un fake', 'Un dummy']
+        answer: 0
+      - id: java-tauto-q2
+        type: mcq
+        prompt: Quel outil lance une vraie base PostgreSQL jetable pour les tests d’intégration ?
+        choices: ['Testcontainers', 'Mockito', 'JaCoCo', 'Lombok']
+        answer: 0
+      - id: java-tauto-order
+        type: order
+        prompt: Remets dans l’ordre le cycle du TDD.
+        lines:
+          - Écrire un test qui échoue (rouge)
+          - Écrire le code minimal pour le faire passer (vert)
+          - Refactoriser en gardant les tests verts
+      - id: java-tauto-code
+        type: code
+        title: Mock fait main
+        prompt: |
+          Teste un `ServiceRappel` sans vrai serveur e-mail. Écris :
+
+          - une interface `Mailer { boolean envoyer(String a, String sujet); }` ;
+          - une classe `MailerMock implements Mailer` qui **enregistre** chaque appel (`a|sujet`) et renvoie une réponse programmée (`false` pour les adresses listées comme en échec) ;
+          - `ServiceRappel.rappeler(List<String> eleves)` qui envoie `Rappel : révisions` à chaque élève dont l’adresse contient `@`, et renvoie le nombre d’envois réussis.
+
+          Entrée : première ligne, les élèves ; deuxième ligne, les adresses en échec (ou `-`). Affiche les appels enregistrés, puis `réussis : N`, puis `vérification : OK` si le mock a reçu exactement un appel par adresse valide, sinon `vérification : ÉCHEC`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> eleves = List.of(sc.nextLine().trim().split("\\s+"));
+                  Set<String> echecs = new HashSet<>(List.of(sc.nextLine().trim().split("\\s+")));
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          interface Mailer { boolean envoyer(String a, String sujet); }
+
+          class MailerMock implements Mailer {
+              final List<String> appels = new ArrayList<>();
+              private final Set<String> echecs;
+              MailerMock(Set<String> echecs) { this.echecs = echecs; }
+              public boolean envoyer(String a, String sujet) { appels.add(a + "|" + sujet); return !echecs.contains(a); }
+          }
+
+          class ServiceRappel {
+              private final Mailer mailer;
+              ServiceRappel(Mailer mailer) { this.mailer = mailer; }
+              int rappeler(List<String> eleves) {
+                  int ok = 0;
+                  for (String e : eleves) if (e.contains("@") && mailer.envoyer(e, "Rappel : révisions")) ok++;
+                  return ok;
+              }
+          }
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  List<String> eleves = List.of(sc.nextLine().trim().split("\\s+"));
+                  Set<String> echecs = new HashSet<>(List.of(sc.nextLine().trim().split("\\s+")));
+                  MailerMock mock = new MailerMock(echecs);
+                  int ok = new ServiceRappel(mock).rappeler(eleves);
+                  mock.appels.forEach(System.out::println);
+                  System.out.println("réussis : " + ok);
+                  long valides = eleves.stream().filter(e -> e.contains("@")).count();
+                  System.out.println("vérification : " + (mock.appels.size() == valides ? "OK" : "ÉCHEC"));
+              }
+          }
+        tests:
+          - { input: "ada@ex.fr bob zoe@ex.fr kiri@ex.fr\nzoe@ex.fr", output: "ada@ex.fr|Rappel : révisions\nzoe@ex.fr|Rappel : révisions\nkiri@ex.fr|Rappel : révisions\nréussis : 2\nvérification : OK" }
+          - { input: "x\n-", output: "réussis : 0\nvérification : OK", hidden: true }
+        require:
+          - { pattern: 'implements\s+Mailer', message: Créer une doublure de Mailer }
+    project:
+      id: java-tauto-projet
+      type: code
+      title: Tests de mutation
+      difficulty: 3
+      prompt: |
+        Simule un outil de mutation comme PIT. La fonction testée est `prix(age, etudiant)` : 0 si age < 4, 5 si age < 12, 7 si étudiant, 10 sinon. Les **mutants** modifient le code :
+
+        - `M1` : `age < 4` devient `age <= 4`
+        - `M2` : `age < 12` devient `age < 13`
+        - `M3` : le tarif étudiant 7 devient 10
+        - `M4` : la condition étudiant est inversée
+
+        Représente la fonction et ses mutants par des `BiFunction<Integer, Boolean, Integer>`. L’entrée est la suite de tests `age etudiant attendu` (écrite pour la version correcte). Un mutant est **tué** si au moins un test échoue sur lui. Affiche `M1 : tué` / `M1 : survivant` puis `score : T/4`.
+      starter: |
+        import java.util.*;
+        import java.util.function.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+        import java.util.function.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                Map<String, BiFunction<Integer, Boolean, Integer>> mutants = new LinkedHashMap<>();
+                mutants.put("M1", (a, e) -> a <= 4 ? 0 : a < 12 ? 5 : e ? 7 : 10);
+                mutants.put("M2", (a, e) -> a < 4 ? 0 : a < 13 ? 5 : e ? 7 : 10);
+                mutants.put("M3", (a, e) -> a < 4 ? 0 : a < 12 ? 5 : e ? 10 : 10);
+                mutants.put("M4", (a, e) -> a < 4 ? 0 : a < 12 ? 5 : !e ? 7 : 10);
+                List<int[]> tests = new ArrayList<>();
+                while (sc.hasNext()) tests.add(new int[]{sc.nextInt(), sc.nextBoolean() ? 1 : 0, sc.nextInt()});
+                int tues = 0;
+                for (var m : mutants.entrySet()) {
+                    boolean tue = tests.stream().anyMatch(t -> m.getValue().apply(t[0], t[1] == 1) != t[2]);
+                    if (tue) tues++;
+                    System.out.println(m.getKey() + " : " + (tue ? "tué" : "survivant"));
+                }
+                System.out.println("score : " + tues + "/4");
+            }
+        }
+      tests:
+        - { input: "2 false 0\n8 false 5\n30 true 7\n30 false 10", output: "M1 : survivant\nM2 : survivant\nM3 : tué\nM4 : tué\nscore : 2/4" }
+        - { input: "4 false 5\n12 false 10\n20 true 7", output: "M1 : tué\nM2 : tué\nM3 : tué\nM4 : tué\nscore : 4/4", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-tauto-ex1
+          type: mcq
+          prompt: Que représente la base de la pyramide des tests ?
+          choices: ['De nombreux tests unitaires rapides', 'Des tests manuels', 'Des tests de bout en bout', 'Des tests de charge']
+          answer: 0
+        - id: java-tauto-ex2
+          type: mcq
+          prompt: Que mesurent les tests de mutation ?
+          choices: ['La capacité des tests à détecter des modifications du code', 'La vitesse du code', 'La couverture des lignes uniquement', 'Le nombre de classes']
+          answer: 0
+        - id: java-tauto-ex3
+          type: mcq
+          prompt: Quelle annotation Spring Boot démarre tout le contexte pour un test d’intégration ?
+          choices: ['@SpringBootTest', '@Test', '@MockBean', '@Mock']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: java-deploiement
+    title: Déploiement
+    summary: Mettre une application Java en production — jar exécutable, Docker multi-étapes, configuration, santé, CI/CD et supervision.
+    minutes: 35
+    concepts: [deploiement]
+    sections:
+      - title: Empaqueter
+        body: |
+          Spring Boot produit un **fat jar** exécutable : `java -jar app.jar`. En conteneur, un Dockerfile **multi-étapes** :
+
+          ```dockerfile
+          FROM eclipse-temurin:21-jdk AS build
+          WORKDIR /src
+          COPY . .
+          RUN ./mvnw -q package -DskipTests
+
+          FROM eclipse-temurin:21-jre
+          RUN useradd -r app
+          USER app
+          COPY --from=build /src/target/app.jar /app/app.jar
+          EXPOSE 8080
+          ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]
+          ```
+
+          La JVM respecte les limites mémoire du conteneur ; `-XX:MaxRAMPercentage` règle la part utilisée par le tas. Alternatives : `jlink` (JRE réduit), GraalVM `native-image` (démarrage en millisecondes).
+      - title: Exploiter
+        body: |
+          - **Configuration externe** : variables d’environnement (`SPRING_DATASOURCE_URL`), jamais de secret dans l’image ;
+          - **Santé** : `/actuator/health` (sondes *liveness*/*readiness* pour Kubernetes) ;
+          - **Arrêt gracieux** : `server.shutdown=graceful` (finir les requêtes en cours au SIGTERM) ;
+          - **Migrations** de base au démarrage (Flyway) ;
+          - **CI/CD** : build → tests → image → déploiement progressif (rolling, blue/green, canary) ;
+          - **Supervision** : logs JSON, métriques Prometheus + Grafana, alertes ;
+          - **Versionnement sémantique** et retour arrière rapide.
+
+          C’est exactement ce que fait Codemori : `docker compose up -d --build` démarre la base, l’API, le service d’exécution et le reverse proxy HTTPS.
+    exercises:
+      - id: java-dep-q1
+        type: mcq
+        prompt: Pourquoi utiliser un Dockerfile multi-étapes ?
+        choices: ['Pour que l’image finale ne contienne que le JRE et le jar, sans les outils de build', 'Pour compiler plus vite', 'Parce que Docker l’exige', 'Pour chiffrer l’image']
+        answer: 0
+      - id: java-dep-q2
+        type: mcq
+        prompt: Que doit faire une application au signal SIGTERM ?
+        choices: ['S’arrêter proprement en terminant les requêtes en cours', 'Ignorer le signal', 'Redémarrer', 'Supprimer ses données']
+        answer: 0
+      - id: java-dep-q3
+        type: mcq
+        prompt: Quel type de déploiement redirige une petite partie du trafic vers la nouvelle version ?
+        choices: ['Canary', 'Big bang', 'Cold start', 'Rollback']
+        answer: 0
+      - id: java-dep-code
+        type: code
+        title: Configuration par l’environnement
+        prompt: |
+          Spring Boot associe les variables d’environnement aux propriétés : `SPRING_DATASOURCE_URL` → `spring.datasource.url` (minuscules, `_` → `.`). Les variables d’environnement **priment** sur le fichier de configuration.
+
+          Entrée : des lignes `fichier cle=valeur` et `env NOM=valeur`, puis `? cle` pour chaque propriété demandée. Affiche `cle = valeur (source)` avec la source `env` ou `fichier`, ou `cle = ? (manquante)`. Les propriétés dont la clé contient `password` ou `secret` sont affichées masquées : `******`.
+        starter: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+              }
+          }
+        solution: |
+          import java.util.*;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Scanner sc = new Scanner(System.in);
+                  Map<String, String> fichier = new HashMap<>(), env = new HashMap<>();
+                  while (sc.hasNextLine()) {
+                      String l = sc.nextLine().trim();
+                      if (l.isEmpty()) continue;
+                      if (l.startsWith("? ")) {
+                          String cle = l.substring(2).trim();
+                          String source = env.containsKey(cle) ? "env" : fichier.containsKey(cle) ? "fichier" : null;
+                          if (source == null) { System.out.println(cle + " = ? (manquante)"); continue; }
+                          String v = source.equals("env") ? env.get(cle) : fichier.get(cle);
+                          if (cle.contains("password") || cle.contains("secret")) v = "******";
+                          System.out.println(cle + " = " + v + " (" + source + ")");
+                          continue;
+                      }
+                      String[] p = l.split(" ", 2);
+                      int i = p[1].indexOf('=');
+                      String k = p[1].substring(0, i), v = p[1].substring(i + 1);
+                      if (p[0].equals("env")) env.put(k.toLowerCase().replace('_', '.'), v);
+                      else fichier.put(k, v);
+                  }
+              }
+          }
+        tests:
+          - { input: "fichier server.port=8080\nfichier spring.datasource.url=jdbc:h2:mem\nenv SPRING_DATASOURCE_URL=jdbc:postgresql://db/codemori\nenv SPRING_DATASOURCE_PASSWORD=s3cr3t\n? server.port\n? spring.datasource.url\n? spring.datasource.password\n? codemori.ai.url", output: "server.port = 8080 (fichier)\nspring.datasource.url = jdbc:postgresql://db/codemori (env)\nspring.datasource.password = ****** (env)\ncodemori.ai.url = ? (manquante)" }
+          - { input: "env SERVER_PORT=9000\n? server.port", output: 'server.port = 9000 (env)', hidden: true }
+    project:
+      id: java-dep-projet
+      type: code
+      title: Déploiement progressif (rolling update)
+      difficulty: 3
+      prompt: |
+        Simule un déploiement progressif sur `n` instances (toutes en version `v1`). On met à jour **une instance à la fois** vers la nouvelle version : l’instance passe `en mise à jour`, puis sa sonde de santé est consultée. Les résultats de sonde sont donnés dans l’ordre (`ok`/`ko`).
+
+        Si une sonde échoue, on arrête et on fait un **retour arrière** : toutes les instances déjà mises à jour repassent en `v1` (dans l’ordre inverse). Affiche chaque étape (`instance i : v2 ok`, `instance i : v2 ko`, `retour arrière instance i`), puis l’état final `[v…, v…]` et `déploiement réussi` ou `déploiement annulé`.
+
+        Entrée : `n nouvelle_version`, puis les résultats de sonde.
+      starter: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+            }
+        }
+      solution: |
+        import java.util.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                Scanner sc = new Scanner(System.in);
+                int n = sc.nextInt();
+                String nouvelle = sc.next();
+                String[] versions = new String[n];
+                Arrays.fill(versions, "v1");
+                Deque<Integer> majs = new ArrayDeque<>();
+                boolean ok = true;
+                for (int i = 0; i < n; i++) {
+                    String sonde = sc.hasNext() ? sc.next() : "ko";
+                    versions[i] = nouvelle;
+                    System.out.println("instance " + i + " : " + nouvelle + " " + sonde);
+                    if (sonde.equals("ok")) majs.push(i);
+                    else { majs.push(i); ok = false; break; }
+                }
+                if (!ok) while (!majs.isEmpty()) {
+                    int i = majs.pop();
+                    versions[i] = "v1";
+                    System.out.println("retour arrière instance " + i);
+                }
+                System.out.println(Arrays.toString(versions));
+                System.out.println(ok ? "déploiement réussi" : "déploiement annulé");
+            }
+        }
+      tests:
+        - { input: "3 v2\nok ok ok", output: "instance 0 : v2 ok\ninstance 1 : v2 ok\ninstance 2 : v2 ok\n[v2, v2, v2]\ndéploiement réussi" }
+        - { input: "4 v3\nok ok ko ok", output: "instance 0 : v3 ok\ninstance 1 : v3 ok\ninstance 2 : v3 ko\nretour arrière instance 2\nretour arrière instance 1\nretour arrière instance 0\n[v1, v1, v1, v1]\ndéploiement annulé" }
+        - { input: "1 v2\nko", output: "instance 0 : v2 ko\nretour arrière instance 0\n[v1]\ndéploiement annulé", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: java-dep-ex1
+          type: mcq
+          prompt: Quelle option règle la part de mémoire du conteneur utilisée par le tas Java ?
+          choices: ['-XX:MaxRAMPercentage', '-Xss', '-verbose', '-ea']
+          answer: 0
+        - id: java-dep-ex2
+          type: mcq
+          prompt: À quoi sert une sonde readiness ?
+          choices: ['Indiquer si l’instance est prête à recevoir du trafic', 'Redémarrer la JVM', 'Compiler le code', 'Sauvegarder la base']
+          answer: 0
+        - id: java-dep-ex3
+          type: mcq
+          prompt: Quelle technologie compile une application Java en exécutable natif ?
+          choices: ['GraalVM native-image', 'javap', 'jshell', 'Maven Wrapper']
+          answer: 0
