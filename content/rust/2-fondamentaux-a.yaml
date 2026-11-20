@@ -1,0 +1,1513 @@
+language: rust
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-ownership
+    title: Ownership (propriété)
+    summary: La règle d’or de Rust — chaque valeur a un unique propriétaire. Comprends les déplacements (move), les copies et la libération automatique.
+    minutes: 35
+    concepts: [ownership, memoire]
+    sections:
+      - title: Les trois règles
+        body: |
+          1. Chaque valeur a **un propriétaire** (une variable).
+          2. Il n’y a **qu’un seul propriétaire** à la fois.
+          3. Quand le propriétaire sort de sa portée, la valeur est **libérée** (*dropped*).
+
+          ```rust
+          {
+              let s = String::from("bonjour"); // s possède la chaîne
+              println!("{s}");
+          } // ← fin de portée : la mémoire de s est libérée automatiquement
+          ```
+
+          Pas de `free()` à oublier comme en C, pas de ramasse-miettes comme en Java : la libération est **déterministe** et décidée à la compilation.
+      - title: Le déplacement (move)
+        body: |
+          ```rust
+          let a = String::from("Kiri");
+          let b = a;            // la propriété est DÉPLACÉE vers b
+          println!("{a}");      // ❌ error[E0382]: borrow of moved value: `a`
+          ```
+
+          Pourquoi ? Une `String` contient un pointeur vers des données sur le tas. Si `a` et `b` pointaient tous deux vers la même mémoire, elle serait libérée **deux fois** à la fin. Rust invalide donc `a`.
+
+          Même chose lors d’un appel de fonction :
+
+          ```rust
+          fn afficher(s: String) { println!("{s}"); } // s est libérée ici
+
+          let nom = String::from("Ada");
+          afficher(nom);     // nom est déplacé dans la fonction
+          // afficher(nom);  // ❌ nom n’est plus valide
+          ```
+
+          Une fonction peut **rendre** la propriété en renvoyant la valeur.
+      - title: Copy et clone
+        body: |
+          Les types simples stockés entièrement sur la pile (`i32`, `f64`, `bool`, `char`, et les tuples de ces types) implémentent le trait **`Copy`** : ils sont **copiés** au lieu d’être déplacés.
+
+          ```rust
+          let x = 5;
+          let y = x;           // copie
+          println!("{x} {y}"); // ✅ 5 5
+          ```
+
+          Pour dupliquer explicitement une valeur qui n’est pas `Copy`, on utilise **`.clone()`** (copie profonde, potentiellement coûteuse) :
+
+          ```rust
+          let a = String::from("Kiri");
+          let b = a.clone();
+          println!("{a} {b}"); // ✅
+          ```
+
+          > 💡 Le plus souvent, on ne clone pas : on **emprunte** (`&`). C’est l’objet du chapitre suivant.
+    exercises:
+      - id: rust-own-q1
+        type: mcq
+        prompt: Que se passe-t-il après `let b = a;` si `a` est une `String` ?
+        choices: [a et b partagent la chaîne, La chaîne est copiée, La propriété est déplacée vers b et a devient inutilisable, Erreur de compilation immédiate]
+        answer: 2
+        concepts: [ownership]
+      - id: rust-own-q2
+        type: mcq
+        multiple: true
+        prompt: Quels types sont `Copy` (copiés au lieu d’être déplacés) ? (plusieurs réponses)
+        choices: [i32, String, bool, 'Vec<i32>', '(i32, char)']
+        answer: [0, 2, 4]
+        concepts: [ownership]
+        explanation: Les types primitifs et les tuples de types `Copy` sont `Copy`. `String` et `Vec` possèdent de la mémoire sur le tas.
+      - id: rust-own-predict
+        type: predict
+        prompt: Ce programme compile. Que va-t-il afficher ?
+        code: |
+          fn prendre_et_rendre(s: String) -> String {
+              let mut t = s;
+              t.push_str("!");
+              t
+          }
+
+          fn main() {
+              let a = String::from("salut");
+              let b = prendre_et_rendre(a);
+              let c = b.clone();
+              println!("{} {}", b, c.len());
+          }
+        output: salut! 6
+        concepts: [ownership]
+      - id: rust-own-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0382). Trouve et corrige l’erreur en gardant l’appel à `afficher`.
+        code: |
+          fn afficher(s: String) {
+              println!("{}", s);
+          }
+
+          fn main() {
+              let message = String::from("Bonjour");
+              afficher(message);
+              println!("Longueur : {}", message.len());
+          }
+        bugLines: [8]
+        choices:
+          - '`message` a été déplacé dans `afficher` : il n’est plus utilisable ensuite'
+          - '`len()` n’existe pas pour String'
+          - afficher devrait renvoyer un i32
+        answer: 0
+        solution: |
+          fn afficher(s: String) {
+              println!("{}", s);
+          }
+
+          fn main() {
+              let message = String::from("Bonjour");
+              let longueur = message.len();
+              afficher(message);
+              println!("Longueur : {}", longueur);
+          }
+        tests:
+          - { input: '', output: "Bonjour\nLongueur : 7" }
+        explanation: On peut calculer la longueur avant le déplacement, cloner, ou (mieux) faire prendre `&String`/`&str` à la fonction.
+        concepts: [ownership]
+      - id: rust-own-fill
+        type: fill
+        prompt: Complète pour que les deux variables restent utilisables.
+        code: |
+          fn main() {
+              let original = String::from("Rust");
+              let copie = original.{{?}}();
+              println!("{} {}", original, copie);
+          }
+        blanks: [[clone]]
+        tests:
+          - { input: '', output: Rust Rust }
+      - id: rust-own-code
+        type: code
+        title: Rendre la propriété
+        prompt: |
+          Écris une fonction `ajouter_signature(texte: String) -> String` qui **prend possession** du texte, ajoute `" -- Kiri"` à la fin et le **rend**.
+
+          Le programme lit une ligne et affiche le résultat.
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut ligne = String::new();
+              io::stdin().read_line(&mut ligne).unwrap();
+              let ligne = ligne.trim().to_string();
+              let signe = ajouter_signature(ligne);
+              println!("{}", signe);
+          }
+        solution: |
+          use std::io;
+
+          fn ajouter_signature(mut texte: String) -> String {
+              texte.push_str(" -- Kiri");
+              texte
+          }
+
+          fn main() {
+              let mut ligne = String::new();
+              io::stdin().read_line(&mut ligne).unwrap();
+              let ligne = ligne.trim().to_string();
+              let signe = ajouter_signature(ligne);
+              println!("{}", signe);
+          }
+        tests:
+          - { input: 'Bonne journée', output: 'Bonne journée -- Kiri' }
+          - { input: 'Merci', output: 'Merci -- Kiri', hidden: true }
+        hints: ['Le paramètre peut être déclaré `mut texte: String` pour pouvoir le modifier.', '`texte.push_str("...")` ajoute du texte.']
+        concepts: [ownership]
+    project:
+      id: rust-own-projet
+      type: code
+      title: Chaîne de traitements
+      difficulty: 2
+      prompt: |
+        Écris trois fonctions qui **prennent et rendent** une `String` :
+
+        - `majuscules(s: String) -> String` (utilise `.to_uppercase()`),
+        - `encadrer(s: String) -> String` qui renvoie `[` + s + `]`,
+        - `repeter(s: String) -> String` qui renvoie `s` répété deux fois, séparé par un espace.
+
+        Pour chaque ligne d’entrée, affiche `repeter(encadrer(majuscules(ligne)))`.
+
+        Exemple : `kiri` → `[KIRI] [KIRI]`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            for ligne in entree.lines() {
+                let s = ligne.to_string();
+                // println!("{}", repeter(encadrer(majuscules(s))));
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn majuscules(s: String) -> String {
+            s.to_uppercase()
+        }
+
+        fn encadrer(s: String) -> String {
+            format!("[{}]", s)
+        }
+
+        fn repeter(s: String) -> String {
+            format!("{} {}", s, s)
+        }
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            for ligne in entree.lines() {
+                let s = ligne.to_string();
+                println!("{}", repeter(encadrer(majuscules(s))));
+            }
+        }
+      tests:
+        - { input: 'kiri', output: '[KIRI] [KIRI]' }
+        - { input: "rust\nété", output: "[RUST] [RUST]\n[ÉTÉ] [ÉTÉ]", hidden: true }
+      hints: ['`format!` fonctionne comme `println!` mais renvoie une `String`.']
+      concepts: [ownership]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-own-ex1
+          type: mcq
+          prompt: Quand la mémoire d’une `String` est-elle libérée ?
+          choices: [Quand le ramasse-miettes passe, Quand son propriétaire sort de portée, À la fin du programme seulement, Quand on appelle free()]
+          answer: 1
+        - id: rust-own-ex2
+          type: mcq
+          prompt: 'Lequel de ces codes compile ?'
+          choices:
+            - 'let a = vec![1]; let b = a; println!("{:?}", a);'
+            - 'let a = 3; let b = a; println!("{}", a);'
+            - 'let a = String::new(); drop(a); println!("{}", a);'
+          answer: 1
+          explanation: '`i32` est `Copy` : `a` reste utilisable.'
+        - id: rust-own-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let a = String::from("ab");
+                let b = a.clone() + "cd";
+                let c = b;
+                println!("{} {}", a, c);
+            }
+          output: ab abcd
+        - id: rust-own-ex4
+          type: mcq
+          prompt: Pourquoi Rust invalide-t-il `a` après `let b = a;` pour une `String` ?
+          choices: [Pour éviter une double libération de la même mémoire, Parce que les String sont constantes, Pour gagner du temps de compilation, Parce que a est trop longue]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-borrowing
+    title: Borrowing (emprunt)
+    summary: Accède à une valeur sans en prendre la propriété grâce aux emprunts (&), et découvre les règles du borrow checker.
+    minutes: 30
+    concepts: [references, ownership]
+    sections:
+      - title: Emprunter plutôt que prendre
+        body: |
+          Plutôt que de déplacer une valeur dans une fonction, on peut lui **prêter** une référence avec `&` :
+
+          ```rust
+          fn longueur(s: &String) -> usize {
+              s.len()
+          } // s est une référence : rien n’est libéré ici
+
+          fn main() {
+              let nom = String::from("Kiri");
+              let n = longueur(&nom);   // on prête nom
+              println!("{nom} fait {n} lettres"); // ✅ nom est toujours valide
+          }
+          ```
+
+          - `&nom` crée une **référence** (un emprunt) ;
+          - la fonction reçoit `&String` ;
+          - le propriétaire reste `nom`.
+      - title: Les règles de l’emprunt
+        body: |
+          À tout moment, pour une donnée, tu peux avoir **soit** :
+
+          - **autant de références partagées** `&T` que tu veux (lecture seule),
+          - **soit une seule référence mutable** `&mut T` (lecture + écriture).
+
+          Et une référence ne doit **jamais survivre** à la valeur qu’elle désigne.
+
+          Ces règles sont vérifiées par le **borrow checker** du compilateur. Elles éliminent les *data races* et les pointeurs pendants **avant l’exécution**.
+
+          ```rust
+          let mut v = vec![1, 2, 3];
+          let premier = &v[0];   // emprunt partagé
+          v.push(4);             // ❌ E0502 : v est emprunté en lecture
+          println!("{premier}");
+          ```
+
+          Ici, `push` pourrait réallouer le vecteur et rendre `premier` invalide : Rust refuse !
+      - title: Portée des emprunts
+        body: |
+          Un emprunt dure jusqu’à sa **dernière utilisation** (*non-lexical lifetimes*) :
+
+          ```rust
+          let mut s = String::from("a");
+          let r1 = &s;
+          let r2 = &s;
+          println!("{r1} {r2}"); // dernière utilisation de r1 et r2
+          let r3 = &mut s;       // ✅ OK : r1 et r2 ne sont plus utilisés
+          r3.push('b');
+          ```
+
+          Astuce : `&str` est encore plus pratique que `&String` comme paramètre, car il accepte aussi les littéraux (`"abc"`). Tu le verras au chapitre *Strings et slices*.
+    exercises:
+      - id: rust-bor-q1
+        type: mcq
+        prompt: 'Que reçoit une fonction déclarée `fn f(s: &String)` ?'
+        choices: [La propriété de la chaîne, Une copie de la chaîne, Une référence empruntée à la chaîne, Un pointeur nul]
+        answer: 2
+        concepts: [references]
+      - id: rust-bor-q2
+        type: mcq
+        prompt: Combien de références mutables vers la même donnée peuvent coexister ?
+        choices: ['0', '1', '2', Autant qu’on veut]
+        answer: 1
+        concepts: [references]
+      - id: rust-bor-fill
+        type: fill
+        prompt: Complète pour prêter `texte` à la fonction sans le déplacer.
+        code: |
+          fn compter_voyelles(s: {{?}}String) -> usize {
+              s.chars().filter(|c| "aeiouy".contains(*c)).count()
+          }
+
+          fn main() {
+              let texte = String::from("programmation");
+              let n = compter_voyelles({{?}}texte);
+              println!("{} : {}", texte, n);
+          }
+        blanks: [['&'], ['&']]
+        tests:
+          - { input: '', output: 'programmation : 5' }
+        concepts: [references]
+      - id: rust-bor-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn somme(v: &Vec<i32>) -> i32 {
+              let mut s = 0;
+              for x in v {
+                  s += x;
+              }
+              s
+          }
+
+          fn main() {
+              let nombres = vec![3, 4, 5];
+              let a = somme(&nombres);
+              let b = somme(&nombres);
+              println!("{} {}", a + b, nombres.len());
+          }
+        output: 24 3
+      - id: rust-bor-bug
+        type: bugfix
+        prompt: Le compilateur refuse ce code (E0502). Trouve la ligne qui pose problème.
+        code: |
+          fn main() {
+              let mut liste = vec![10, 20, 30];
+              let premier = &liste[0];
+              liste.push(40);
+              println!("premier = {}", premier);
+          }
+        bugLines: [4]
+        choices:
+          - On modifie la liste alors qu’une référence partagée vers elle est encore utilisée
+          - push n’existe pas sur Vec
+          - On ne peut pas emprunter un élément de vecteur
+        answer: 0
+        solution: |
+          fn main() {
+              let mut liste = vec![10, 20, 30];
+              let premier = liste[0];
+              liste.push(40);
+              println!("premier = {}", premier);
+          }
+        tests:
+          - { input: '', output: premier = 10 }
+        explanation: '`push` peut réallouer le vecteur, ce qui invaliderait la référence. Ici, copier la valeur (`i32` est `Copy`) résout le problème.'
+      - id: rust-bor-code
+        type: code
+        title: Statistiques empruntées
+        prompt: |
+          Écris deux fonctions qui **empruntent** le vecteur (paramètre `&Vec<i64>`) :
+
+          - `minimum(v: &Vec<i64>) -> i64`
+          - `maximum(v: &Vec<i64>) -> i64`
+
+          Le programme lit des entiers séparés par des espaces et affiche `min max` (déjà écrit).
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut ligne = String::new();
+              io::stdin().read_line(&mut ligne).unwrap();
+              let v: Vec<i64> = ligne.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              println!("{} {}", minimum(&v), maximum(&v));
+          }
+        solution: |
+          use std::io;
+
+          fn minimum(v: &Vec<i64>) -> i64 {
+              let mut m = v[0];
+              for &x in v {
+                  if x < m { m = x; }
+              }
+              m
+          }
+
+          fn maximum(v: &Vec<i64>) -> i64 {
+              let mut m = v[0];
+              for &x in v {
+                  if x > m { m = x; }
+              }
+              m
+          }
+
+          fn main() {
+              let mut ligne = String::new();
+              io::stdin().read_line(&mut ligne).unwrap();
+              let v: Vec<i64> = ligne.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              println!("{} {}", minimum(&v), maximum(&v));
+          }
+        tests:
+          - { input: '4 -2 9 7', output: '-2 9' }
+          - { input: '5', output: '5 5', hidden: true }
+          - { input: '-1 -8 -3', output: '-8 -1', hidden: true }
+        require:
+          - { pattern: 'fn\s+minimum\s*\(\s*v\s*:\s*&', message: minimum doit emprunter le vecteur (&) }
+        concepts: [references, fonctions]
+    project:
+      id: rust-bor-projet
+      type: code
+      title: Analyseur de texte
+      difficulty: 2
+      prompt: |
+        Lis tout le texte de l’entrée. Écris des fonctions qui **empruntent** le texte (`&String`) :
+
+        - `nombre_lignes`, `nombre_mots`, `nombre_caracteres` (caractères hors retours à la ligne, avec `.chars()`).
+
+        Affiche :
+
+        ```
+        Lignes : …
+        Mots : …
+        Caractères : …
+        ```
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut texte = String::new();
+            io::stdin().read_to_string(&mut texte).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn nombre_lignes(t: &String) -> usize {
+            t.lines().count()
+        }
+
+        fn nombre_mots(t: &String) -> usize {
+            t.split_whitespace().count()
+        }
+
+        fn nombre_caracteres(t: &String) -> usize {
+            t.chars().filter(|c| *c != '\n' && *c != '\r').count()
+        }
+
+        fn main() {
+            let mut texte = String::new();
+            io::stdin().read_to_string(&mut texte).unwrap();
+            println!("Lignes : {}", nombre_lignes(&texte));
+            println!("Mots : {}", nombre_mots(&texte));
+            println!("Caractères : {}", nombre_caracteres(&texte));
+        }
+      tests:
+        - { input: "Bonjour le monde\nRust est génial", output: "Lignes : 2\nMots : 6\nCaractères : 31" }
+        - { input: 'été', output: "Lignes : 1\nMots : 1\nCaractères : 3", hidden: true }
+        - { input: "a b\n\nc", output: "Lignes : 3\nMots : 3\nCaractères : 4", hidden: true }
+      hints: ['`.lines()`, `.split_whitespace()` et `.chars()` sont tes amis.', 'Attention : `.len()` compte des **octets**, pas des caractères (« é » occupe 2 octets).']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-bor-ex1
+          type: mcq
+          prompt: Quelle combinaison d’emprunts est autorisée simultanément ?
+          choices: ['Deux &mut', 'Un & et un &mut', 'Trois &', 'Un &mut et deux &']
+          answer: 2
+        - id: rust-bor-ex2
+          type: mcq
+          prompt: Quel composant du compilateur vérifie les règles d’emprunt ?
+          choices: [Le linker, Le borrow checker, Le préprocesseur, Le garbage collector]
+          answer: 1
+        - id: rust-bor-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn premier_mot(s: &String) -> usize {
+                s.split(' ').next().unwrap().len()
+            }
+            fn main() {
+                let s = String::from("emprunt partagé");
+                println!("{} {}", premier_mot(&s), s);
+            }
+          output: 7 emprunt partagé
+        - id: rust-bor-ex4
+          type: mcq
+          prompt: Jusqu’à quand dure un emprunt ?
+          choices: [Jusqu’à la fin de la fonction, Jusqu’à sa dernière utilisation, Jusqu’à la fin du programme, Une seule instruction]
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-references
+    title: Références en détail
+    summary: Déréférencement avec *, références de références, comparaison avec les pointeurs et durée de vie d’une référence.
+    minutes: 25
+    concepts: [references]
+    sections:
+      - title: Déréférencer
+        body: |
+          Une référence contient l’**adresse** d’une valeur. L’opérateur `*` permet d’accéder à la valeur pointée :
+
+          ```rust
+          let x = 10;
+          let r = &x;
+          println!("{}", *r + 1);   // 11
+          println!("{}", r);        // 10 : println! déréférence automatiquement
+          assert_eq!(*r, 10);
+          ```
+
+          Les appels de méthode déréférencent automatiquement (*auto-deref*) : `r.len()` fonctionne sur `&String` comme sur `String`.
+
+          Comparer deux références compare les **valeurs** pointées : `&3 == &3` vaut `true`.
+      - title: Pas de référence pendante
+        body: |
+          En C, on peut renvoyer l’adresse d’une variable locale déjà détruite. En Rust, c’est impossible :
+
+          ```rust
+          fn pendante() -> &String {   // ❌ E0106: missing lifetime specifier
+              let s = String::from("oups");
+              &s                       // s serait détruite à la fin de la fonction
+          }
+          ```
+
+          La solution : renvoyer la valeur **possédée** (`String`) et non une référence.
+
+          | | Référence Rust | Pointeur C/C++ |
+          |---|---|---|
+          | Peut être nulle | ❌ jamais | ✅ |
+          | Peut pendre (*dangling*) | ❌ vérifié | ✅ comportement indéfini |
+          | Arithmétique | ❌ | ✅ |
+      - title: Itérer par référence
+        body: |
+          Parcourir une collection **par référence** évite de la consommer :
+
+          ```rust
+          let mots = vec![String::from("a"), String::from("b")];
+          for m in &mots {          // m : &String
+              println!("{m}");
+          }
+          println!("{}", mots.len()); // ✅ mots toujours disponible
+
+          for m in mots { }         // consomme mots (déplacement)
+          ```
+
+          Le motif `&x` dans une boucle déstructure la référence : `for &n in &vec_d_entiers` donne directement des `i32`.
+    exercises:
+      - id: rust-ref-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let a = 5;
+              let r = &a;
+              let rr = &r;
+              println!("{} {}", *r * 2, **rr + 1);
+          }
+        output: 10 6
+      - id: rust-ref-q1
+        type: mcq
+        prompt: Pourquoi ce code ne compile-t-il pas ? `fn f() -> &String { let s = String::new(); &s }`
+        choices:
+          - La référence pointerait vers une valeur détruite à la fin de la fonction
+          - On ne peut pas créer de String vide
+          - Les fonctions ne peuvent pas renvoyer de références
+        answer: 0
+      - id: rust-ref-q2
+        type: mcq
+        prompt: Une référence Rust peut-elle être nulle ?
+        choices: [Oui, avec null, Oui, avec nullptr, 'Non, jamais (on utilise Option<&T>)', Seulement en mode release]
+        answer: 2
+      - id: rust-ref-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve la ligne qui pose problème.
+        code: |
+          fn main() {
+              let noms = vec![String::from("Ada"), String::from("Linus")];
+              for n in noms {
+                  println!("{}", n);
+              }
+              println!("{} noms", noms.len());
+          }
+        bugLines: [3]
+        choices:
+          - La boucle consomme (déplace) le vecteur ; il faut itérer sur &noms
+          - Les vecteurs de String sont interdits
+          - println! ne peut pas afficher une String
+        answer: 0
+        solution: |
+          fn main() {
+              let noms = vec![String::from("Ada"), String::from("Linus")];
+              for n in &noms {
+                  println!("{}", n);
+              }
+              println!("{} noms", noms.len());
+          }
+        tests:
+          - { input: '', output: "Ada\nLinus\n2 noms" }
+      - id: rust-ref-code
+        type: code
+        title: Le plus long mot
+        prompt: |
+          Écris `fn plus_long(mots: &Vec<String>) -> String` qui renvoie (une copie du) mot le plus long. En cas d’égalité, garde le premier.
+
+          L’entrée contient des mots séparés par des espaces.
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut ligne = String::new();
+              io::stdin().read_line(&mut ligne).unwrap();
+              let mots: Vec<String> = ligne.split_whitespace().map(|m| m.to_string()).collect();
+              println!("{}", plus_long(&mots));
+          }
+        solution: |
+          use std::io;
+
+          fn plus_long(mots: &Vec<String>) -> String {
+              let mut meilleur = &mots[0];
+              for m in mots {
+                  if m.chars().count() > meilleur.chars().count() {
+                      meilleur = m;
+                  }
+              }
+              meilleur.clone()
+          }
+
+          fn main() {
+              let mut ligne = String::new();
+              io::stdin().read_line(&mut ligne).unwrap();
+              let mots: Vec<String> = ligne.split_whitespace().map(|m| m.to_string()).collect();
+              println!("{}", plus_long(&mots));
+          }
+        tests:
+          - { input: 'le borrow checker veille', output: checker }
+          - { input: 'un deux six', output: deux, hidden: true }
+          - { input: 'éléphant zèbre', output: éléphant, hidden: true }
+    project:
+      id: rust-ref-projet
+      type: code
+      title: Classement des scores
+      difficulty: 3
+      prompt: |
+        Chaque ligne contient un **nom** et un **score** entier. Stocke les noms dans un `Vec<String>` et les scores dans un `Vec<i32>`.
+
+        Écris `fn indice_du_meilleur(scores: &Vec<i32>) -> usize` et `fn moyenne(scores: &Vec<i32>) -> f64`, puis affiche :
+
+        ```
+        Meilleur : <nom> (<score>)
+        Moyenne : <moyenne avec 1 décimale>
+        Participants : <nombre>
+        ```
+
+        En cas d’égalité, le premier rencontré l’emporte.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut noms: Vec<String> = Vec::new();
+            let mut scores: Vec<i32> = Vec::new();
+            for ligne in entree.lines() {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                noms.push(p[0].to_string());
+                scores.push(p[1].parse().unwrap());
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn indice_du_meilleur(scores: &Vec<i32>) -> usize {
+            let mut idx = 0;
+            for (i, s) in scores.iter().enumerate() {
+                if *s > scores[idx] {
+                    idx = i;
+                }
+            }
+            idx
+        }
+
+        fn moyenne(scores: &Vec<i32>) -> f64 {
+            let total: i32 = scores.iter().sum();
+            total as f64 / scores.len() as f64
+        }
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut noms: Vec<String> = Vec::new();
+            let mut scores: Vec<i32> = Vec::new();
+            for ligne in entree.lines() {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                noms.push(p[0].to_string());
+                scores.push(p[1].parse().unwrap());
+            }
+            let i = indice_du_meilleur(&scores);
+            println!("Meilleur : {} ({})", noms[i], scores[i]);
+            println!("Moyenne : {:.1}", moyenne(&scores));
+            println!("Participants : {}", noms.len());
+        }
+      tests:
+        - { input: "Ada 12\nLinus 18\nGrace 15", output: "Meilleur : Linus (18)\nMoyenne : 15.0\nParticipants : 3" }
+        - { input: "Kiri 10\nRei 10", output: "Meilleur : Kiri (10)\nMoyenne : 10.0\nParticipants : 2", hidden: true }
+        - { input: "Solo -3", output: "Meilleur : Solo (-3)\nMoyenne : -3.0\nParticipants : 1", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-ref-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let v = vec![1, 2, 3];
+                let mut s = 0;
+                for &x in &v {
+                    s += x * x;
+                }
+                println!("{} {}", s, v.len());
+            }
+          output: 14 3
+        - id: rust-ref-ex2
+          type: mcq
+          prompt: Que fait l’opérateur `*` appliqué à une référence ?
+          choices: [Multiplie par 2, Accède à la valeur pointée, Crée une copie profonde, Libère la mémoire]
+          answer: 1
+        - id: rust-ref-ex3
+          type: mcq
+          prompt: Que vaut `&5 == &5` ?
+          choices: ['true', 'false', Erreur de compilation]
+          answer: 0
+          explanation: La comparaison de références compare les valeurs pointées.
+        - id: rust-ref-ex4
+          type: mcq
+          prompt: Comment corriger une fonction qui voudrait renvoyer une référence vers une variable locale ?
+          choices: [Renvoyer la valeur possédée (par ex. String), Ajouter unsafe, Utiliser static mut, C’est impossible à corriger]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-references-mutables
+    title: Mutabilité des références
+    summary: Modifie une valeur empruntée avec &mut, comprends l’exclusivité et évite les conflits d’emprunts.
+    minutes: 25
+    concepts: [references, mutabilite]
+    sections:
+      - title: Emprunt mutable
+        body: |
+          Pour qu’une fonction **modifie** une valeur sans en prendre la propriété :
+
+          ```rust
+          fn ajouter_exclamation(s: &mut String) {
+              s.push('!');
+          }
+
+          fn main() {
+              let mut cri = String::from("Rust");   // 1. variable mut
+              ajouter_exclamation(&mut cri);        // 2. emprunt &mut
+              println!("{cri}");                    // Rust!
+          }
+          ```
+
+          Trois conditions : la variable est `mut`, on passe `&mut`, et le paramètre est de type `&mut T`.
+
+          Pour modifier un entier pointé, il faut **déréférencer** :
+
+          ```rust
+          fn doubler(n: &mut i32) { *n *= 2; }
+          ```
+      - title: L’exclusivité
+        body: |
+          Un `&mut` est **exclusif** : pendant qu’il est actif, aucune autre référence (même en lecture) n’est permise.
+
+          ```rust
+          let mut x = 1;
+          let a = &mut x;
+          let b = &mut x;      // ❌ E0499: cannot borrow `x` as mutable more than once
+          *a += 1;
+          ```
+
+          C’est ce qui rend impossibles les **data races** : deux morceaux de code ne peuvent jamais modifier la même donnée en même temps.
+
+          Solutions habituelles : réduire la portée de l’emprunt (bloc `{}`), terminer l’utilisation du premier emprunt avant de créer le second, ou découper la donnée (`split_at_mut` pour les tranches).
+      - title: Modifier une collection
+        body: |
+          ```rust
+          let mut notes = vec![8, 12, 15];
+          for n in &mut notes {     // n : &mut i32
+              *n += 2;              // bonus pour tout le monde
+          }
+          println!("{:?}", notes);  // [10, 14, 17]
+          ```
+
+          `{:?}` est le format **Debug** : il permet d’afficher un vecteur entier.
+    exercises:
+      - id: rust-mref-fill
+        type: fill
+        prompt: Complète pour que la fonction incrémente le compteur.
+        code: |
+          fn incrementer(c: {{?}} i32) {
+              {{?}}c += 1;
+          }
+
+          fn main() {
+              let mut compteur = 0;
+              incrementer(&mut compteur);
+              incrementer(&mut compteur);
+              println!("{}", compteur);
+          }
+        blanks: [['&mut'], ['*']]
+        tests:
+          - { input: '', output: '2' }
+        concepts: [references, mutabilite]
+      - id: rust-mref-q1
+        type: mcq
+        prompt: Quelle erreur obtient-on avec deux `&mut` simultanés vers la même variable ?
+        choices: [E0382 (valeur déplacée), E0499 (emprunt mutable multiple), E0308 (types incompatibles), Aucune]
+        answer: 1
+      - id: rust-mref-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let mut v = vec![1, 2, 3];
+              for x in &mut v {
+                  *x = *x * 10 + 1;
+              }
+              v.push(0);
+              println!("{:?}", v);
+          }
+        output: '[11, 21, 31, 0]'
+      - id: rust-mref-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          fn vider(s: &mut String) {
+              s.clear();
+          }
+
+          fn main() {
+              let texte = String::from("brouillon");
+              vider(&mut texte);
+              println!("[{}]", texte);
+          }
+        bugLines: [6]
+        choices:
+          - On ne peut pas emprunter mutablement une variable déclarée sans mut
+          - clear() n’existe pas
+          - Il faut passer texte sans &mut
+        answer: 0
+        solution: |
+          fn vider(s: &mut String) {
+              s.clear();
+          }
+
+          fn main() {
+              let mut texte = String::from("brouillon");
+              vider(&mut texte);
+              println!("[{}]", texte);
+          }
+        tests:
+          - { input: '', output: '[]' }
+      - id: rust-mref-code
+        type: code
+        title: Échanger deux valeurs
+        prompt: |
+          Écris `fn echanger(a: &mut i32, b: &mut i32)` qui échange les valeurs pointées **sans utiliser** `std::mem::swap`.
+
+          Le programme lit deux entiers, les échange et les affiche.
+        starter: |
+          use std::io;
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<i32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              let (mut x, mut y) = (v[0], v[1]);
+              echanger(&mut x, &mut y);
+              println!("{} {}", x, y);
+          }
+        solution: |
+          use std::io;
+
+          fn echanger(a: &mut i32, b: &mut i32) {
+              let tmp = *a;
+              *a = *b;
+              *b = tmp;
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<i32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              let (mut x, mut y) = (v[0], v[1]);
+              echanger(&mut x, &mut y);
+              println!("{} {}", x, y);
+          }
+        tests:
+          - { input: '3 8', output: '8 3' }
+          - { input: '-1 -1', output: '-1 -1', hidden: true }
+          - { input: '0 42', output: '42 0', hidden: true }
+        forbid:
+          - { pattern: 'swap', message: 'Ne pas utiliser swap' }
+    project:
+      id: rust-mref-projet
+      type: code
+      title: Compte bancaire
+      difficulty: 3
+      prompt: |
+        Le solde initial est lu sur la première ligne. Chaque ligne suivante est une opération : `depot N` ou `retrait N`.
+
+        Écris `fn appliquer(solde: &mut i64, op: &str, montant: i64) -> bool` qui modifie le solde et renvoie `false` si un retrait est refusé (fonds insuffisants — le solde ne change pas).
+
+        Pour chaque opération refusée, affiche `Refusé : retrait N`. À la fin, affiche `Solde final : X`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut lignes = entree.lines();
+            let mut solde: i64 = lignes.next().unwrap().trim().parse().unwrap();
+            for ligne in lignes {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                let montant: i64 = p[1].parse().unwrap();
+                // appliquer(&mut solde, p[0], montant)
+            }
+            println!("Solde final : {}", solde);
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn appliquer(solde: &mut i64, op: &str, montant: i64) -> bool {
+            if op == "depot" {
+                *solde += montant;
+                true
+            } else if *solde >= montant {
+                *solde -= montant;
+                true
+            } else {
+                false
+            }
+        }
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut lignes = entree.lines();
+            let mut solde: i64 = lignes.next().unwrap().trim().parse().unwrap();
+            for ligne in lignes {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                let montant: i64 = p[1].parse().unwrap();
+                if !appliquer(&mut solde, p[0], montant) {
+                    println!("Refusé : {} {}", p[0], montant);
+                }
+            }
+            println!("Solde final : {}", solde);
+        }
+      tests:
+        - { input: "100\ndepot 50\nretrait 120\nretrait 40", output: "Refusé : retrait 40\nSolde final : 30" }
+        - { input: "0\nretrait 1\ndepot 1\nretrait 1", output: "Refusé : retrait 1\nSolde final : 0", hidden: true }
+        - { input: "500\ndepot 0", output: 'Solde final : 500', hidden: true }
+      require:
+        - { pattern: 'solde\s*:\s*&mut\s+i64', message: 'appliquer doit recevoir le solde en &mut i64' }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-mref-ex1
+          type: mcq
+          prompt: Quelles conditions faut-il pour appeler `f(&mut x)` ?
+          choices: [x doit être déclaré mut, x doit être Copy, x doit être une String, Aucune]
+          answer: 0
+        - id: rust-mref-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn ajouter(v: &mut Vec<i32>, n: i32) {
+                v.push(n);
+                v.push(n * 2);
+            }
+            fn main() {
+                let mut v = Vec::new();
+                ajouter(&mut v, 1);
+                ajouter(&mut v, 5);
+                println!("{:?}", v);
+            }
+          output: '[1, 2, 5, 10]'
+        - id: rust-mref-ex3
+          type: mcq
+          prompt: Quel problème l’exclusivité de `&mut` empêche-t-elle ?
+          choices: [Les fuites mémoire, Les data races, Les boucles infinies, Les erreurs de syntaxe]
+          answer: 1
+        - id: rust-mref-ex4
+          type: fill
+          prompt: Complète pour tripler chaque élément.
+          code: |
+            for x in {{?}} v {
+                *x *= 3;
+            }
+          blanks: [['&mut']]
+
+  # ------------------------------------------------------------------
+  - slug: rust-stack-heap
+    title: Stack et Heap
+    summary: Comprends où vivent tes données — la pile (stack) et le tas (heap) — et ce que cela implique pour Box, Vec et String.
+    minutes: 25
+    concepts: [memoire]
+    sections:
+      - title: Deux zones de mémoire
+        body: |
+          **La pile (stack)** : rapide, organisée en « assiettes empilées ». Chaque appel de fonction y réserve un cadre (*frame*) pour ses variables locales, libéré au retour. Les données doivent avoir une **taille connue à la compilation**.
+
+          **Le tas (heap)** : zone plus grande et flexible, pour les données de taille **dynamique** (texte saisi, listes qui grandissent). L’allocation y est plus lente ; on y accède via un **pointeur** stocké, lui, sur la pile.
+
+          | | Pile | Tas |
+          |---|---|---|
+          | Vitesse | très rapide | plus lente |
+          | Taille | fixe, connue | dynamique |
+          | Libération | automatique (fin de fonction) | via le propriétaire (Rust), `delete` (C++), GC (Java) |
+      - title: Anatomie d’une String
+        body: |
+          ```rust
+          let s = String::from("Kiri");
+          ```
+
+          Sur la **pile**, `s` occupe 3 mots machine : un **pointeur** vers les octets, la **longueur** (4) et la **capacité** (place réservée). Les caractères `K i r i` sont sur le **tas**.
+
+          `Vec<T>` a exactement la même structure. Quand la capacité est dépassée, le vecteur **réalloue** une zone plus grande et y copie ses éléments :
+
+          ```rust
+          let mut v = Vec::with_capacity(2);
+          v.push(1); v.push(2);
+          println!("{} {}", v.len(), v.capacity()); // 2 2
+          v.push(3);                                // réallocation
+          ```
+      - title: Box, une valeur sur le tas
+        body: |
+          `Box<T>` place une valeur sur le tas et garde un pointeur unique vers elle :
+
+          ```rust
+          let b = Box::new(5);
+          println!("{}", *b + 1); // 6
+          ```
+
+          Usages typiques :
+
+          - grosses structures qu’on veut déplacer sans les copier ;
+          - **types récursifs** (une liste chaînée contient… une liste) dont la taille serait infinie sans indirection :
+
+          ```rust
+          enum Liste {
+              Fin,
+              Noeud(i32, Box<Liste>),
+          }
+          ```
+
+          `std::mem::size_of::<T>()` donne la taille en octets d’un type sur la pile.
+    exercises:
+      - id: rust-mem-q1
+        type: mcq
+        prompt: Où sont stockés les caractères d’une `String` ?
+        choices: [Sur la pile, Sur le tas, Dans le binaire, Dans un registre]
+        answer: 1
+        concepts: [memoire]
+      - id: rust-mem-q2
+        type: mcq
+        prompt: Pourquoi un `enum Liste { Fin, Noeud(i32, Liste) }` ne compile-t-il pas ?
+        choices: [Le type a une taille infinie (récursif sans indirection), Les enum ne peuvent pas contenir d’i32, Il manque derive(Debug), Le nom Liste est réservé]
+        answer: 0
+        explanation: Il faut une indirection, par exemple `Box<Liste>`, dont la taille est fixe (un pointeur).
+      - id: rust-mem-predict
+        type: predict
+        prompt: Que va afficher ce programme (sur une machine 64 bits) ?
+        code: |
+          use std::mem::size_of;
+          fn main() {
+              println!("{} {} {}", size_of::<u8>(), size_of::<i64>(), size_of::<Box<[u8; 1000]>>());
+          }
+        output: 1 8 8
+        explanation: Un `Box` n’est qu’un pointeur (8 octets), quelle que soit la taille des données pointées.
+      - id: rust-mem-fill
+        type: fill
+        prompt: Complète pour allouer 42 sur le tas puis l’afficher.
+        code: |
+          fn main() {
+              let b = {{?}}::new(42);
+              println!("{}", {{?}}b);
+          }
+        blanks: [[Box], ['*', '']]
+        tests:
+          - { input: '', output: '42' }
+      - id: rust-mem-code
+        type: code
+        title: Somme d’une liste chaînée
+        prompt: |
+          On donne une liste chaînée récursive. Complète la fonction **récursive** `somme(l: &Liste) -> i64`.
+
+          Le programme construit la liste à partir des entiers lus et affiche la somme.
+        starter: |
+          use std::io;
+
+          enum Liste {
+              Fin,
+              Noeud(i64, Box<Liste>),
+          }
+
+          fn somme(l: &Liste) -> i64 {
+              match l {
+                  Liste::Fin => 0,
+                  Liste::Noeud(valeur, suite) => todo!(),
+              }
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let mut liste = Liste::Fin;
+              for x in s.split_whitespace().rev() {
+                  liste = Liste::Noeud(x.parse().unwrap(), Box::new(liste));
+              }
+              println!("{}", somme(&liste));
+          }
+        solution: |
+          use std::io;
+
+          enum Liste {
+              Fin,
+              Noeud(i64, Box<Liste>),
+          }
+
+          fn somme(l: &Liste) -> i64 {
+              match l {
+                  Liste::Fin => 0,
+                  Liste::Noeud(valeur, suite) => valeur + somme(suite),
+              }
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let mut liste = Liste::Fin;
+              for x in s.split_whitespace().rev() {
+                  liste = Liste::Noeud(x.parse().unwrap(), Box::new(liste));
+              }
+              println!("{}", somme(&liste));
+          }
+        tests:
+          - { input: '1 2 3 4', output: '10' }
+          - { input: '', output: '0', hidden: true }
+          - { input: '-5 100', output: '95', hidden: true }
+    project:
+      id: rust-mem-projet
+      type: code
+      title: Pile d’annulation (undo)
+      difficulty: 3
+      prompt: |
+        Simule un éditeur avec annulation. Chaque ligne est une commande :
+
+        - `ecrire MOT` : ajoute le mot au texte (séparé par un espace) et mémorise l’action ;
+        - `annuler` : retire le dernier mot écrit (ne fait rien s’il n’y en a pas) ;
+        - `afficher` : affiche le texte courant entre crochets.
+
+        Utilise un `Vec<String>` comme **pile** (`push` / `pop`).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut pile: Vec<String> = Vec::new();
+            for ligne in entree.lines() {
+                // À toi
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut pile: Vec<String> = Vec::new();
+            for ligne in entree.lines() {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                match p[0] {
+                    "ecrire" => pile.push(p[1].to_string()),
+                    "annuler" => {
+                        pile.pop();
+                    }
+                    _ => println!("[{}]", pile.join(" ")),
+                }
+            }
+        }
+      tests:
+        - { input: "ecrire Bonjour\necrire le\necrire monde\nafficher\nannuler\nafficher", output: "[Bonjour le monde]\n[Bonjour le]" }
+        - { input: "annuler\nafficher\necrire a\nannuler\nannuler\nafficher", output: "[]\n[]", hidden: true }
+      hints: ['`pile.pop()` renvoie un `Option` : on peut ignorer le résultat.', '`pile.join(" ")` assemble les mots.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-mem-ex1
+          type: mcq
+          prompt: Quelle zone mémoire est la plus rapide à allouer ?
+          choices: [La pile, Le tas, Le disque, Elles sont identiques]
+          answer: 0
+        - id: rust-mem-ex2
+          type: mcq
+          prompt: Que contient une variable `Vec<i32>` sur la pile ?
+          choices: [Tous les éléments, 'Un pointeur, une longueur et une capacité', Seulement le premier élément, Rien]
+          answer: 1
+        - id: rust-mem-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let mut v: Vec<i32> = Vec::with_capacity(10);
+                v.push(7);
+                let b = Box::new(v.len() * 3);
+                println!("{} {} {}", v.len(), v.capacity() >= 10, *b);
+            }
+          output: 1 true 3
+        - id: rust-mem-ex4
+          type: mcq
+          prompt: À quoi sert `Box<T>` dans un type récursif ?
+          choices: [À donner une taille fixe grâce à l’indirection, À rendre le type thread-safe, À copier les données, À rien]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-strings-slices
+    title: Strings et slices
+    summary: String vs &str, tranches (slices) de chaînes et de tableaux, UTF-8 et méthodes indispensables sur le texte.
+    minutes: 35
+    concepts: [chaines, slices]
+    sections:
+      - title: String et &str
+        body: |
+          - **`String`** : chaîne **possédée**, modifiable, allouée sur le tas.
+          - **`&str`** (*string slice*) : **vue empruntée** sur une suite d’octets UTF-8. Les littéraux `"abc"` sont des `&'static str`.
+
+          ```rust
+          let litteral: &str = "Bonjour";
+          let mut possedee: String = String::from("Bon");
+          possedee.push_str("jour");
+          let vue: &str = &possedee;        // String → &str (gratuit)
+          let copie: String = litteral.to_string(); // &str → String (allocation)
+          ```
+
+          👉 Pour un paramètre en **lecture seule**, préfère `&str` : il accepte à la fois `"littéral"` et `&ma_string`.
+      - title: Les slices
+        body: |
+          Une **slice** est une vue sur une portion contiguë d’une collection :
+
+          ```rust
+          let s = String::from("bonjour le monde");
+          let debut: &str = &s[0..7];   // "bonjour"
+          let fin = &s[11..];           // "monde"
+
+          let tab = [10, 20, 30, 40];
+          let milieu: &[i32] = &tab[1..3]; // [20, 30]
+          ```
+
+          ⚠️ Les indices de `&s[a..b]` sont en **octets**. En UTF-8, « é » occupe 2 octets : couper au milieu provoque un *panic*. Pour manipuler des caractères, utilise `.chars()`.
+
+          Une fonction qui accepte `&[i32]` fonctionne avec un tableau, un `Vec` ou une portion de l’un d’eux.
+      - title: Méthodes utiles
+        body: |
+          | Méthode | Effet |
+          |---|---|
+          | `len()` | longueur en **octets** |
+          | `chars().count()` | nombre de caractères |
+          | `trim()` | enlève les espaces au début et à la fin |
+          | `to_uppercase()` / `to_lowercase()` | casse |
+          | `contains("x")`, `starts_with`, `ends_with` | recherche |
+          | `replace("a", "b")` | remplacement |
+          | `split(',')`, `split_whitespace()` | découpage |
+          | `chars().rev().collect::<String>()` | inversion |
+          | `format!("{a}-{b}")` | construction |
+
+          Concaténation : `s1 + &s2` (consomme `s1`) ou `format!("{s1}{s2}")` (n’en consomme aucune).
+    exercises:
+      - id: rust-str-q1
+        type: mcq
+        prompt: Quel type de paramètre est le plus flexible pour une fonction qui lit du texte ?
+        choices: ['String', '&String', '&str', 'Vec<char>']
+        answer: 2
+        concepts: [chaines]
+      - id: rust-str-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let s = "rustacé";
+              println!("{} {}", s.len(), s.chars().count());
+              println!("{}", &s[0..4]);
+          }
+        output: "8 7\nrust"
+        explanation: '« é » occupe 2 octets en UTF-8 : 8 octets pour 7 caractères.'
+        concepts: [chaines]
+      - id: rust-str-predict2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn somme(t: &[i32]) -> i32 {
+              t.iter().sum()
+          }
+          fn main() {
+              let v = vec![1, 2, 3, 4, 5];
+              println!("{} {}", somme(&v), somme(&v[1..3]));
+          }
+        output: 15 5
+        concepts: [slices]
+      - id: rust-str-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          fn main() {
+              let a = String::from("Hello");
+              let b = String::from(" World");
+              let c = a + b;
+              println!("{}", c);
+          }
+        bugLines: [4]
+        choices:
+          - L’opérateur + attend une &str à droite (il faut écrire &b)
+          - On ne peut pas concaténer des chaînes en Rust
+          - Il faut déclarer c avec mut
+        answer: 0
+        solution: |
+          fn main() {
+              let a = String::from("Hello");
+              let b = String::from(" World");
+              let c = a + &b;
+              println!("{}", c);
+          }
+        tests:
+          - { input: '', output: Hello World }
+        concepts: [chaines]
+      - id: rust-str-fill
+        type: fill
+        prompt: Complète pour inverser la chaîne caractère par caractère.
+        code: |
+          fn main() {
+              let s = "Kiri";
+              let inverse: String = s.{{?}}().rev().collect();
+              println!("{}", inverse);
+          }
+        blanks: [[chars]]
+        tests:
+          - { input: '', output: iriK }
+      - id: rust-str-code
+        type: code
+        title: Palindrome
+        prompt: |
+          Écris `fn est_palindrome(s: &str) -> bool` qui ignore la casse et les espaces. Pour chaque ligne lue, affiche `oui` ou `non`.
+
+          Exemple : `Esope reste ici et se repose` → `oui`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut entree = String::new();
+              io::stdin().read_to_string(&mut entree).unwrap();
+              for ligne in entree.lines() {
+                  println!("{}", if est_palindrome(ligne) { "oui" } else { "non" });
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn est_palindrome(s: &str) -> bool {
+              let lettres: Vec<char> = s.to_lowercase().chars().filter(|c| !c.is_whitespace()).collect();
+              let inverse: Vec<char> = lettres.iter().rev().cloned().collect();
+              lettres == inverse
+          }
+
+          fn main() {
+              let mut entree = String::new();
+              io::stdin().read_to_string(&mut entree).unwrap();
+              for ligne in entree.lines() {
+                  println!("{}", if est_palindrome(ligne) { "oui" } else { "non" });
+              }
+          }
+        tests:
+          - { input: "Esope reste ici et se repose\nRust", output: "oui\nnon" }
+          - { input: "kayak\nÉté\nA", output: "oui\noui\noui", hidden: true }
+          - { input: 'ab', output: non, hidden: true }
+        concepts: [chaines]
+    project:
+      id: rust-str-projet
+      type: code
+      title: Formateur de noms
+      difficulty: 3
+      prompt: |
+        Chaque ligne contient un nom complet mal formaté (espaces superflus, casse aléatoire), par exemple `   jEAN   dupont `.
+
+        Écris `fn formater(nom: &str) -> String` qui renvoie le nom au format `Jean DUPONT` : le **dernier** mot en majuscules, les précédents avec une majuscule initiale puis des minuscules, séparés par un seul espace.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            for ligne in entree.lines() {
+                println!("{}", formater(ligne));
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn capitaliser(mot: &str) -> String {
+            let mut c = mot.chars();
+            match c.next() {
+                Some(premiere) => premiere.to_uppercase().collect::<String>() + &c.as_str().to_lowercase(),
+                None => String::new(),
+            }
+        }
+
+        fn formater(nom: &str) -> String {
+            let mots: Vec<&str> = nom.split_whitespace().collect();
+            let mut morceaux: Vec<String> = Vec::new();
+            for (i, m) in mots.iter().enumerate() {
+                if i == mots.len() - 1 {
+                    morceaux.push(m.to_uppercase());
+                } else {
+                    morceaux.push(capitaliser(m));
+                }
+            }
+            morceaux.join(" ")
+        }
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            for ligne in entree.lines() {
+                println!("{}", formater(ligne));
+            }
+        }
+      tests:
+        - { input: '   jEAN   dupont ', output: Jean DUPONT }
+        - { input: "ada lovelace\nmarie   sKLODOWSKA curie", output: "Ada LOVELACE\nMarie Sklodowska CURIE", hidden: true }
+        - { input: 'émile zola', output: Émile ZOLA, hidden: true }
+      hints: ['Découpe avec `split_whitespace()`.', 'Pour la majuscule initiale : récupère le premier `char` avec `.chars().next()`, puis le reste avec `.as_str()`.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-str-ex1
+          type: mcq
+          prompt: Que renvoie `"héros".len()` ?
+          choices: ['5', '6', '4', Erreur]
+          answer: 1
+          explanation: « é » occupe 2 octets en UTF-8.
+        - id: rust-str-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let s = String::from("un,deux,,trois");
+                let n = s.split(',').filter(|m| !m.is_empty()).count();
+                println!("{} {}", n, s.replace(",", "-"));
+            }
+          output: 3 un-deux--trois
+        - id: rust-str-ex3
+          type: mcq
+          prompt: Quel est le type de `&tab[1..3]` si `tab` est un `[i32; 5]` ?
+          choices: ['[i32; 2]', '&[i32]', 'Vec<i32>', '&Vec<i32>']
+          answer: 1
+        - id: rust-str-ex4
+          type: mcq
+          prompt: Quelle expression convertit un `&str` en `String` ?
+          choices: ['s.to_string()', 's.as_str()', '&s', '*s']
+          answer: 0

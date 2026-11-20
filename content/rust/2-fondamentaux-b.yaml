@@ -1,0 +1,1861 @@
+language: rust
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: rust-structs
+    title: Structs
+    summary: Crée tes propres types avec struct, ajoute des méthodes avec impl et des constructeurs associés.
+    minutes: 35
+    concepts: [structs, classes]
+    sections:
+      - title: Définir et instancier une struct
+        body: |
+          ```rust
+          struct Joueur {
+              nom: String,
+              niveau: u32,
+              actif: bool,
+          }
+
+          fn main() {
+              let mut j = Joueur {
+                  nom: String::from("Kiri"),
+                  niveau: 1,
+                  actif: true,
+              };
+              j.niveau += 1;               // la variable entière doit être mut
+              println!("{} niv. {}", j.nom, j.niveau);
+          }
+          ```
+
+          Raccourcis utiles :
+
+          ```rust
+          let nom = String::from("Ada");
+          let a = Joueur { nom, niveau: 3, actif: true };   // nom: nom
+          let b = Joueur { nom: String::from("Bob"), ..a };  // reste copié de a
+          ```
+
+          Variantes : la **tuple struct** `struct Point(i32, i32);` et la **unit struct** `struct Marqueur;`.
+      - title: Méthodes avec impl
+        body: |
+          ```rust
+          struct Rectangle { largeur: f64, hauteur: f64 }
+
+          impl Rectangle {
+              // Fonction associée (constructeur) : pas de self
+              fn new(largeur: f64, hauteur: f64) -> Self {
+                  Self { largeur, hauteur }
+              }
+              fn carre(c: f64) -> Self { Self::new(c, c) }
+
+              // Méthodes : premier paramètre self
+              fn aire(&self) -> f64 { self.largeur * self.hauteur }
+              fn agrandir(&mut self, facteur: f64) {
+                  self.largeur *= facteur;
+                  self.hauteur *= facteur;
+              }
+              fn peut_contenir(&self, autre: &Rectangle) -> bool {
+                  self.largeur >= autre.largeur && self.hauteur >= autre.hauteur
+              }
+          }
+
+          let mut r = Rectangle::new(2.0, 3.0);  // appel avec ::
+          r.agrandir(2.0);                        // appel avec .
+          println!("{}", r.aire());               // 24
+          ```
+
+          - `&self` : lecture ; `&mut self` : modification ; `self` : consomme l’objet.
+          - `Self` désigne le type en cours (`Rectangle`).
+      - title: Afficher une struct
+        body: |
+          `println!("{}", r)` ne compile pas : Rust ne sait pas comment afficher ton type. Deux solutions :
+
+          ```rust
+          #[derive(Debug)]                 // affichage développeur automatique
+          struct Point { x: i32, y: i32 }
+
+          println!("{:?}", Point { x: 1, y: 2 });  // Point { x: 1, y: 2 }
+          println!("{:#?}", Point { x: 1, y: 2 }); // version indentée
+          ```
+
+          Ou implémenter le trait `Display` pour un affichage personnalisé :
+
+          ```rust
+          use std::fmt;
+          impl fmt::Display for Point {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  write!(f, "({}, {})", self.x, self.y)
+              }
+          }
+          ```
+
+          D’autres traits se dérivent : `Clone`, `Copy`, `PartialEq` (pour `==`), `Default`…
+    exercises:
+      - id: rust-struct-q1
+        type: mcq
+        prompt: Comment appelle-t-on une fonction déclarée dans `impl` **sans** paramètre `self` ?
+        choices: [Une méthode statique interdite, Une fonction associée (appelée avec Type::nom), Un constructeur obligatoire, Une macro]
+        answer: 1
+        concepts: [structs]
+      - id: rust-struct-q2
+        type: mcq
+        prompt: Quel premier paramètre utiliser pour une méthode qui **modifie** l’objet ?
+        choices: ['self', '&self', '&mut self', 'mut self: &Self']
+        answer: 2
+      - id: rust-struct-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          #[derive(Debug, Clone, PartialEq)]
+          struct Point { x: i32, y: i32 }
+
+          impl Point {
+              fn deplacer(&mut self, dx: i32, dy: i32) {
+                  self.x += dx;
+                  self.y += dy;
+              }
+          }
+
+          fn main() {
+              let mut a = Point { x: 1, y: 2 };
+              let b = a.clone();
+              a.deplacer(3, -2);
+              println!("{:?} {}", a, a == b);
+          }
+        output: 'Point { x: 4, y: 0 } false'
+        concepts: [structs]
+      - id: rust-struct-fill
+        type: fill
+        prompt: Complète la méthode `aire` et le constructeur.
+        code: |
+          struct Carre { cote: u32 }
+
+          impl Carre {
+              fn new(cote: u32) -> {{?}} {
+                  Self { cote }
+              }
+              fn aire({{?}}) -> u32 {
+                  self.cote * self.cote
+              }
+          }
+
+          fn main() {
+              let c = Carre::new(7);
+              println!("{}", c.aire());
+          }
+        blanks: [[Self, Carre], ['&self']]
+        tests:
+          - { input: '', output: '49' }
+        concepts: [structs, classes]
+      - id: rust-struct-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          struct Compteur { valeur: u32 }
+
+          impl Compteur {
+              fn incrementer(&self) {
+                  self.valeur += 1;
+              }
+          }
+
+          fn main() {
+              let mut c = Compteur { valeur: 0 };
+              c.incrementer();
+              println!("{}", c.valeur);
+          }
+        bugLines: [4]
+        choices:
+          - La méthode modifie self mais ne le reçoit qu’en lecture (&self au lieu de &mut self)
+          - Les struct ne peuvent pas contenir de u32
+          - Il faut appeler Compteur::incrementer()
+        answer: 0
+        solution: |
+          struct Compteur { valeur: u32 }
+
+          impl Compteur {
+              fn incrementer(&mut self) {
+                  self.valeur += 1;
+              }
+          }
+
+          fn main() {
+              let mut c = Compteur { valeur: 0 };
+              c.incrementer();
+              println!("{}", c.valeur);
+          }
+        tests:
+          - { input: '', output: '1' }
+        concepts: [structs, classes]
+      - id: rust-struct-code
+        type: code
+        title: Fraction
+        prompt: |
+          Crée une struct `Fraction { num: i64, den: i64 }` avec :
+
+          - `fn new(num: i64, den: i64) -> Self` qui **simplifie** la fraction (via le PGCD) ;
+          - `fn plus(&self, autre: &Fraction) -> Fraction`.
+
+          Le programme lit deux fractions `a b` et `c d` (une par ligne) et affiche leur somme simplifiée `num/den`. Les dénominateurs sont positifs.
+        starter: |
+          use std::io;
+
+          fn pgcd(a: i64, b: i64) -> i64 {
+              if b == 0 { a.abs() } else { pgcd(b, a % b) }
+          }
+
+          // struct Fraction + impl ici
+
+          fn lire() -> (i64, i64) {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<i64> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              (v[0], v[1])
+          }
+
+          fn main() {
+              let (a, b) = lire();
+              let (c, d) = lire();
+              let f = Fraction::new(a, b).plus(&Fraction::new(c, d));
+              println!("{}/{}", f.num, f.den);
+          }
+        solution: |
+          use std::io;
+
+          fn pgcd(a: i64, b: i64) -> i64 {
+              if b == 0 { a.abs() } else { pgcd(b, a % b) }
+          }
+
+          struct Fraction {
+              num: i64,
+              den: i64,
+          }
+
+          impl Fraction {
+              fn new(num: i64, den: i64) -> Self {
+                  let g = pgcd(num, den).max(1);
+                  Self { num: num / g, den: den / g }
+              }
+              fn plus(&self, autre: &Fraction) -> Fraction {
+                  Fraction::new(self.num * autre.den + autre.num * self.den, self.den * autre.den)
+              }
+          }
+
+          fn lire() -> (i64, i64) {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let v: Vec<i64> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
+              (v[0], v[1])
+          }
+
+          fn main() {
+              let (a, b) = lire();
+              let (c, d) = lire();
+              let f = Fraction::new(a, b).plus(&Fraction::new(c, d));
+              println!("{}/{}", f.num, f.den);
+          }
+        tests:
+          - { input: "1 2\n1 3", output: 5/6 }
+          - { input: "1 4\n1 4", output: 1/2, hidden: true }
+          - { input: "-1 2\n1 2", output: 0/1, hidden: true }
+          - { input: "2 6\n5 10", output: 5/6, hidden: true }
+        concepts: [structs, classes]
+    project:
+      id: rust-struct-projet
+      type: code
+      title: Inventaire de jeu
+      difficulty: 3
+      prompt: |
+        Crée une struct `Objet { nom: String, quantite: u32, prix: f64 }` et une struct `Inventaire { objets: Vec<Objet> }` avec les méthodes :
+
+        - `ajouter(&mut self, nom: &str, quantite: u32, prix: f64)` — si l’objet existe déjà, augmente sa quantité ;
+        - `valeur_totale(&self) -> f64`.
+
+        Chaque ligne contient `nom quantite prix`. Affiche ensuite chaque objet (dans l’ordre d’ajout) au format `nom x quantite` puis `Total : <valeur avec 2 décimales>`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        struct Objet {
+            nom: String,
+            quantite: u32,
+            prix: f64,
+        }
+
+        struct Inventaire {
+            objets: Vec<Objet>,
+        }
+
+        impl Inventaire {
+            fn new() -> Self {
+                Self { objets: Vec::new() }
+            }
+            fn ajouter(&mut self, nom: &str, quantite: u32, prix: f64) {
+                for o in &mut self.objets {
+                    if o.nom == nom {
+                        o.quantite += quantite;
+                        return;
+                    }
+                }
+                self.objets.push(Objet { nom: nom.to_string(), quantite, prix });
+            }
+            fn valeur_totale(&self) -> f64 {
+                self.objets.iter().map(|o| o.quantite as f64 * o.prix).sum()
+            }
+        }
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let mut inv = Inventaire::new();
+            for ligne in entree.lines() {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                inv.ajouter(p[0], p[1].parse().unwrap(), p[2].parse().unwrap());
+            }
+            for o in &inv.objets {
+                println!("{} x {}", o.nom, o.quantite);
+            }
+            println!("Total : {:.2}", inv.valeur_totale());
+        }
+      tests:
+        - { input: "potion 3 2.5\nepee 1 40\npotion 2 2.5", output: "potion x 5\nepee x 1\nTotal : 52.50" }
+        - { input: "pomme 10 0.3", output: "pomme x 10\nTotal : 3.00", hidden: true }
+        - { input: "a 1 1\nb 2 2\na 3 1\nc 0 9.99", output: "a x 4\nb x 2\nc x 0\nTotal : 8.00", hidden: true }
+      require:
+        - { pattern: 'struct\s+Inventaire', message: Définir la struct Inventaire }
+        - { pattern: 'fn\s+ajouter\s*\(\s*&mut\s+self', message: 'ajouter doit prendre &mut self' }
+      concepts: [structs, classes]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-struct-ex1
+          type: mcq
+          prompt: Que permet `#[derive(Debug)]` ?
+          choices: ['D’afficher la struct avec {:?}', 'De comparer avec ==', De copier la struct, De la rendre publique]
+          answer: 0
+        - id: rust-struct-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            struct V(i32, i32);
+            impl V {
+                fn norme1(&self) -> i32 { self.0.abs() + self.1.abs() }
+            }
+            fn main() {
+                let v = V(-3, 4);
+                println!("{}", v.norme1());
+            }
+          output: '7'
+        - id: rust-struct-ex3
+          type: mcq
+          prompt: Comment appeler la fonction associée `new` d’une struct `Compte` ?
+          choices: ['Compte.new()', 'Compte::new()', 'new Compte()', 'Compte->new()']
+          answer: 1
+        - id: rust-struct-ex4
+          type: mcq
+          prompt: Que désigne `Self` dans un bloc `impl Rectangle` ?
+          choices: [L’instance courante, Le type Rectangle, La fonction main, Le module parent]
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-enums
+    title: Enums
+    summary: Modélise des choix exclusifs avec les énumérations, y compris des variantes qui portent des données.
+    minutes: 30
+    concepts: [enums]
+    sections:
+      - title: Des variantes simples… ou riches
+        body: |
+          ```rust
+          enum Direction {
+              Nord,
+              Sud,
+              Est,
+              Ouest,
+          }
+          let d = Direction::Nord;
+          ```
+
+          Contrairement à beaucoup de langages, chaque variante peut **porter des données différentes** :
+
+          ```rust
+          enum Message {
+              Quitter,                         // aucune donnée
+              Deplacer { x: i32, y: i32 },     // champs nommés
+              Ecrire(String),                  // une String
+              Couleur(u8, u8, u8),             // trois u8
+          }
+          ```
+
+          On appelle cela un **type somme** : une valeur `Message` est *soit* `Quitter`, *soit* `Deplacer`, *soit*… jamais deux à la fois.
+      - title: Exploiter une enum avec match
+        body: |
+          ```rust
+          fn decrire(m: &Message) -> String {
+              match m {
+                  Message::Quitter => String::from("quitter"),
+                  Message::Deplacer { x, y } => format!("aller en ({x}, {y})"),
+                  Message::Ecrire(texte) => format!("écrire « {texte} »"),
+                  Message::Couleur(r, g, b) => format!("couleur #{:02x}{:02x}{:02x}", r, g, b),
+              }
+          }
+          ```
+
+          Le compilateur **vérifie que toutes les variantes sont traitées**. Si tu ajoutes une variante plus tard, chaque `match` incomplet devient une erreur : impossible d’oublier un cas !
+      - title: Méthodes sur une enum
+        body: |
+          Comme les structs, les enums peuvent avoir un bloc `impl` :
+
+          ```rust
+          #[derive(Debug, Clone, Copy, PartialEq)]
+          enum Feu { Rouge, Orange, Vert }
+
+          impl Feu {
+              fn suivant(self) -> Feu {
+                  match self {
+                      Feu::Vert => Feu::Orange,
+                      Feu::Orange => Feu::Rouge,
+                      Feu::Rouge => Feu::Vert,
+                  }
+              }
+              fn duree(&self) -> u32 {
+                  match self { Feu::Rouge => 30, Feu::Orange => 5, Feu::Vert => 25 }
+              }
+          }
+          ```
+
+          `use Feu::*;` permet d’écrire `Rouge` au lieu de `Feu::Rouge`.
+    exercises:
+      - id: rust-enum-q1
+        type: mcq
+        prompt: Qu’est-ce qui distingue les enums de Rust de celles du C ?
+        choices: [Elles ne peuvent contenir que des entiers, Chaque variante peut porter des données différentes, Elles sont toujours mutables, Elles n’existent qu’en mode unsafe]
+        answer: 1
+        concepts: [enums]
+      - id: rust-enum-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          enum Forme {
+              Cercle(f64),
+              Rectangle(f64, f64),
+          }
+
+          fn aire(f: &Forme) -> f64 {
+              match f {
+                  Forme::Cercle(r) => 3.0 * r * r,
+                  Forme::Rectangle(l, h) => l * h,
+              }
+          }
+
+          fn main() {
+              let formes = [Forme::Cercle(2.0), Forme::Rectangle(3.0, 4.0)];
+              let total: f64 = formes.iter().map(aire).sum();
+              println!("{}", total);
+          }
+        output: '24'
+        concepts: [enums]
+      - id: rust-enum-fill
+        type: fill
+        prompt: Complète la variante et le match.
+        code: |
+          enum Animal {
+              Chien,
+              Chat,
+          }
+
+          fn cri(a: Animal) -> &'static str {
+              match a {
+                  Animal::{{?}} => "Wouf",
+                  Animal::Chat => "Miaou",
+              }
+          }
+
+          fn main() {
+              println!("{} {}", cri(Animal::Chien), cri(Animal::Chat));
+          }
+        blanks: [[Chien]]
+        tests:
+          - { input: '', output: Wouf Miaou }
+      - id: rust-enum-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas (E0004). Trouve la ligne du problème.
+        code: |
+          enum Saison { Printemps, Ete, Automne, Hiver }
+
+          fn temperature(s: Saison) -> i32 {
+              match s {
+                  Saison::Printemps => 15,
+                  Saison::Ete => 28,
+                  Saison::Automne => 12,
+              }
+          }
+
+          fn main() {
+              println!("{}", temperature(Saison::Hiver));
+          }
+        bugLines: [4]
+        choices:
+          - Le match n’est pas exhaustif, la variante Hiver n’est pas traitée
+          - Une enum ne peut pas avoir quatre variantes
+          - Il faut écrire Hiver en minuscules
+        answer: 0
+        solution: |
+          enum Saison { Printemps, Ete, Automne, Hiver }
+
+          fn temperature(s: Saison) -> i32 {
+              match s {
+                  Saison::Printemps => 15,
+                  Saison::Ete => 28,
+                  Saison::Automne => 12,
+                  Saison::Hiver => 3,
+              }
+          }
+
+          fn main() {
+              println!("{}", temperature(Saison::Hiver));
+          }
+        tests:
+          - { input: '', output: '3' }
+      - id: rust-enum-code
+        type: code
+        title: Feu tricolore
+        prompt: |
+          Définis `enum Feu { Rouge, Orange, Vert }` avec une méthode `suivant(&self) -> Feu` (Vert → Orange → Rouge → Vert) et une méthode `nom(&self) -> &str`.
+
+          Le programme lit le feu de départ (`Rouge`, `Orange` ou `Vert`) et un nombre `n`, puis affiche les `n` feux suivants, un par ligne.
+        starter: |
+          use std::io;
+
+          // enum Feu + impl ici
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let p: Vec<&str> = s.split_whitespace().collect();
+              let n: u32 = p[1].parse().unwrap();
+              let mut feu = match p[0] {
+                  "Rouge" => Feu::Rouge,
+                  "Orange" => Feu::Orange,
+                  _ => Feu::Vert,
+              };
+              for _ in 0..n {
+                  feu = feu.suivant();
+                  println!("{}", feu.nom());
+              }
+          }
+        solution: |
+          use std::io;
+
+          enum Feu {
+              Rouge,
+              Orange,
+              Vert,
+          }
+
+          impl Feu {
+              fn suivant(&self) -> Feu {
+                  match self {
+                      Feu::Vert => Feu::Orange,
+                      Feu::Orange => Feu::Rouge,
+                      Feu::Rouge => Feu::Vert,
+                  }
+              }
+              fn nom(&self) -> &str {
+                  match self {
+                      Feu::Rouge => "Rouge",
+                      Feu::Orange => "Orange",
+                      Feu::Vert => "Vert",
+                  }
+              }
+          }
+
+          fn main() {
+              let mut s = String::new();
+              io::stdin().read_line(&mut s).unwrap();
+              let p: Vec<&str> = s.split_whitespace().collect();
+              let n: u32 = p[1].parse().unwrap();
+              let mut feu = match p[0] {
+                  "Rouge" => Feu::Rouge,
+                  "Orange" => Feu::Orange,
+                  _ => Feu::Vert,
+              };
+              for _ in 0..n {
+                  feu = feu.suivant();
+                  println!("{}", feu.nom());
+              }
+          }
+        tests:
+          - { input: 'Vert 4', output: "Orange\nRouge\nVert\nOrange" }
+          - { input: 'Rouge 1', output: Vert, hidden: true }
+          - { input: 'Orange 3', output: "Rouge\nVert\nOrange", hidden: true }
+        concepts: [enums]
+    project:
+      id: rust-enum-projet
+      type: code
+      title: Robot sur une grille
+      difficulty: 3
+      prompt: |
+        Un robot démarre en `(0, 0)` orienté vers le **Nord**. Définis `enum Direction { Nord, Est, Sud, Ouest }` et `enum Commande { Avancer(i32), Gauche, Droite }`.
+
+        Chaque ligne d’entrée est une commande : `A n` (avancer de n cases), `G` (tourner à gauche), `D` (tourner à droite). Nord = y+1, Est = x+1.
+
+        À la fin, affiche `x y direction` (direction en toutes lettres : `Nord`, `Est`, `Sud`, `Ouest`).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        #[derive(Clone, Copy)]
+        enum Direction { Nord, Est, Sud, Ouest }
+
+        enum Commande { Avancer(i32), Gauche, Droite }
+
+        impl Direction {
+            fn droite(self) -> Direction {
+                match self {
+                    Direction::Nord => Direction::Est,
+                    Direction::Est => Direction::Sud,
+                    Direction::Sud => Direction::Ouest,
+                    Direction::Ouest => Direction::Nord,
+                }
+            }
+            fn gauche(self) -> Direction {
+                self.droite().droite().droite()
+            }
+            fn nom(self) -> &'static str {
+                match self {
+                    Direction::Nord => "Nord",
+                    Direction::Est => "Est",
+                    Direction::Sud => "Sud",
+                    Direction::Ouest => "Ouest",
+                }
+            }
+        }
+
+        fn main() {
+            let mut entree = String::new();
+            io::stdin().read_to_string(&mut entree).unwrap();
+            let (mut x, mut y, mut dir) = (0i32, 0i32, Direction::Nord);
+            for ligne in entree.lines() {
+                let p: Vec<&str> = ligne.split_whitespace().collect();
+                let cmd = match p[0] {
+                    "A" => Commande::Avancer(p[1].parse().unwrap()),
+                    "G" => Commande::Gauche,
+                    _ => Commande::Droite,
+                };
+                match cmd {
+                    Commande::Gauche => dir = dir.gauche(),
+                    Commande::Droite => dir = dir.droite(),
+                    Commande::Avancer(n) => match dir {
+                        Direction::Nord => y += n,
+                        Direction::Sud => y -= n,
+                        Direction::Est => x += n,
+                        Direction::Ouest => x -= n,
+                    },
+                }
+            }
+            println!("{} {} {}", x, y, dir.nom());
+        }
+      tests:
+        - { input: "A 3\nD\nA 2\nG\nG\nA 5", output: -3 3 Ouest }
+        - { input: G, output: 0 0 Ouest, hidden: true }
+        - { input: "D\nD\nA 4\nD\nA 1", output: -1 -4 Ouest, hidden: true }
+      require:
+        - { pattern: 'enum\s+Direction', message: Définir enum Direction }
+        - { pattern: 'enum\s+Commande', message: Définir enum Commande }
+      concepts: [enums]
+    exam:
+      pass: 70
+      questions:
+        - id: rust-enum-ex1
+          type: mcq
+          prompt: Que se passe-t-il si on ajoute une variante à une enum utilisée dans des `match` sans joker ?
+          choices: [Rien, Les match concernés ne compilent plus tant que le cas n’est pas traité, Le programme plante à l’exécution, La variante est ignorée]
+          answer: 1
+        - id: rust-enum-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            enum Op { Add(i32, i32), Neg(i32) }
+            fn eval(o: Op) -> i32 {
+                match o { Op::Add(a, b) => a + b, Op::Neg(a) => -a }
+            }
+            fn main() {
+                println!("{}", eval(Op::Add(2, 3)) + eval(Op::Neg(10)));
+            }
+          output: '-5'
+        - id: rust-enum-ex3
+          type: mcq
+          prompt: Comment appelle-t-on un type dont la valeur est « soit A, soit B, soit C » ?
+          choices: [Un type produit, Un type somme, Un type générique, Un type unitaire]
+          answer: 1
+        - id: rust-enum-ex4
+          type: fill
+          prompt: Complète la déstructuration de la variante à champs nommés.
+          code: |
+            match m {
+                Message::Deplacer { {{?}}, y } => println!("{} {}", x, y),
+                _ => {}
+            }
+          blanks: [[x]]
+
+  # ------------------------------------------------------------------
+  - slug: rust-pattern-matching
+    title: Pattern matching
+    summary: Maîtrise match, if let, while let, les gardes, les intervalles, la déstructuration et les liaisons avec @.
+    minutes: 30
+    concepts: [pattern-matching]
+    sections:
+      - title: Les motifs possibles
+        body: |
+          ```rust
+          match valeur {
+              0 => "zéro",                    // littéral
+              1 | 2 => "un ou deux",          // alternative
+              3..=9 => "chiffre",             // intervalle
+              n if n < 0 => "négatif",        // garde (condition)
+              n @ 10..=99 => { println!("{n}"); "deux chiffres" } // liaison @
+              _ => "grand",                   // joker
+          }
+          ```
+
+          Déstructuration de tuples, structs et tableaux :
+
+          ```rust
+          let (a, b) = (1, 2);
+          match point {
+              Point { x: 0, y } => println!("sur l’axe Y à {y}"),
+              Point { x, y: 0 } => println!("sur l’axe X à {x}"),
+              Point { .. } => println!("ailleurs"),   // .. ignore le reste
+          }
+          match tableau {
+              [premier, .., dernier] => println!("{premier}…{dernier}"),
+          }
+          ```
+      - title: if let et while let
+        body: |
+          Quand un seul cas t’intéresse, `if let` est plus concis qu’un `match` :
+
+          ```rust
+          let config: Option<u32> = Some(3);
+          if let Some(n) = config {
+              println!("valeur : {n}");
+          } else {
+              println!("pas de valeur");
+          }
+          ```
+
+          `while let` boucle tant que le motif correspond :
+
+          ```rust
+          let mut pile = vec![1, 2, 3];
+          while let Some(sommet) = pile.pop() {
+              println!("{sommet}");   // 3, 2, 1
+          }
+          ```
+
+          Et `let … else` (Rust 1.65+) sort tôt si le motif échoue :
+
+          ```rust
+          let Some(x) = valeur else { return; };
+          ```
+      - title: matches! et bonnes pratiques
+        body: |
+          La macro `matches!` renvoie un booléen :
+
+          ```rust
+          let est_voyelle = matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'y');
+          ```
+
+          Bonnes pratiques :
+
+          - préfère un `match` exhaustif à un joker `_` quand c’est possible : le compilateur te protège lors des évolutions ;
+          - l’ordre des bras compte : le **premier** motif qui correspond l’emporte ;
+          - `match` est une expression : tous les bras renvoient le même type.
+    exercises:
+      - id: rust-pm-predict1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn classer(n: i32) -> &'static str {
+              match n {
+                  i32::MIN..=-1 => "négatif",
+                  0 => "zéro",
+                  x if x % 2 == 0 => "pair",
+                  _ => "impair",
+              }
+          }
+          fn main() {
+              for n in [-4, 0, 7, 10] {
+                  print!("{} ", classer(n));
+              }
+              println!();
+          }
+        output: négatif zéro impair pair
+        concepts: [pattern-matching]
+      - id: rust-pm-q1
+        type: mcq
+        prompt: Quel code affiche la valeur seulement si l’Option est `Some` ?
+        choices:
+          - 'if opt == Some { println!("{}", opt) }'
+          - 'if let Some(v) = opt { println!("{}", v) }'
+          - 'match opt { v => println!("{}", v) }'
+          - 'when Some(v) = opt { println!("{}", v) }'
+        answer: 1
+      - id: rust-pm-predict2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let t = [3, 1, 4, 1, 5];
+              match t {
+                  [a, b, .., z] => println!("{} {} {}", a, b, z),
+              }
+              let mut v = vec![10, 20];
+              while let Some(x) = v.pop() {
+                  print!("{} ", x);
+              }
+              println!();
+          }
+        output: "3 1 5\n20 10"
+      - id: rust-pm-fill
+        type: fill
+        prompt: Complète la liaison qui capture l’âge s’il est entre 13 et 19.
+        code: |
+          fn main() {
+              let age = 16;
+              match age {
+                  a {{?}} 13..=19 => println!("ado de {} ans", a),
+                  _ => println!("autre"),
+              }
+          }
+        blanks: [['@']]
+        tests:
+          - { input: '', output: ado de 16 ans }
+      - id: rust-pm-bug
+        type: bugfix
+        prompt: Ce programme affiche toujours « nombre ». Trouve le bras fautif.
+        code: |
+          fn decrire(n: u32) -> &'static str {
+              match n {
+                  _ => "nombre",
+                  0 => "zéro",
+                  1..=9 => "chiffre",
+              }
+          }
+          fn main() {
+              println!("{} {} {}", decrire(0), decrire(5), decrire(42));
+          }
+        bugLines: [3]
+        choices:
+          - Le joker _ est placé en premier et capture tous les cas
+          - Il manque un bras pour 42
+          - match ne fonctionne pas sur u32
+        answer: 0
+        solution: |
+          fn decrire(n: u32) -> &'static str {
+              match n {
+                  0 => "zéro",
+                  1..=9 => "chiffre",
+                  _ => "nombre",
+              }
+          }
+          fn main() {
+              println!("{} {} {}", decrire(0), decrire(5), decrire(42));
+          }
+        tests:
+          - { input: '', output: zéro chiffre nombre }
+      - id: rust-pm-code
+        type: code
+        title: Quadrants
+        prompt: |
+          Pour chaque ligne contenant deux entiers `x y`, affiche la position du point avec un `match` sur le tuple `(x, y)` :
+
+          - `origine`, `axe X`, `axe Y`,
+          - `quadrant 1` (x>0, y>0), `quadrant 2` (x<0, y>0), `quadrant 3` (x<0, y<0), `quadrant 4` (x>0, y<0).
+        starter: |
+          use std::io::{self, Read};
+
+          fn position(x: i32, y: i32) -> &'static str {
+              match (x, y) {
+                  (0, 0) => "origine",
+                  _ => todo!(),
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let v: Vec<i32> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  println!("{}", position(v[0], v[1]));
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn position(x: i32, y: i32) -> &'static str {
+              match (x, y) {
+                  (0, 0) => "origine",
+                  (_, 0) => "axe X",
+                  (0, _) => "axe Y",
+                  (x, y) if x > 0 && y > 0 => "quadrant 1",
+                  (x, y) if x < 0 && y > 0 => "quadrant 2",
+                  (x, y) if x < 0 && y < 0 => "quadrant 3",
+                  _ => "quadrant 4",
+              }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let v: Vec<i32> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  println!("{}", position(v[0], v[1]));
+              }
+          }
+        tests:
+          - { input: "0 0\n3 0\n-2 5", output: "origine\naxe X\nquadrant 2" }
+          - { input: "0 -7\n1 1\n-1 -1\n4 -4", output: "axe Y\nquadrant 1\nquadrant 3\nquadrant 4", hidden: true }
+        require:
+          - { pattern: '\bmatch\b', message: Utiliser match }
+        concepts: [pattern-matching]
+    project:
+      id: rust-pm-projet
+      type: code
+      title: Calculatrice à jetons
+      difficulty: 3
+      prompt: |
+        Chaque ligne contient une expression `a op b` (entiers séparés par des espaces, `op` parmi `+ - * / %`).
+
+        Utilise un `match` sur l’opérateur, avec une **garde** pour la division et le modulo par zéro, et affiche le résultat ou `erreur : division par zéro` / `erreur : opérateur inconnu`.
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                let a: i64 = p[0].parse().unwrap();
+                let b: i64 = p[2].parse().unwrap();
+                // match (p[1], b) { … }
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                let a: i64 = p[0].parse().unwrap();
+                let b: i64 = p[2].parse().unwrap();
+                match (p[1], b) {
+                    ("/" | "%", 0) => println!("erreur : division par zéro"),
+                    ("+", b) => println!("{}", a + b),
+                    ("-", b) => println!("{}", a - b),
+                    ("*", b) => println!("{}", a * b),
+                    ("/", b) => println!("{}", a / b),
+                    ("%", b) => println!("{}", a % b),
+                    _ => println!("erreur : opérateur inconnu"),
+                }
+            }
+        }
+      tests:
+        - { input: "6 * 7\n10 / 0\n9 % 4", output: "42\nerreur : division par zéro\n1" }
+        - { input: "1 ^ 2\n-5 + 3\n8 - 10", output: "erreur : opérateur inconnu\n-2\n-2", hidden: true }
+        - { input: "7 % 0\n100 / 7", output: "erreur : division par zéro\n14", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-pm-ex1
+          type: mcq
+          prompt: Dans un `match`, quel bras est exécuté si plusieurs motifs correspondent ?
+          choices: [Le dernier, Le premier, Tous, Aucun (erreur)]
+          answer: 1
+        - id: rust-pm-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn main() {
+                let c = 'e';
+                let v = matches!(c, 'a' | 'e' | 'i' | 'o' | 'u');
+                let n = match c { 'a'..='m' => 1, _ => 2 };
+                println!("{} {}", v, n);
+            }
+          output: true 1
+        - id: rust-pm-ex3
+          type: mcq
+          prompt: Que fait `..` dans le motif `Point { x, .. }` ?
+          choices: [Ignore les autres champs, Crée un intervalle, Copie la struct, Erreur]
+          answer: 0
+        - id: rust-pm-ex4
+          type: mcq
+          prompt: Quelle construction boucle tant que `pile.pop()` renvoie `Some` ?
+          choices: ['for let', 'while let Some(x) = pile.pop()', 'loop if let', 'match while']
+          answer: 1
+
+  # ------------------------------------------------------------------
+  - slug: rust-option
+    title: Option
+    summary: Représente l’absence de valeur sans null grâce à Option<T>, et manipule-la avec match, unwrap_or, map et ?.
+    minutes: 30
+    concepts: [option]
+    sections:
+      - title: Pas de null en Rust
+        body: |
+          Tony Hoare, l’inventeur de `null`, l’a qualifié d’« erreur à un milliard de dollars ». Rust ne l’a pas : une valeur qui peut être absente est de type **`Option<T>`** :
+
+          ```rust
+          enum Option<T> {
+              Some(T),
+              None,
+          }
+          ```
+
+          ```rust
+          fn trouver_indice(v: &[i32], cible: i32) -> Option<usize> {
+              for (i, &x) in v.iter().enumerate() {
+                  if x == cible { return Some(i); }
+              }
+              None
+          }
+          ```
+
+          Le type `Option<usize>` **force** l’appelant à envisager l’absence : impossible d’utiliser la valeur comme un `usize` directement.
+      - title: Extraire la valeur
+        body: |
+          ```rust
+          let r = trouver_indice(&[4, 8, 15], 8);
+
+          match r {                                // exhaustif
+              Some(i) => println!("trouvé en {i}"),
+              None => println!("absent"),
+          }
+          if let Some(i) = r { /* … */ }           // un seul cas
+
+          let i = r.unwrap_or(0);                  // valeur par défaut
+          let i = r.unwrap_or_default();           // défaut du type (0)
+          let i = r.expect("doit exister");        // panique avec message si None
+          let i = r.unwrap();                      // panique si None (à éviter !)
+          ```
+
+          `is_some()` / `is_none()` testent la présence.
+      - title: Transformer sans extraire
+        body: |
+          ```rust
+          let age: Option<u32> = Some(17);
+          let majeur = age.map(|a| a >= 18);          // Some(false)
+          let double = age.map(|a| a * 2);            // Some(34)
+          let filtre = age.filter(|&a| a > 20);       // None
+          let suivant = age.and_then(|a| a.checked_sub(20)); // None (évite le dépassement)
+          ```
+
+          Dans une fonction qui renvoie elle-même un `Option`, l’opérateur **`?`** renvoie `None` immédiatement si la valeur est absente :
+
+          ```rust
+          fn initiale_du_premier(noms: &[&str]) -> Option<char> {
+              let premier = noms.first()?;    // None → la fonction renvoie None
+              premier.chars().next()
+          }
+          ```
+
+          De nombreuses méthodes de la bibliothèque standard renvoient des `Option` : `v.get(i)`, `v.first()`, `s.find('x')`, `iter.max()`, `str.parse().ok()`…
+    exercises:
+      - id: rust-opt-q1
+        type: mcq
+        prompt: Que renvoie `vec![1, 2, 3].get(10)` ?
+        choices: [Un panic, 'None', '0', 'Some(0)']
+        answer: 1
+        concepts: [option]
+      - id: rust-opt-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn main() {
+              let a: Option<i32> = Some(4);
+              let b: Option<i32> = None;
+              println!("{} {}", a.unwrap_or(0) + b.unwrap_or(10), a.map(|x| x * x).unwrap_or(-1));
+              println!("{:?} {:?}", b.map(|x| x + 1), a.filter(|&x| x > 5));
+          }
+        output: "14 16\nNone None"
+        concepts: [option]
+      - id: rust-opt-fill
+        type: fill
+        prompt: Complète la fonction qui renvoie la première lettre, ou None pour une chaîne vide.
+        code: |
+          fn premiere_lettre(s: &str) -> {{?}}<char> {
+              s.chars().next()
+          }
+
+          fn main() {
+              match premiere_lettre("Rust") {
+                  {{?}}(c) => println!("{}", c),
+                  None => println!("vide"),
+              }
+          }
+        blanks: [[Option], [Some]]
+        tests:
+          - { input: '', output: R }
+        concepts: [option]
+      - id: rust-opt-bug
+        type: bugfix
+        prompt: Ce programme panique quand la recherche échoue. Trouve la ligne dangereuse.
+        code: |
+          fn main() {
+              let notes = vec![12, 15, 9];
+              let position = notes.iter().position(|&n| n == 20);
+              let i = position.unwrap();
+              println!("indice {}", i);
+          }
+        bugLines: [4]
+        choices:
+          - unwrap() panique quand l’Option vaut None ; il faut gérer le cas absent
+          - position() n’existe pas
+          - Le vecteur est vide
+        answer: 0
+        solution: |
+          fn main() {
+              let notes = vec![12, 15, 9];
+              let position = notes.iter().position(|&n| n == 20);
+              match position {
+                  Some(i) => println!("indice {}", i),
+                  None => println!("note absente"),
+              }
+          }
+        tests:
+          - { input: '', output: note absente }
+        concepts: [option]
+      - id: rust-opt-code
+        type: code
+        title: Division sûre
+        prompt: |
+          Écris `fn diviser(a: i64, b: i64) -> Option<i64>` qui renvoie `None` si `b` vaut 0.
+
+          Pour chaque ligne `a b`, affiche le quotient ou `impossible`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let v: Vec<i64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  // utilise diviser(v[0], v[1])
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn diviser(a: i64, b: i64) -> Option<i64> {
+              if b == 0 { None } else { Some(a / b) }
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  let v: Vec<i64> = l.split_whitespace().map(|x| x.parse().unwrap()).collect();
+                  match diviser(v[0], v[1]) {
+                      Some(q) => println!("{}", q),
+                      None => println!("impossible"),
+                  }
+              }
+          }
+        tests:
+          - { input: "10 2\n5 0", output: "5\nimpossible" }
+          - { input: "-9 3\n0 0\n7 7", output: "-3\nimpossible\n1", hidden: true }
+        require:
+          - { pattern: 'Option\s*<\s*i64\s*>', message: 'diviser doit renvoyer Option<i64>' }
+        concepts: [option, fonctions]
+    project:
+      id: rust-opt-projet
+      type: code
+      title: Annuaire
+      difficulty: 3
+      prompt: |
+        La première ligne contient un nombre `n` de contacts, suivis de `n` lignes `nom telephone`. Les lignes suivantes sont des recherches (un nom par ligne).
+
+        Écris `fn chercher<'a>(annuaire: &'a [(String, String)], nom: &str) -> Option<&'a String>` et, pour chaque recherche, affiche `nom : telephone` ou `nom : inconnu`.
+
+        Termine en affichant le nom le plus long de l’annuaire avec `iter().max_by_key(...)` (en cas d’égalité, le dernier rencontré).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut lignes = e.lines();
+            let n: usize = lignes.next().unwrap().trim().parse().unwrap();
+            let mut annuaire: Vec<(String, String)> = Vec::new();
+            for _ in 0..n {
+                let p: Vec<&str> = lignes.next().unwrap().split_whitespace().collect();
+                annuaire.push((p[0].to_string(), p[1].to_string()));
+            }
+            for nom in lignes {
+                // recherche
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn chercher<'a>(annuaire: &'a [(String, String)], nom: &str) -> Option<&'a String> {
+            annuaire.iter().find(|(n, _)| n == nom).map(|(_, t)| t)
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut lignes = e.lines();
+            let n: usize = lignes.next().unwrap().trim().parse().unwrap();
+            let mut annuaire: Vec<(String, String)> = Vec::new();
+            for _ in 0..n {
+                let p: Vec<&str> = lignes.next().unwrap().split_whitespace().collect();
+                annuaire.push((p[0].to_string(), p[1].to_string()));
+            }
+            for nom in lignes {
+                let nom = nom.trim();
+                match chercher(&annuaire, nom) {
+                    Some(t) => println!("{} : {}", nom, t),
+                    None => println!("{} : inconnu", nom),
+                }
+            }
+            if let Some((plus_long, _)) = annuaire.iter().max_by_key(|(n, _)| n.chars().count()) {
+                println!("Nom le plus long : {}", plus_long);
+            }
+        }
+      tests:
+        - { input: "2\nAda 0601\nLinus 0702\nLinus\nGrace", output: "Linus : 0702\nGrace : inconnu\nNom le plus long : Linus" }
+        - { input: "3\nBob 1\nAlice 2\nEve 3\nEve\nAlice\nbob", output: "Eve : 3\nAlice : 2\nbob : inconnu\nNom le plus long : Alice", hidden: true }
+      hints: ['`iter().find(...)` renvoie un `Option`, que tu peux transformer avec `.map(...)`.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-opt-ex1
+          type: mcq
+          prompt: Que fait l’opérateur `?` sur un `Option` dans une fonction qui renvoie `Option` ?
+          choices: [Il panique si None, Il renvoie None immédiatement si la valeur est absente, Il remplace None par 0, Il ne compile pas]
+          answer: 1
+        - id: rust-opt-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn f(v: &[i32]) -> Option<i32> {
+                let a = v.first()?;
+                let b = v.get(2)?;
+                Some(a + b)
+            }
+            fn main() {
+                println!("{:?} {:?}", f(&[1, 2, 3]), f(&[1, 2]));
+            }
+          output: Some(4) None
+        - id: rust-opt-ex3
+          type: mcq
+          prompt: Pourquoi `Option<T>` est-il plus sûr que `null` ?
+          choices: [Il est plus rapide, Le compilateur oblige à traiter le cas None, Il occupe moins de mémoire, Il n’y a aucune différence]
+          answer: 1
+        - id: rust-opt-ex4
+          type: fill
+          prompt: Complète pour obtenir 0 si la conversion échoue.
+          code: 'let n: i32 = "abc".parse().ok().{{?}}(0);'
+          blanks: [[unwrap_or]]
+
+  # ------------------------------------------------------------------
+  - slug: rust-result
+    title: Result
+    summary: Représente le succès ou l’échec d’une opération avec Result<T, E>, et propage les erreurs avec ?.
+    minutes: 30
+    concepts: [erreurs, result]
+    sections:
+      - title: Ok ou Err
+        body: |
+          ```rust
+          enum Result<T, E> {
+              Ok(T),    // succès, avec la valeur
+              Err(E),   // échec, avec l’erreur
+          }
+          ```
+
+          Exemple de la bibliothèque standard :
+
+          ```rust
+          let r: Result<i32, std::num::ParseIntError> = "42".parse::<i32>();
+          match r {
+              Ok(n) => println!("nombre : {n}"),
+              Err(e) => println!("erreur : {e}"),
+          }
+          ```
+
+          `"abc".parse::<i32>()` renvoie `Err(...)` avec le message *invalid digit found in string*.
+      - title: Créer ses propres erreurs
+        body: |
+          ```rust
+          fn racine(x: f64) -> Result<f64, String> {
+              if x < 0.0 {
+                  Err(format!("{x} est négatif"))
+              } else {
+                  Ok(x.sqrt())
+              }
+          }
+          ```
+
+          Pour un code plus robuste, on utilise une **enum d’erreurs** :
+
+          ```rust
+          #[derive(Debug)]
+          enum ErreurRetrait {
+              SoldeInsuffisant { manque: u64 },
+              CompteBloque,
+          }
+
+          fn retirer(solde: u64, montant: u64) -> Result<u64, ErreurRetrait> {
+              if montant > solde {
+                  return Err(ErreurRetrait::SoldeInsuffisant { manque: montant - solde });
+              }
+              Ok(solde - montant)
+          }
+          ```
+      - title: Propager avec ?
+        body: |
+          `?` extrait la valeur d’un `Ok`… ou **renvoie l’erreur** à l’appelant :
+
+          ```rust
+          fn somme_texte(a: &str, b: &str) -> Result<i32, std::num::ParseIntError> {
+              let x = a.trim().parse::<i32>()?;
+              let y = b.trim().parse::<i32>()?;
+              Ok(x + y)
+          }
+          ```
+
+          Méthodes pratiques : `unwrap_or`, `unwrap_or_else`, `map`, `map_err` (convertir l’erreur), `ok()` (→ `Option`), `is_ok()`, `expect("message")`.
+
+          | Situation | Outil |
+          |---|---|
+          | Valeur peut manquer, ce n’est pas une erreur | `Option` |
+          | Opération qui peut échouer, avec une raison | `Result` |
+          | Bug impossible à récupérer | `panic!` |
+    exercises:
+      - id: rust-res-q1
+        type: mcq
+        prompt: Que renvoie `"12a".parse::<i32>()` ?
+        choices: ['Ok(12)', 'Err(...)', 'None', '0']
+        answer: 1
+        concepts: [result]
+      - id: rust-res-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          fn verifier(age: i32) -> Result<i32, String> {
+              if age < 0 { Err(String::from("âge négatif")) } else { Ok(age) }
+          }
+          fn main() {
+              for a in [20, -3] {
+                  match verifier(a) {
+                      Ok(v) => println!("ok {}", v),
+                      Err(e) => println!("erreur : {}", e),
+                  }
+              }
+              println!("{}", verifier(-1).unwrap_or(0));
+          }
+        output: "ok 20\nerreur : âge négatif\n0"
+      - id: rust-res-fill
+        type: fill
+        prompt: Complète pour propager l’erreur de conversion.
+        code: |
+          fn doubler(s: &str) -> Result<i32, std::num::ParseIntError> {
+              let n: i32 = s.parse(){{?}};
+              {{?}}(n * 2)
+          }
+
+          fn main() {
+              println!("{:?} {}", doubler("21"), doubler("x").is_err());
+          }
+        blanks: [['?'], [Ok]]
+        tests:
+          - { input: '', output: Ok(42) true }
+        concepts: [result, erreurs]
+      - id: rust-res-bug
+        type: bugfix
+        prompt: Ce programme ne compile pas. Trouve l’erreur.
+        code: |
+          fn lire_nombre(s: &str) -> i32 {
+              let n = s.parse::<i32>()?;
+              n
+          }
+
+          fn main() {
+              println!("{}", lire_nombre("7"));
+          }
+        bugLines: [1, 2]
+        choices:
+          - L’opérateur ? ne peut être utilisé que dans une fonction qui renvoie Result (ou Option)
+          - parse ne fonctionne pas sur &str
+          - Il faut écrire i64
+        answer: 0
+        solution: |
+          fn lire_nombre(s: &str) -> Result<i32, std::num::ParseIntError> {
+              let n = s.parse::<i32>()?;
+              Ok(n)
+          }
+
+          fn main() {
+              println!("{}", lire_nombre("7").unwrap());
+          }
+        tests:
+          - { input: '', output: '7' }
+      - id: rust-res-code
+        type: code
+        title: Validation de mot de passe
+        prompt: |
+          Écris `fn valider(mdp: &str) -> Result<(), String>` qui renvoie la **première** erreur rencontrée, dans cet ordre :
+
+          1. `trop court` (moins de 8 caractères) ;
+          2. `il manque un chiffre` ;
+          3. `il manque une majuscule`.
+
+          Pour chaque ligne, affiche `valide` ou `invalide : <raison>`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  match valider(l) {
+                      Ok(()) => println!("valide"),
+                      Err(raison) => println!("invalide : {}", raison),
+                  }
+              }
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn valider(mdp: &str) -> Result<(), String> {
+              if mdp.chars().count() < 8 {
+                  return Err(String::from("trop court"));
+              }
+              if !mdp.chars().any(|c| c.is_ascii_digit()) {
+                  return Err(String::from("il manque un chiffre"));
+              }
+              if !mdp.chars().any(|c| c.is_uppercase()) {
+                  return Err(String::from("il manque une majuscule"));
+              }
+              Ok(())
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              for l in e.lines() {
+                  match valider(l) {
+                      Ok(()) => println!("valide"),
+                      Err(raison) => println!("invalide : {}", raison),
+                  }
+              }
+          }
+        tests:
+          - { input: "abc\nmotdepasse\nmotdepasse1\nMotDePasse1", output: "invalide : trop court\ninvalide : il manque un chiffre\ninvalide : il manque une majuscule\nvalide" }
+          - { input: "12345678\nAZERTYUI9", output: "invalide : il manque une majuscule\nvalide", hidden: true }
+        concepts: [result, erreurs]
+    project:
+      id: rust-res-projet
+      type: code
+      title: Lecteur de configuration
+      difficulty: 3
+      prompt: |
+        Chaque ligne est censée être de la forme `cle=valeur_entiere`. Écris `fn analyser(ligne: &str) -> Result<(String, i64), String>` qui renvoie :
+
+        - `Err("ligne N : '=' manquant")` si la ligne ne contient pas `=` ;
+        - `Err("ligne N : valeur invalide")` si la valeur n’est pas un entier ;
+
+        (`N` = numéro de ligne, à partir de 1 — passe-le en paramètre.)
+
+        Affiche chaque erreur au fur et à mesure, puis `Somme : S` (somme des valeurs valides) et `Clés : k1, k2, …` (clés valides dans l’ordre).
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            for (i, ligne) in e.lines().enumerate() {
+                // analyser(ligne, i + 1)
+            }
+        }
+      solution: |
+        use std::io::{self, Read};
+
+        fn analyser(ligne: &str, num: usize) -> Result<(String, i64), String> {
+            let (cle, valeur) = ligne.split_once('=').ok_or(format!("ligne {} : '=' manquant", num))?;
+            let v = valeur.trim().parse::<i64>().map_err(|_| format!("ligne {} : valeur invalide", num))?;
+            Ok((cle.trim().to_string(), v))
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut somme = 0;
+            let mut cles = Vec::new();
+            for (i, ligne) in e.lines().enumerate() {
+                match analyser(ligne, i + 1) {
+                    Ok((c, v)) => {
+                        somme += v;
+                        cles.push(c);
+                    }
+                    Err(err) => println!("{}", err),
+                }
+            }
+            println!("Somme : {}", somme);
+            println!("Clés : {}", cles.join(", "));
+        }
+      tests:
+        - { input: "port=8080\nhote\ntimeout=abc\nretries=3", output: "ligne 2 : '=' manquant\nligne 3 : valeur invalide\nSomme : 8083\nClés : port, retries" }
+        - { input: "a=1\nb = -5", output: "Somme : -4\nClés : a, b", hidden: true }
+        - { input: "x=\n=3", output: "ligne 1 : valeur invalide\nSomme : 3\nClés : ", hidden: true }
+      hints: ['`split_once(''='')` renvoie un `Option<(&str, &str)>` ; `ok_or(...)` le transforme en `Result`.', '`map_err` permet de remplacer l’erreur de `parse` par ton propre message.']
+    exam:
+      pass: 70
+      questions:
+        - id: rust-res-ex1
+          type: mcq
+          prompt: Quand préférer `Result` à `Option` ?
+          choices: [Quand l’échec doit être expliqué par une erreur, Toujours, Jamais, Pour les nombres uniquement]
+          answer: 0
+        - id: rust-res-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn f(s: &str) -> Result<i32, String> {
+                s.parse::<i32>().map_err(|_| format!("'{}' ?", s))
+            }
+            fn main() {
+                let r: Vec<String> = ["3", "x"].iter().map(|s| match f(s) {
+                    Ok(n) => (n * 3).to_string(),
+                    Err(e) => e,
+                }).collect();
+                println!("{}", r.join(" "));
+            }
+          output: 9 'x' ?
+        - id: rust-res-ex3
+          type: mcq
+          prompt: Que fait `.ok()` sur un `Result<T, E>` ?
+          choices: ['Le convertit en Option<T> (Err devient None)', Panique en cas d’erreur, Renvoie toujours true, Supprime l’erreur et renvoie T]
+          answer: 0
+        - id: rust-res-ex4
+          type: mcq
+          prompt: Que fait `?` sur un `Err(e)` ?
+          choices: [Il renvoie Err(e) depuis la fonction courante, Il ignore l’erreur, Il panique, Il boucle]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: rust-gestion-erreurs
+    title: Gestion des erreurs
+    summary: panic! ou Result ? Conçois des types d’erreur, implémente Display, convertis avec From et organise la gestion d’erreurs d’un programme.
+    minutes: 35
+    concepts: [erreurs]
+    sections:
+      - title: Erreurs récupérables et irrécupérables
+        body: |
+          - **`panic!`** : bug ou état impossible. Le programme s’arrête (déroulement de la pile, message, code de sortie ≠ 0).
+          - **`Result`** : échec prévisible (fichier absent, saisie invalide, réseau coupé) que l’appelant peut traiter.
+
+          ```rust
+          fn indice_valide(i: usize, n: usize) {
+              assert!(i < n, "indice {} hors limites ({})", i, n); // panique si faux
+          }
+          ```
+
+          Règle pratique : dans une **bibliothèque**, renvoie des `Result` ; `unwrap`/`expect` sont acceptables dans les prototypes, les tests, ou quand l’échec est réellement impossible.
+      - title: Un type d’erreur soigné
+        body: |
+          ```rust
+          use std::fmt;
+          use std::num::ParseIntError;
+
+          #[derive(Debug)]
+          enum ErreurApp {
+              Format(ParseIntError),
+              Negatif(i64),
+          }
+
+          impl fmt::Display for ErreurApp {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  match self {
+                      ErreurApp::Format(e) => write!(f, "format invalide ({e})"),
+                      ErreurApp::Negatif(n) => write!(f, "{n} est négatif"),
+                  }
+              }
+          }
+
+          impl std::error::Error for ErreurApp {}
+
+          // Conversion automatique utilisée par `?`
+          impl From<ParseIntError> for ErreurApp {
+              fn from(e: ParseIntError) -> Self { ErreurApp::Format(e) }
+          }
+
+          fn lire_positif(s: &str) -> Result<i64, ErreurApp> {
+              let n: i64 = s.trim().parse()?;   // ParseIntError → ErreurApp via From
+              if n < 0 { return Err(ErreurApp::Negatif(n)); }
+              Ok(n)
+          }
+          ```
+      - title: Box<dyn Error> et l’écosystème
+        body: |
+          Pour une application, on peut accepter **n’importe quelle erreur** :
+
+          ```rust
+          use std::error::Error;
+
+          fn main() -> Result<(), Box<dyn Error>> {
+              let n: i32 = "42".parse()?;
+              let contenu = std::fs::read_to_string("config.txt")?;
+              println!("{n} {}", contenu.len());
+              Ok(())
+          }
+          ```
+
+          Dans l’écosystème, deux crates sont très répandues :
+
+          - **thiserror** : dérive `Display`/`From` pour tes enums d’erreurs (bibliothèques) ;
+          - **anyhow** : un type d’erreur unique avec contexte (`.context("lecture de la config")`) pour les applications.
+    exercises:
+      - id: rust-err-q1
+        type: mcq
+        prompt: Dans quel cas `panic!` est-il le choix approprié ?
+        choices: [Une saisie utilisateur invalide, Un fichier introuvable, Un invariant interne violé (bug), Une connexion réseau coupée]
+        answer: 2
+        concepts: [erreurs]
+      - id: rust-err-q2
+        type: mcq
+        prompt: Que permet d’implémenter `From<ParseIntError> for MonErreur` ?
+        choices: ['Que ? convertisse automatiquement l’erreur', Que l’erreur s’affiche, Que l’erreur soit ignorée, Rien de particulier]
+        answer: 0
+      - id: rust-err-predict
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          use std::fmt;
+
+          enum E { Vide, TropLong(usize) }
+
+          impl fmt::Display for E {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  match self {
+                      E::Vide => write!(f, "vide"),
+                      E::TropLong(n) => write!(f, "trop long ({})", n),
+                  }
+              }
+          }
+
+          fn check(s: &str) -> Result<&str, E> {
+              if s.is_empty() { Err(E::Vide) }
+              else if s.len() > 5 { Err(E::TropLong(s.len())) }
+              else { Ok(s) }
+          }
+
+          fn main() {
+              for s in ["", "abc", "abcdefgh"] {
+                  match check(s) {
+                      Ok(v) => println!("ok {}", v),
+                      Err(e) => println!("{}", e),
+                  }
+              }
+          }
+        output: "vide\nok abc\ntrop long (8)"
+      - id: rust-err-fill
+        type: fill
+        prompt: Complète la signature de `main` pour pouvoir utiliser `?` avec n’importe quelle erreur.
+        code: |
+          use std::error::Error;
+
+          fn main() -> Result<(), Box<dyn {{?}}>> {
+              let n: i32 = "21".parse()?;
+              println!("{}", n * 2);
+              {{?}}(())
+          }
+        blanks: [[Error], [Ok]]
+        tests:
+          - { input: '', output: '42' }
+      - id: rust-err-code
+        type: code
+        title: Moyenne robuste
+        prompt: |
+          Chaque ligne doit contenir une note entière entre 0 et 20. Écris `fn lire_note(s: &str) -> Result<u32, String>` qui renvoie `Err("'<s>' n'est pas un nombre")` ou `Err("<n> hors limites")`.
+
+          Affiche chaque erreur, puis `Moyenne : X` (2 décimales) des notes valides, ou `Aucune note valide`.
+        starter: |
+          use std::io::{self, Read};
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+          }
+        solution: |
+          use std::io::{self, Read};
+
+          fn lire_note(s: &str) -> Result<u32, String> {
+              let n: i64 = s.trim().parse().map_err(|_| format!("'{}' n'est pas un nombre", s.trim()))?;
+              if !(0..=20).contains(&n) {
+                  return Err(format!("{} hors limites", n));
+              }
+              Ok(n as u32)
+          }
+
+          fn main() {
+              let mut e = String::new();
+              io::stdin().read_to_string(&mut e).unwrap();
+              let mut notes = Vec::new();
+              for l in e.lines() {
+                  match lire_note(l) {
+                      Ok(n) => notes.push(n),
+                      Err(err) => println!("{}", err),
+                  }
+              }
+              if notes.is_empty() {
+                  println!("Aucune note valide");
+              } else {
+                  let total: u32 = notes.iter().sum();
+                  println!("Moyenne : {:.2}", total as f64 / notes.len() as f64);
+              }
+          }
+        tests:
+          - { input: "12\nabc\n25\n15", output: "'abc' n'est pas un nombre\n25 hors limites\nMoyenne : 13.50" }
+          - { input: "-1\nx", output: "-1 hors limites\n'x' n'est pas un nombre\nAucune note valide", hidden: true }
+          - { input: "20\n0\n7", output: 'Moyenne : 9.00', hidden: true }
+        concepts: [erreurs, result]
+    project:
+      id: rust-err-projet
+      type: code
+      title: Distributeur automatique
+      difficulty: 3
+      prompt: |
+        Implémente un distributeur avec une enum `ErreurDistrib { ProduitInconnu(String), StockEpuise(String), CreditInsuffisant { manque: u32 } }` qui implémente `Display`.
+
+        Le stock initial : `cafe` (prix 120, stock 2), `the` (100, 1), `eau` (80, 5). Chaque ligne d’entrée est une commande `produit credit`.
+
+        Pour chaque commande, affiche `OK : <produit>, monnaie <credit - prix>` ou `Erreur : <message>` avec les messages :
+
+        - `produit inconnu (<nom>)`
+        - `stock épuisé (<nom>)`
+        - `crédit insuffisant, il manque <manque>`
+      starter: |
+        use std::io::{self, Read};
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+        }
+      solution: |
+        use std::fmt;
+        use std::io::{self, Read};
+
+        enum ErreurDistrib {
+            ProduitInconnu(String),
+            StockEpuise(String),
+            CreditInsuffisant { manque: u32 },
+        }
+
+        impl fmt::Display for ErreurDistrib {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self {
+                    ErreurDistrib::ProduitInconnu(n) => write!(f, "produit inconnu ({})", n),
+                    ErreurDistrib::StockEpuise(n) => write!(f, "stock épuisé ({})", n),
+                    ErreurDistrib::CreditInsuffisant { manque } => write!(f, "crédit insuffisant, il manque {}", manque),
+                }
+            }
+        }
+
+        struct Produit {
+            nom: String,
+            prix: u32,
+            stock: u32,
+        }
+
+        fn acheter(stock: &mut Vec<Produit>, nom: &str, credit: u32) -> Result<u32, ErreurDistrib> {
+            let p = stock
+                .iter_mut()
+                .find(|p| p.nom == nom)
+                .ok_or(ErreurDistrib::ProduitInconnu(nom.to_string()))?;
+            if p.stock == 0 {
+                return Err(ErreurDistrib::StockEpuise(nom.to_string()));
+            }
+            if credit < p.prix {
+                return Err(ErreurDistrib::CreditInsuffisant { manque: p.prix - credit });
+            }
+            p.stock -= 1;
+            Ok(credit - p.prix)
+        }
+
+        fn main() {
+            let mut e = String::new();
+            io::stdin().read_to_string(&mut e).unwrap();
+            let mut stock = vec![
+                Produit { nom: "cafe".into(), prix: 120, stock: 2 },
+                Produit { nom: "the".into(), prix: 100, stock: 1 },
+                Produit { nom: "eau".into(), prix: 80, stock: 5 },
+            ];
+            for l in e.lines() {
+                let p: Vec<&str> = l.split_whitespace().collect();
+                let credit: u32 = p[1].parse().unwrap();
+                match acheter(&mut stock, p[0], credit) {
+                    Ok(monnaie) => println!("OK : {}, monnaie {}", p[0], monnaie),
+                    Err(err) => println!("Erreur : {}", err),
+                }
+            }
+        }
+      tests:
+        - { input: "cafe 200\nthe 50\nsoda 100\nthe 100\nthe 100", output: "OK : cafe, monnaie 80\nErreur : crédit insuffisant, il manque 50\nErreur : produit inconnu (soda)\nOK : the, monnaie 0\nErreur : stock épuisé (the)" }
+        - { input: "cafe 120\ncafe 120\ncafe 500\neau 79", output: "OK : cafe, monnaie 0\nOK : cafe, monnaie 0\nErreur : stock épuisé (cafe)\nErreur : crédit insuffisant, il manque 1", hidden: true }
+      require:
+        - { pattern: 'enum\s+ErreurDistrib', message: Définir enum ErreurDistrib }
+        - { pattern: 'impl\s+(std::)?fmt::Display\s+for\s+ErreurDistrib|impl\s+Display\s+for\s+ErreurDistrib', message: Implémenter Display pour ErreurDistrib }
+    exam:
+      pass: 70
+      questions:
+        - id: rust-err-ex1
+          type: mcq
+          prompt: Quel trait faut-il implémenter pour afficher une erreur avec `{}` ?
+          choices: [Debug, Display, Error, From]
+          answer: 1
+        - id: rust-err-ex2
+          type: mcq
+          prompt: Quelle crate est conçue pour simplifier les erreurs dans une **application** (avec contexte) ?
+          choices: [serde, anyhow, tokio, rand]
+          answer: 1
+        - id: rust-err-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            fn etape(n: i32) -> Result<i32, String> {
+                if n > 10 { Err(format!("{} trop grand", n)) } else { Ok(n * 3) }
+            }
+            fn chaine(n: i32) -> Result<i32, String> {
+                let a = etape(n)?;
+                let b = etape(a)?;
+                Ok(b)
+            }
+            fn main() {
+                println!("{:?}", chaine(2));
+                println!("{:?}", chaine(5));
+            }
+          output: "Ok(18)\nErr(\"15 trop grand\")"
+        - id: rust-err-ex4
+          type: mcq
+          prompt: Que fait `assert!(cond, "msg")` si `cond` est faux ?
+          choices: [Renvoie Err, Panique avec le message, Affiche un avertissement, Rien en mode debug]
+          answer: 1
