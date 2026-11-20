@@ -11,6 +11,10 @@ L, H, EP = 60.0, 40.0, 8.0            # 60 x 40, epaisseur 8
 CHF_BG = (15.0, 20.0)                 # pan coupe bas-gauche (sur X, sur Y)
 CHF_HD = (14.0, 10.0)                 # pan coupe haut-droite (sur X, sur Y)
 R_ANGLES = 1.5                        # conge des aretes verticales
+CHF_DESSUS = 1.2                      # chanfrein contour dessus (45 deg)
+CHF_DESSOUS = 0.5                     # chanfrein contour dessous (anti patte d'elephant)
+CHF_TROU = 0.8                        # chanfrein du percage (dessus et dessous)
+CHF_LOGO = 0.6                        # chanfrein bord de la cuvette du logo
 TROU_D, TROU_X, TROU_Y = 5.0, 6.0, 34.0   # percage anneau (haut gauche)
 
 GRAVURE = 3.5                         # profondeur gravure du texte
@@ -30,8 +34,20 @@ hx, hy = CHF_HD
 contour = [(bx, 0), (L, 0), (L, H - hy), (L - hx, H), (0, H), (0, by)]
 corps = cq.Workplane("XY").polyline(contour).close().extrude(EP)
 corps = corps.edges("|Z").fillet(R_ANGLES)
+corps = corps.faces(">Z").chamfer(CHF_DESSUS)
+corps = corps.faces("<Z").chamfer(CHF_DESSOUS)
 corps = corps.cut(
     cq.Workplane("XY").center(TROU_X, TROU_Y).circle(TROU_D / 2).extrude(EP)
+)
+
+# ---------------- CHANFREIN du bord de la cuvette du logo (45 deg) ----------------
+lw, lh = LOGO_X1 - LOGO_X0, BANDES[0][1] - BANDES[-1][0]
+lc = ((LOGO_X0 + LOGO_X1) / 2, (BANDES[0][1] + BANDES[-1][0]) / 2)
+sur = 0.5  # depasse au-dessus du dessus pour une coupe propre
+corps = corps.cut(
+    cq.Workplane("XY").workplane(offset=EP - CHF_LOGO).center(*lc).rect(lw, lh)
+    .workplane(offset=CHF_LOGO + sur).rect(lw + 2 * (CHF_LOGO + sur), lh + 2 * (CHF_LOGO + sur))
+    .loft()
 )
 
 # ---------------- MARCHES (escalier) ----------------
@@ -40,6 +56,13 @@ for y0, y1, d in BANDES:
               .center((LOGO_X0 + LOGO_X1) / 2, (y0 + y1) / 2)
               .rect(LOGO_X1 - LOGO_X0, y1 - y0).extrude(d + 1))
     corps = corps.cut(marche)
+
+# ---------------- CHANFREINS percage + bord du logo ----------------
+e = 0.01
+corps = corps.edges(cq.selectors.AndSelector(
+    cq.selectors.TypeSelector("CIRCLE"),
+    cq.selectors.BoxSelector((TROU_X - 1, TROU_Y - 1, -e), (TROU_X + 1, TROU_Y + 1, EP + e)))
+).chamfer(CHF_TROU)
 
 
 def ajuste(sol, x0, x1, y0, y1):
