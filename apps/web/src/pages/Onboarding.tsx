@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import clsx from 'clsx';
 import { Check, ChevronRight, Loader2 } from 'lucide-react';
-import { api, ApiError, LANG_META, LEVEL_NAMES } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useFeedback, type Rewards } from '../lib/feedback';
 import Mascot from '../components/Mascot';
@@ -195,7 +195,7 @@ export default function Onboarding() {
             <motion.div key={run.question.id} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="chip text-sm">
-                  {LANG_META[run.language].icon} {LANG_META[run.language].name}
+                  {langMeta(run.language).icon} {langMeta(run.language).name}
                 </span>
                 <ProgressBar value={run.index / run.total} className="flex-1" />
                 <span className="text-sm font-bold">
@@ -231,8 +231,8 @@ export default function Onboarding() {
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {Object.entries(result).map(([l, r]) => (
                   <div key={l} className="rounded-3xl bg-ink-50 p-4 dark:bg-ink-800">
-                    <div className="text-3xl">{LANG_META[l].icon}</div>
-                    <div className="text-lg font-black">{LANG_META[l].name}</div>
+                    <div className="text-3xl">{langMeta(l).icon}</div>
+                    <div className="text-lg font-black">{langMeta(l).name}</div>
                     <div className="mt-1 font-extrabold text-brand-500">{r.levelName}</div>
                     <div className="muted text-sm">
                       {r.score} % de réussite ({r.answered} questions)

@@ -16,7 +16,8 @@ import { maybeCompleteChapter, touchChapter } from '../lib/progress.js';
 import { glossaryFor } from '../lib/glossary.js';
 import { parse } from './auth.js';
 
-export const LANGS = ['rust', 'cpp', 'java'];
+export { PLACEMENT_LANGS as LANGS } from '../lib/languages.js';
+import { requireRunnable } from '../lib/languages.js';
 
 export function mergeRewards(a: Rewards, b: Rewards): Rewards {
   return {
@@ -27,6 +28,7 @@ export function mergeRewards(a: Rewards, b: Rewards): Rewards {
     dailyGoalReached: a.dailyGoalReached || b.dailyGoalReached,
     achievements: [...a.achievements, ...b.achievements],
     challenges: [...a.challenges, ...b.challenges],
+    flames: [...(a.flames ?? []), ...(b.flames ?? [])],
   };
 }
 
@@ -267,6 +269,7 @@ export default async function exerciseRoutes(app: FastifyInstance) {
     let source = body.code ?? '';
     if (ex.type === 'fill') source = fillTemplate(c.code, body.blanks ?? []);
     if (ex.type === 'predict') throw badRequest("Pour cet exercice, il faut prédire la sortie sans exécuter le programme 😉");
+    await requireRunnable(language);
     if (!source.trim()) throw badRequest('Aucun code à exécuter');
     await consumeRun(user);
     const visible: { input: string; output: string }[] = c.visibleTests ?? [];

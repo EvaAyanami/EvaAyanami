@@ -41,7 +41,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
   /** Explication pédagogique d'une erreur de compilation / d'exécution. */
   app.post('/assistant/explain', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
     const user = requireUser(req);
-    const body = parse(z.object({ language: z.enum(['rust', 'cpp', 'java']), stderr: z.string().max(20000), exitCode: z.number().int().optional(), code: z.string().max(50000).optional() }), req.body);
+    const body = parse(z.object({ language: z.string().max(20), stderr: z.string().max(20000), exitCode: z.number().int().optional(), code: z.string().max(50000).optional() }), req.body);
     const local = explainError(body.language, body.stderr, body.exitCode);
     let ai: string | null = null;
     if (body.code && (await aiAvailable()) && (await aiAllowed(user))) {

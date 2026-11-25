@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApi } from '../lib/hooks';
-import { LANG_META, LEVEL_NAMES } from '../lib/api';
+import { LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
 import { PageTitle, Loading, ErrorBox, ProgressBar, MascotSays } from '../components/ui';
 
 interface P {
@@ -47,7 +47,7 @@ export default function Projects() {
                           const done = p.progress.find((x) => x.language === l)?.completed;
                           return (
                             <span key={l} className={`chip ${done ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : ''}`}>
-                              {LANG_META[l].icon} {LANG_META[l].name}
+                              {langMeta(l).icon} {langMeta(l).name}
                             </span>
                           );
                         })}

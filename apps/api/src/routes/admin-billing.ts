@@ -8,6 +8,7 @@ import { extendPremium, paymentsConfigured, premiumHistory, setPremiumUntil, str
 import { parse } from './auth.js';
 import { newKey } from '../lib/stripe.js';
 import { applySkillLevel } from './placement.js';
+import { languageIds } from '../lib/languages.js';
 
 const adSchema = z.object({
   title: z.string().min(1).max(120),
@@ -102,7 +103,7 @@ export default async function adminBillingRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/admin/users/:id/skills', async (req) => prisma.skillProfile.findMany({ where: { userId: req.params.id } }));
   app.put<{ Params: { id: string; lang: string } }>('/admin/users/:id/skills/:lang', async (req) => {
     const b = parse(z.object({ level: z.number().int().min(1).max(5) }), req.body);
-    if (!['rust', 'cpp', 'java'].includes(req.params.lang)) throw badRequest('Langage inconnu');
+    if (!(await languageIds()).includes(req.params.lang)) throw badRequest('Langage inconnu');
     await applySkillLevel(req.params.id, req.params.lang, b.level, 'admin');
     return { ok: true };
   });

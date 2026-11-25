@@ -45,6 +45,20 @@ export function parseDiagnostics(language: string, stderr: string): Diagnostic[]
       const m = /^Main\.java:(\d+): (error|warning): (.*)$/.exec(l);
       if (m) out.push({ line: +m[1], column: 1, severity: m[2] as 'error' | 'warning', message: m[3] });
     }
+  } else if (language === 'python') {
+    //   File "main.py", line 3        …        SyntaxError: '(' was never closed
+    let last: { line: number } | null = null;
+    for (const l of lines) {
+      const m = /File "(?:.*\/)?main\.py", line (\d+)/.exec(l);
+      if (m) last = { line: +m[1] };
+      const e = /^(\w+(?:Error|Exception|Warning)): (.*)$/.exec(l.trim());
+      if (e && last) out.push({ line: last.line, column: 1, severity: e[1].endsWith('Warning') ? 'warning' : 'error', message: `${e[1]}: ${e[2]}` });
+    }
+  } else if (language === 'php') {
+    for (const l of lines) {
+      const m = /^(?:PHP )?(Parse error|Fatal error|Warning|Deprecated|Notice): (.*?) in (?:.*\/)?main\.php(?: on line |:)(\d+)/.exec(l);
+      if (m) out.push({ line: +m[3], column: 1, severity: /Warning|Deprecated|Notice/.test(m[1]) ? 'warning' : 'error', message: `${m[1]} : ${m[2]}` });
+    }
   }
   return out.slice(0, 50);
 }
@@ -331,7 +345,32 @@ const JAVA: Rule[] = [
   },
 ];
 
-const BY_LANG: Record<string, Rule[]> = { rust: RUST, cpp: CPP, java: JAVA };
+const PYTHON: Rule[] = [
+  { re: /IndentationError|unexpected indent|expected an indented block/, title: 'Indentation incorrecte', explanation: 'En Python, l’indentation (les espaces en début de ligne) délimite les blocs. Un bloc après `if`, `for`, `def`… doit être décalé, et toutes ses lignes alignées.', tip: 'Utilise 4 espaces par niveau, jamais un mélange d’espaces et de tabulations.' },
+  { re: /SyntaxError: expected ':'|invalid syntax.*:/, title: 'Deux-points manquants', explanation: 'Les lignes `if`, `elif`, `else`, `for`, `while`, `def` et `class` se terminent par `:`.', tip: 'Ajoute `:` à la fin de la ligne indiquée.' },
+  { re: /was never closed|unexpected EOF|EOL while scanning|unterminated string/, title: 'Parenthèse ou guillemet non fermé', explanation: 'Une parenthèse, un crochet ou une chaîne ouverte n’est jamais refermée.', tip: 'Compte les `(` et `)`, les `[` et `]`, et vérifie les guillemets de la ligne indiquée.' },
+  { re: /NameError: name '(\w+)' is not defined/, title: 'Nom inconnu', explanation: 'Tu utilises une variable ou une fonction qui n’existe pas (encore) : faute de frappe, ou variable définie plus bas.', tip: 'Vérifie l’orthographe (Python distingue majuscules et minuscules) et que la variable est définie avant.' },
+  { re: /TypeError: can only concatenate str|unsupported operand type/, title: 'Types incompatibles', explanation: 'Tu combines des types qui ne vont pas ensemble, par exemple un texte et un nombre avec `+`.', tip: 'Convertis : `str(nombre)` pour du texte, `int(texte)` pour un nombre, ou utilise une f-string : `f"{x}"`.' },
+  { re: /ValueError: invalid literal for int/, title: 'Conversion en nombre impossible', explanation: '`int()` a reçu un texte qui n’est pas un nombre entier.', tip: 'Nettoie l’entrée avec `.strip()` et vérifie son contenu.' },
+  { re: /IndexError/, title: 'Indice hors limites', explanation: 'Tu accèdes à un élément qui n’existe pas dans la liste.', tip: 'Les indices vont de `0` à `len(liste) - 1`.' },
+  { re: /KeyError/, title: 'Clé absente du dictionnaire', explanation: 'La clé demandée n’existe pas dans le dictionnaire.', tip: 'Utilise `d.get(cle, valeur_par_defaut)` ou teste `if cle in d`.' },
+  { re: /ZeroDivisionError/, title: 'Division par zéro', explanation: 'Une division par 0 est impossible.', tip: 'Teste le diviseur avant de diviser.' },
+  { re: /AttributeError/, title: 'Attribut ou méthode inexistant', explanation: 'L’objet n’a pas l’attribut ou la méthode demandé (souvent : mauvais type, ou `None`).', tip: 'Affiche `type(x)` pour vérifier le type réel.' },
+  { re: /RecursionError/, title: 'Récursion trop profonde', explanation: 'Une fonction s’appelle elle-même sans fin.', tip: 'Vérifie le cas de base.' },
+  { re: /EOFError/, title: 'Entrée vide', explanation: '`input()` n’a rien reçu à lire.', tip: 'Lis exactement autant de lignes que l’énoncé en fournit.' },
+];
+
+const PHP: Rule[] = [
+  { re: /unexpected end of file|expecting "," or ";"|unexpected token/, title: 'Erreur de syntaxe', explanation: 'Il manque souvent un `;` en fin d’instruction, ou une accolade `}` / un guillemet n’est pas fermé.', tip: 'Regarde la ligne indiquée ET la précédente : en PHP, chaque instruction finit par `;`.' },
+  { re: /Undefined variable/, title: 'Variable non définie', explanation: 'Tu lis une variable qui n’a jamais reçu de valeur.', tip: 'Vérifie l’orthographe (les variables commencent par `$`) et initialise-la avant usage.' },
+  { re: /Call to undefined function/, title: 'Fonction inconnue', explanation: 'La fonction appelée n’existe pas.', tip: 'Vérifie le nom (PHP n’est pas sensible à la casse pour les fonctions, mais l’est pour les variables).' },
+  { re: /Undefined (array key|offset|index)/, title: 'Clé de tableau absente', explanation: 'La clé ou l’indice demandé n’existe pas dans le tableau.', tip: 'Teste avec `isset($t[$k])` ou utilise `$t[$k] ?? valeur_par_defaut`.' },
+  { re: /DivisionByZeroError|Division by zero/, title: 'Division par zéro', explanation: 'Une division (ou un modulo) par 0 est impossible.', tip: 'Teste le diviseur avant de diviser.' },
+  { re: /TypeError/, title: 'Mauvais type', explanation: 'Une fonction a reçu un argument d’un type inattendu.', tip: 'Vérifie les types déclarés et convertis avec `(int)`, `(string)`…' },
+  { re: /Call to a member function .* on null/, title: 'Méthode appelée sur null', explanation: 'L’objet sur lequel tu appelles la méthode vaut `null`.', tip: 'Crée l’objet avec `new` avant de l’utiliser.' },
+];
+
+const BY_LANG: Record<string, Rule[]> = { rust: RUST, cpp: CPP, java: JAVA, python: PYTHON, php: PHP };
 
 export function explainError(language: string, text: string, exitCode?: number): Explanation[] {
   const rules = BY_LANG[language] ?? [];

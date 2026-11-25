@@ -6,6 +6,7 @@
 import { z } from 'zod';
 
 export const AVATAR_OPTIONS = {
+  gender: ['codeuse', 'codeur', 'neutre'],
   skin: ['porcelaine', 'clair', 'peche', 'dore', 'cannelle', 'cacao'],
   hairStyle: ['court', 'carre', 'long', 'queue', 'couettes', 'herisse', 'boucle', 'chignon', 'rase'],
   hairColor: ['bleu', 'noir', 'brun', 'chatain', 'blond', 'roux', 'rose', 'violet', 'vert', 'blanc', 'arcenciel', 'or'],
@@ -28,14 +29,14 @@ export const PREMIUM_ITEMS: Partial<Record<keyof typeof AVATAR_OPTIONS, string[]
 };
 
 export const DEFAULT_AVATAR = {
-  skin: 'clair', hairStyle: 'court', hairColor: 'brun', eyes: 'rond', eyeColor: 'noisette', mouth: 'sourire',
+  gender: 'neutre', skin: 'clair', hairStyle: 'court', hairColor: 'brun', eyes: 'rond', eyeColor: 'noisette', mouth: 'sourire',
   outfit: 'uniforme', outfitColor: 'marine', accessory: 'barrette', background: 'ciel', blush: true,
 };
 export type Avatar = typeof DEFAULT_AVATAR;
 
 const e = <K extends keyof typeof AVATAR_OPTIONS>(k: K) => z.enum(AVATAR_OPTIONS[k] as unknown as [string, ...string[]]);
 export const avatarSchema = z.object({
-  skin: e('skin'), hairStyle: e('hairStyle'), hairColor: e('hairColor'), eyes: e('eyes'), eyeColor: e('eyeColor'),
+  gender: e('gender'), skin: e('skin'), hairStyle: e('hairStyle'), hairColor: e('hairColor'), eyes: e('eyes'), eyeColor: e('eyeColor'),
   mouth: e('mouth'), outfit: e('outfit'), outfitColor: e('outfitColor'), accessory: e('accessory'), background: e('background'),
   blush: z.boolean(),
 });

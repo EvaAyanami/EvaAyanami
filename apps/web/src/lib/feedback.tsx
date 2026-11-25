@@ -20,6 +20,7 @@ export interface Rewards {
   dailyGoalReached: boolean;
   achievements: { id: string; title: string; description: string; icon: string; xp: number }[];
   challenges: { title: string; xpReward: number }[];
+  flames?: { friend: string; flame: number; milestone?: { days: number; title: string; xp: number } }[];
 }
 
 interface Toast {
@@ -72,11 +73,16 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       if (!r && !extra) return;
       if (r?.xp) toast(`+${r.xp} XP`, 'xp');
       if (r?.streakIncreased && r.streak > 1) toast(`🔥 Série de ${r.streak} jours !`, 'success');
-      const big = extra || r?.levelUp || (r?.achievements.length ?? 0) > 0 || (r?.challenges.length ?? 0) > 0 || r?.dailyGoalReached;
+      for (const f of r?.flames ?? []) if (!f.milestone) toast(`🔥 Flamme avec ${f.friend} : ${f.flame} jour${f.flame > 1 ? 's' : ''} !`, 'success');
+      const flameMilestone = r?.flames?.find((f) => f.milestone);
+      const big = extra || flameMilestone || r?.levelUp || (r?.achievements.length ?? 0) > 0 || (r?.challenges.length ?? 0) > 0 || r?.dailyGoalReached;
       if (big) {
         let title = extra?.title ?? '';
         let text = extra?.text ?? '';
-        if (!title && r?.levelUp) {
+        if (!title && flameMilestone) {
+          title = `Flamme « ${flameMilestone.milestone!.title} » ! 🔥`;
+          text = `${flameMilestone.flame} jours d’apprentissage avec ${flameMilestone.friend}. Vous gagnez tous les deux +${flameMilestone.milestone!.xp} XP !`;
+        } else if (!title && r?.levelUp) {
           title = `Niveau ${r.level} atteint !`;
           text = 'Tu progresses à toute vitesse. Kiri est fière de toi !';
         } else if (!title && r?.achievements.length) {

@@ -8,6 +8,7 @@ import type { Rule, TestCase } from './content.js';
 import { runCode, type RunnerResult } from './runner.js';
 import { parseDiagnostics, explainError, type Diagnostic, type Explanation } from './diagnostics.js';
 import { badRequest } from './http.js';
+import { runWebChecks } from './webcheck.js';
 
 export interface TestReport {
   name: string;
@@ -195,6 +196,20 @@ export async function grade(ex: Exercise, answer: Answer, language: string): Pro
       if (!Array.isArray(blanks) || blanks.length !== content.blankCount) throw badRequest('Remplis tous les trous');
       const accepted: string[][] = sol.blanks;
       const perBlank = blanks.map((b, i) => (accepted[i] ?? []).some((a) => normalizeToken(a) === normalizeToken(b)));
+      if (sol.checks?.length) {
+        // Exercice HTML/CSS : le document complété doit satisfaire les vérifications.
+        const rules = runWebChecks(fillTemplate(content.code, blanks), sol.checks);
+        const ok = rules.filter((r) => r.passed).length;
+        const correct = ok === rules.length;
+        return {
+          correct,
+          score: Math.round((ok / rules.length) * 100),
+          feedback: correct ? 'Le document complété est correct !' : `${ok}/${rules.length} vérifications réussies.`,
+          explanation: correct ? explanation : undefined,
+          rules,
+          parts: Object.fromEntries(perBlank.map((v, i) => [`trou ${i + 1}`, v])),
+        };
+      }
       if (sol.tests?.length) {
         // Exercice compilé : le programme complété doit compiler et passer les tests.
         const source = fillTemplate(content.code, blanks);
@@ -265,6 +280,19 @@ export async function grade(ex: Exercise, answer: Answer, language: string): Pro
     }
     case 'code': {
       if (typeof answer.code !== 'string' || !answer.code.trim()) throw badRequest('Écris ton programme avant de valider');
+      if (sol.checks?.length) {
+        // Piste Web : analyse du HTML/CSS (aucune exécution).
+        const rules = [...runWebChecks(answer.code, sol.checks), ...checkRules(answer.code, sol.require ?? [], sol.forbid ?? [])];
+        const ok = rules.filter((r) => r.passed).length;
+        const correct = ok === rules.length;
+        return {
+          correct,
+          score: Math.round((ok / rules.length) * 100),
+          feedback: correct ? `Bravo ! ${ok}/${rules.length} vérifications réussies.` : `${ok}/${rules.length} vérifications réussies — regarde ce qui manque ci-dessous.`,
+          explanation: correct ? explanation : undefined,
+          rules,
+        };
+      }
       const rules = checkRules(answer.code, sol.require ?? [], sol.forbid ?? []);
       const r = await runTests(language, answer.code, sol.tests);
       const passed = r.tests!.filter((t) => t.passed).length;
@@ -353,7 +381,7 @@ export function publicExercise(ex: Exercise, language?: string) {
       return { ...base, code: c.code, choices: choiceOrder(ex).map((i) => c.choices[i]), visibleTests: c.visibleTests };
     case 'code': {
       const starter = c.starters ? (c.starters[language ?? 'rust'] ?? '') : c.starter;
-      return { ...base, starter, visibleTests: c.visibleTests, rules: c.rules ?? [], languages: c.starters ? Object.keys(c.starters) : undefined };
+      return { ...base, starter, visibleTests: c.visibleTests, rules: [...(c.checks ?? []), ...(c.rules ?? [])], languages: c.starters ? Object.keys(c.starters) : undefined };
     }
   }
   return base;

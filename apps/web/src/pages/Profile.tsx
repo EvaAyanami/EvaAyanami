@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import Avatar from '../components/Avatar';
 import TwoFactorCard from '../components/TwoFactorCard';
 import { PremiumBadge, remaining, usePlan } from '../lib/plan';
-import { api, ApiError, LANG_META, LEVEL_NAMES } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
 import { useAuth, type User } from '../lib/auth';
 import { useApi } from '../lib/hooks';
 import { useFeedback } from '../lib/feedback';
@@ -54,7 +54,7 @@ export default function Profile() {
 
   async function setLevel(lang: string, level: number) {
     await api(`/me/skills/${lang}`, { method: 'PUT', body: { level } });
-    toast(`Niveau ${LANG_META[lang].name} : ${LEVEL_NAMES[level]}`, 'success');
+    toast(`Niveau ${langMeta(lang).name} : ${LEVEL_NAMES[level]}`, 'success');
     skills.reload();
   }
 
@@ -156,7 +156,7 @@ export default function Profile() {
           {skills.data?.map((s) => (
             <div key={s.language} className="mb-4">
               <div className="mb-1 flex items-center justify-between">
-                <span className="font-black">{LANG_META[s.language].icon} {LANG_META[s.language].name}</span>
+                <span className="font-black">{langMeta(s.language).icon} {langMeta(s.language).name}</span>
                 <span className="muted text-xs font-bold">{s.source === 'placement' ? `évalué (${s.details?.score ?? '?'} %)` : s.source === 'manual' ? 'réglé manuellement' : 'par défaut'}</span>
               </div>
               <div className="grid grid-cols-5 gap-1">

@@ -52,6 +52,12 @@ jobs:
           - nom: sandbox-java
             contexte: apps/runner/images
             dockerfile: apps/runner/images/java/Dockerfile
+          - nom: sandbox-python
+            contexte: apps/runner/images
+            dockerfile: apps/runner/images/python/Dockerfile
+          - nom: sandbox-php
+            contexte: apps/runner/images
+            dockerfile: apps/runner/images/php/Dockerfile
     steps:
       - uses: actions/checkout@v4
 

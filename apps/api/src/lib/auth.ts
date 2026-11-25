@@ -98,6 +98,8 @@ export function publicUser(u: User) {
     formerPremium: !!u.premiumUntil && u.premiumUntil <= new Date(),
     avatar: effectiveAvatar(u.avatar, (!!u.premiumUntil && u.premiumUntil > new Date()) || u.role === 'ADMIN'),
     hasAvatar: !!u.avatar,
+    locale: u.locale,
+    emailVerified: u.emailVerified,
     displayName: u.displayName,
     role: u.role,
     theme: u.theme,

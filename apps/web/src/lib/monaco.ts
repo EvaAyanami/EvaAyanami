@@ -4,9 +4,13 @@
  */
 import * as monaco from 'monaco-editor';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import { loader } from '@monaco-editor/react';
 
-(self as any).MonacoEnvironment = { getWorker: () => new editorWorker() };
+(self as any).MonacoEnvironment = {
+  getWorker: (_: string, label: string) => (label === 'html' ? new htmlWorker() : label === 'css' ? new cssWorker() : new editorWorker()),
+};
 loader.config({ monaco });
 
 monaco.editor.defineTheme('codemori-dark', {
@@ -94,6 +98,34 @@ const SNIPPETS: Record<string, Snip[]> = {
     ['list', 'List<${1:Integer}> ${2:liste} = new ArrayList<>();', 'Liste'],
     ['map', 'Map<${1:String}, ${2:Integer}> ${3:map} = new HashMap<>();', 'Dictionnaire'],
     ['trycatch', 'try {\n\t$0\n} catch (${1:Exception} e) {\n\t\n}', 'Bloc try/catch'],
+  ],
+  python: [
+    ['print', 'print(${1:valeur})', 'Affiche une valeur'],
+    ['input', '${1:n} = int(input())', 'Lit un entier'],
+    ['def', 'def ${1:nom}(${2}):\n\t${0:pass}', 'Déclare une fonction'],
+    ['for', 'for ${1:i} in range(${2:10}):\n\t$0', 'Boucle for'],
+    ['while', 'while ${1:condition}:\n\t$0', 'Boucle while'],
+    ['if', 'if ${1:condition}:\n\t$0', 'Condition'],
+    ['class', 'class ${1:Nom}:\n\tdef __init__(self${2}):\n\t\t$0', 'Classe'],
+    ['main', 'def main():\n\t$0\n\n\nif __name__ == "__main__":\n\tmain()', 'Point d’entrée'],
+    ['lines', 'import sys\nlignes = sys.stdin.read().splitlines()', 'Lire toute l’entrée'],
+  ],
+  php: [
+    ['echo', 'echo ${1:\\$valeur}, "\\n";', 'Affiche une valeur'],
+    ['php', '<?php\ndeclare(strict_types=1);\n\n$0', 'Début de fichier PHP'],
+    ['function', 'function ${1:nom}(${2}): ${3:void}\n{\n\t$0\n}', 'Déclare une fonction'],
+    ['foreach', 'foreach (${1:\\$tableau} as ${2:\\$valeur}) {\n\t$0\n}', 'Parcourt un tableau'],
+    ['if', 'if (${1:condition}) {\n\t$0\n}', 'Condition'],
+    ['class', 'class ${1:Nom}\n{\n\tpublic function __construct(${2})\n\t{\n\t\t$0\n\t}\n}', 'Classe'],
+    ['readline', '\\$${1:n} = (int) trim(fgets(STDIN));', 'Lit un entier'],
+  ],
+  html: [
+    ['html5', '<!DOCTYPE html>\n<html lang="fr">\n<head>\n\t<meta charset="UTF-8">\n\t<title>${1:Ma page}</title>\n\t<style>\n\t\t$2\n\t</style>\n</head>\n<body>\n\t$0\n</body>\n</html>', 'Squelette HTML5'],
+    ['a', '<a href="${1:https://}">${2:lien}</a>', 'Lien'],
+    ['img', '<img src="${1}" alt="${2:description}">', 'Image'],
+    ['ul', '<ul>\n\t<li>$0</li>\n</ul>', 'Liste à puces'],
+    ['flex', 'display: flex;\ngap: ${1:1rem};\nalign-items: ${2:center};', 'Conteneur Flexbox'],
+    ['grid', 'display: grid;\ngrid-template-columns: ${1:repeat(3, 1fr)};\ngap: ${2:1rem};', 'Conteneur Grid'],
   ],
 };
 

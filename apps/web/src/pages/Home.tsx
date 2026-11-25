@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Flame, Star, Target, Clock, CheckCircle2, Percent, BookOpenCheck, RotateCcw, ArrowRight, Swords, AlertTriangle, PlayCircle, Crown, Trophy } from 'lucide-react';
 import { useApi, useIdle } from '../lib/hooks';
-import { formatDuration, LANG_META } from '../lib/api';
+import { formatDuration, LANG_META, langMeta } from '../lib/api';
 import Duo from '../components/Duo';
 import { Podium, type BestCoderData } from './BestCoder';
 import { PageTitle, ProgressBar, Ring, Loading, ErrorBox, Bars, LangBadge } from '../components/ui';
@@ -164,8 +164,8 @@ export default function Home() {
               {data.languages.map((l) => (
                 <Link key={l.id} to={`/parcours/${l.id}`} className="rounded-3xl border-2 border-ink-100 p-4 transition hover:border-brand-200 dark:border-ink-800 dark:hover:border-brand-800">
                   <div className="flex items-center gap-3">
-                    <Ring value={l.total ? l.validated / l.total : 0} color={LANG_META[l.id]?.color}>
-                      <span className="text-xl">{LANG_META[l.id]?.icon}</span>
+                    <Ring value={l.total ? l.validated / l.total : 0} color={langMeta(l.id)?.color}>
+                      <span className="text-xl">{langMeta(l.id)?.icon}</span>
                     </Ring>
                     <div>
                       <div className="font-black">{l.name}</div>

@@ -12,11 +12,13 @@ import App from './App';
 import { AuthProvider } from './lib/auth';
 import { FeedbackProvider } from './lib/feedback';
 import { PlanProvider } from './lib/plan';
+import { I18nProvider } from './lib/i18n';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
+      <I18nProvider>
       <AuthProvider>
         <FeedbackProvider>
           <PlanProvider>
@@ -24,6 +26,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           </PlanProvider>
         </FeedbackProvider>
       </AuthProvider>
+      </I18nProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

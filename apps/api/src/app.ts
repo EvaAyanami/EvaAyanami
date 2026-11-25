@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { loadUser } from './lib/auth.js';
+import { verificationRequired } from './lib/mail.js';
 import { HttpError } from './lib/http.js';
 import authRoutes from './routes/auth.js';
 import learnRoutes from './routes/learn.js';
@@ -20,6 +21,9 @@ import adminRoutes from './routes/admin.js';
 import billingRoutes from './routes/billing.js';
 import friendRoutes from './routes/friends.js';
 import communityRoutes from './routes/community.js';
+import feedbackRoutes from './routes/feedback.js';
+import quizRoutes from './routes/quiz.js';
+import oauthRoutes from './routes/oauth.js';
 import adminBillingRoutes from './routes/admin-billing.js';
 
 // Domaines nécessaires à Google AdSense (uniquement si ADS_PROVIDER=adsense).
@@ -69,7 +73,12 @@ export async function buildApp() {
   });
 
   app.addHook('preHandler', async (req, reply) => {
-    if (req.url.startsWith('/api/')) await loadUser(req, reply);
+    if (req.url.startsWith('/api/')) {
+      await loadUser(req, reply);
+      // Adresse e-mail non vérifiée : seules l'authentification et la langue restent accessibles.
+      if (req.user && !req.user.emailVerified && !/^\/api\/(auth\/|me$|me\?|health)/.test(req.url) && verificationRequired())
+        throw new HttpError(403, 'Confirme d’abord ton adresse e-mail : clique sur le lien reçu par e-mail.', { code: 'EMAIL_UNVERIFIED' });
+    }
   });
 
   app.setErrorHandler(async (err: FastifyError | HttpError, req, reply) => {
@@ -111,6 +120,9 @@ export async function buildApp() {
       await api.register(billingRoutes);
       await api.register(friendRoutes);
       await api.register(communityRoutes);
+      await api.register(feedbackRoutes);
+      await api.register(quizRoutes);
+      await api.register(oauthRoutes);
     },
     { prefix: '/api' },
   );

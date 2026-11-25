@@ -44,6 +44,20 @@ services:
       context: ./apps/runner/images
       dockerfile: java/Dockerfile
 
+  sandbox-python:
+    <<: *sandbox
+    image: codemori/sandbox-python:latest
+    build:
+      context: ./apps/runner/images
+      dockerfile: python/Dockerfile
+
+  sandbox-php:
+    <<: *sandbox
+    image: codemori/sandbox-php:latest
+    build:
+      context: ./apps/runner/images
+      dockerfile: php/Dockerfile
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -75,6 +89,8 @@ services:
       RUNNER_MEMORY_RUST: ${RUNNER_MEMORY_RUST:-512m}
       RUNNER_MEMORY_CPP: ${RUNNER_MEMORY_CPP:-384m}
       RUNNER_MEMORY_JAVA: ${RUNNER_MEMORY_JAVA:-640m}
+      RUNNER_IMAGE_PYTHON: codemori/sandbox-python:latest
+      RUNNER_IMAGE_PHP: codemori/sandbox-php:latest
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       # Accès au démon Docker pour créer les bacs à sable. Voir docs/securite.md.
@@ -84,6 +100,8 @@ services:
       sandbox-rust: { condition: service_completed_successfully }
       sandbox-cpp: { condition: service_completed_successfully }
       sandbox-java: { condition: service_completed_successfully }
+      sandbox-python: { condition: service_completed_successfully }
+      sandbox-php: { condition: service_completed_successfully }
 
   app:
     build:

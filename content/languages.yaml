@@ -6,6 +6,7 @@
   version: Rust stable (édition 2021)
   fileName: main.rs
   order: 1
+  icon: 🦀
 - id: cpp
   name: C++
   tagline: La puissance du bas niveau avec les abstractions du haut niveau.
@@ -14,6 +15,7 @@
   version: C++23 (GCC)
   fileName: main.cpp
   order: 2
+  icon: ⚙️
 - id: java
   name: Java
   tagline: Robuste, portable et omniprésent en entreprise.
@@ -22,3 +24,66 @@
   version: Java 21 LTS (OpenJDK)
   fileName: Main.java
   order: 3
+  icon: ☕
+- id: python
+  name: Python
+  tagline: Le langage le plus simple à lire, et l’un des plus utilisés au monde.
+  description: Langage polyvalent et lisible, star de la data, de l’IA, de l’automatisation et du web. Tu apprendras le Python moderne (3.12) — listes, dictionnaires, fonctions, classes, compréhensions et bibliothèque standard.
+  color: '#3776ab'
+  version: Python 3.12 (CPython)
+  fileName: main.py
+  order: 4
+  icon: 🐍
+- id: web
+  name: HTML & CSS
+  tagline: La structure et le style de toutes les pages web.
+  description: HTML décrit le contenu d’une page (titres, textes, images, liens, formulaires), CSS lui donne son apparence (couleurs, typographie, mise en page Flexbox et Grid, responsive). Ton code s’affiche en direct dans un aperçu.
+  color: '#e34f26'
+  version: HTML5 et CSS3
+  fileName: index.html
+  order: 5
+  category: web
+  runtime: web
+  icon: 🌐
+- id: php
+  name: PHP
+  tagline: Le moteur côté serveur d’une grande partie du web.
+  description: Langage côté serveur derrière WordPress, Laravel et des millions de sites. Tu apprendras le PHP moderne (8.3) — tableaux, fonctions, classes, types stricts et bonnes pratiques.
+  color: '#777bb4'
+  version: PHP 8.3
+  fileName: main.php
+  order: 6
+  icon: 🐘
+- id: opengl
+  name: OpenGL
+  tagline: Les notions de la 3D en temps réel, pas à pas.
+  description: Comprendre comment une carte graphique dessine une scène — pipeline graphique, sommets, shaders GLSL, textures, transformations et caméra. Une piste de notions, à part, avec des schémas animés.
+  color: '#5586a4'
+  version: OpenGL 4.6 / GLSL
+  fileName: notes.txt
+  order: 7
+  category: graphics
+  runtime: none
+  icon: 🔺
+- id: vulkan
+  name: Vulkan
+  tagline: L’API graphique moderne, explicite et bas niveau.
+  description: Les notions de Vulkan — instance, périphérique, files, swapchain, pipelines, command buffers et synchronisation. Une piste de notions, à part, pour comprendre ce que fait un moteur moderne.
+  color: '#a41e22'
+  version: Vulkan 1.3
+  fileName: notes.txt
+  order: 8
+  category: graphics
+  runtime: none
+  icon: 🌋
+- id: hardware
+  name: Hardware
+  tagline: Ce qui se passe vraiment dans un ordinateur.
+  description: Du transistor au processeur — binaire, portes logiques, CPU, mémoire, stockage, carte mère, GPU, périphériques et réseau. Des animations pour voir la logique de chaque composant.
+  color: '#10b981'
+  version: Les bases du matériel
+  fileName: notes.txt
+  order: 9
+  category: hardware
+  runtime: none
+  icon: 🔌

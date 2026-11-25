@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { Users, BookOpen, Trophy, Settings, AlertOctagon, Database, LayoutDashboard, FolderKanban, Plus, Save, Trash2, PlayCircle, ChevronLeft, Download, Upload, Crown } from 'lucide-react';
+import { Users, BookOpen, Trophy, Settings, AlertOctagon, Database, LayoutDashboard, FolderKanban, Plus, Save, Trash2, PlayCircle, ChevronLeft, Download, Upload, Crown, MessageSquareHeart } from 'lucide-react';
 import { api, ApiError, LANG_META, LEVEL_NAMES, TYPE_LABEL } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { useFeedback } from '../../lib/feedback';
 import { PageTitle, Loading, ErrorBox, Bars, Modal } from '../../components/ui';
 import Monetization from './Monetization';
+import FeedbackAdmin from './FeedbackAdmin';
 
 const TABS = [
   { to: '', label: 'Vue d’ensemble', icon: LayoutDashboard, end: true },
@@ -15,6 +16,7 @@ const TABS = [
   { to: 'projets', label: 'Projets', icon: FolderKanban },
   { to: 'recompenses', label: 'Récompenses', icon: Trophy },
   { to: 'monetisation', label: 'Monétisation', icon: Crown },
+  { to: 'avis', label: 'Avis', icon: MessageSquareHeart },
   { to: 'parametres', label: 'Paramètres', icon: Settings },
   { to: 'journaux', label: 'Journaux', icon: AlertOctagon },
   { to: 'contenu', label: 'Import / export', icon: Database },
@@ -40,6 +42,7 @@ export default function Admin() {
         <Route path="recompenses" element={<AchievementsTab />} />
         <Route path="parametres" element={<SettingsTab />} />
         <Route path="monetisation" element={<Monetization />} />
+        <Route path="avis" element={<FeedbackAdmin />} />
         <Route path="journaux" element={<Logs />} />
         <Route path="contenu" element={<ContentTab />} />
       </Routes>
@@ -128,7 +131,7 @@ function UsersTab() {
           <tbody>
             {data?.users.map((u) => (
               <tr key={u.id} className="border-t border-ink-100 dark:border-ink-800">
-                <td className="p-2"><div className="font-bold">{u.displayName} {u.disabled && <span className="chip bg-rose-100 text-rose-600">désactivé</span>}</div><div className="muted text-xs">{u.tag} · {u.email}</div><div className="mt-0.5 flex flex-wrap gap-1">{u.premiumUntil && new Date(u.premiumUntil) > new Date() && <span className="chip bg-amber-100 text-amber-700">👑 jusqu’au {new Date(u.premiumUntil).toLocaleDateString('fr-FR')}</span>}{u.twoFactor && <span className="chip bg-emerald-100 text-emerald-700">2FA</span>}</div></td>
+                <td className="p-2"><div className="font-bold">{u.displayName} {u.disabled && <span className="chip bg-rose-100 text-rose-600">désactivé</span>}</div><div className="muted text-xs">{u.tag} · {u.email}</div><div className="mt-0.5 flex flex-wrap gap-1">{u.premiumUntil && new Date(u.premiumUntil) > new Date() && <span className="chip bg-amber-100 text-amber-700">👑 jusqu’au {new Date(u.premiumUntil).toLocaleDateString('fr-FR')}</span>}{u.twoFactor && <span className="chip bg-emerald-100 text-emerald-700">2FA</span>}{!u.emailVerified && <span className="chip bg-amber-100 text-amber-700">e-mail non vérifié</span>}</div></td>
                 <td className="p-2">{u.role === 'ADMIN' ? '🛡️ Admin' : 'Apprenant'}</td>
                 <td className="p-2">{u.xp} (niv. {u.level})</td>
                 <td className="p-2 text-xs">{new Date(u.lastActiveAt).toLocaleString('fr-FR')}</td>
@@ -139,6 +142,7 @@ function UsersTab() {
                   <button className="btn-outline btn-sm" onClick={() => { const p = prompt('Nouveau mot de passe (8 caractères min.) :'); if (p) act(u.id, { password: p }, 'Mot de passe réinitialisé'); }}>Mot de passe</button>
                   <button className="btn-outline btn-sm" onClick={async () => { const d = prompt('Offrir combien de jours de Premium ? (0 = retirer le Premium)', '30'); if (d === null) return; try { await api(`/admin/users/${u.id}/premium`, { body: Number(d) > 0 ? { days: Number(d) } : { revoke: true } }); toast('Premium mis à jour', 'success'); reload(); } catch (e) { toast((e as ApiError).message, 'error'); } }}>👑 Premium</button>
                   <button className="btn-outline btn-sm" onClick={async () => { const lang = prompt('Langage (rust, cpp ou java) :'); if (!lang) return; const lvl = prompt('Niveau (1 à 5) :'); if (!lvl) return; try { await api(`/admin/users/${u.id}/skills/${lang.trim()}`, { method: 'PUT', body: { level: Number(lvl) } }); toast('Niveau modifié', 'success'); } catch (e) { toast((e as ApiError).message, 'error'); } }}>Niveau</button>
+                  {!u.emailVerified && <button className="btn-outline btn-sm" onClick={() => act(u.id, { verifyEmail: true }, 'Adresse marquée comme vérifiée')}>Valider l’e-mail</button>}
                   {u.twoFactor && <button className="btn-outline btn-sm" onClick={async () => { if (!confirm('Désactiver la double authentification de ce compte (téléphone perdu) ?')) return; await api(`/admin/users/${u.id}/reset-2fa`, { body: {} }); toast('2FA réinitialisée', 'success'); reload(); }}>Reset 2FA</button>}
                   <button className="btn-outline btn-sm" onClick={() => confirm('Réinitialiser toute la progression ?') && act(u.id, { resetProgress: true }, 'Progression réinitialisée')}>Reset</button>
                   <button className="btn-danger btn-sm" onClick={async () => { if (confirm(`Supprimer ${u.email} ?`)) { await api(`/admin/users/${u.id}`, { method: 'DELETE' }).catch((e) => toast(e.message, 'error')); reload(); } }}><Trash2 size={14} /></button>

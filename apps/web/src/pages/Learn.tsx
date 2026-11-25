@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useApi } from '../lib/hooks';
-import { LANG_META, LEVEL_NAMES } from '../lib/api';
+import { CATEGORY_LABEL, langMeta, LEVEL_NAMES } from '../lib/api';
 import { PageTitle, ProgressBar, Loading, ErrorBox, MascotSays } from '../components/ui';
 
 interface Lang {
   id: string;
+  category: string;
+  runtime: string;
   name: string;
   tagline: string;
   description: string;
@@ -42,6 +44,15 @@ function LangArt({ id }: { id: string }) {
         <circle cx="96" cy="18" r="6" fill="#22d3ee" />
       </svg>
     );
+  if (id !== 'java')
+    return (
+      <div className="relative flex h-24 items-center justify-center">
+        <motion.div className="absolute h-16 w-16 rounded-full bg-white/15" animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 3, repeat: Infinity }} />
+        <motion.span className="relative text-5xl drop-shadow" animate={{ y: [0, -4, 0], rotate: [0, -4, 4, 0] }} transition={{ duration: 4, repeat: Infinity }}>
+          {langMeta(id).icon}
+        </motion.span>
+      </div>
+    );
   return (
     <svg viewBox="0 0 120 80" className="h-24 w-full">
       <circle cx="60" cy="42" r="28" fill="#fff" opacity="0.15" />
@@ -58,19 +69,26 @@ export default function Learn() {
   if (error || !data) return <ErrorBox message={error ?? 'Erreur'} onRetry={reload} />;
   return (
     <div>
-      <PageTitle title="Apprendre" subtitle="Trois parcours indépendants, de débutant absolu à expert. Ton niveau est évalué séparément pour chaque langage." />
+      <PageTitle title="Apprendre" subtitle="Des parcours indépendants, de débutant absolu à expert. Ton niveau est suivi séparément pour chaque piste." />
       <MascotSays mood="explain" className="mb-6">
         Choisis un parcours ! Chaque chapitre contient un cours, des exercices interactifs, un mini-projet et un examen de validation.
       </MascotSays>
-      <div className="grid gap-5 md:grid-cols-3">
-        {data.map((l, i) => {
-          const m = LANG_META[l.id];
+      {(['code', 'web', 'graphics', 'hardware'] as const).map((cat) => {
+        const list = data.filter((l) => (l.category ?? 'code') === cat);
+        if (!list.length) return null;
+        return (
+          <section key={cat} className="mb-8">
+            <h2 className="text-xl font-black text-ink-900 dark:text-white">{CATEGORY_LABEL[cat].title}</h2>
+            <p className="muted mb-3 text-sm">{CATEGORY_LABEL[cat].subtitle}</p>
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {list.map((l, i) => {
+          const m = langMeta(l.id);
           return (
             <motion.div key={l.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="card flex flex-col overflow-hidden !p-0">
               <div className={`bg-gradient-to-br ${m.gradient} px-5 pb-2 pt-5 text-white`}>
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black">{l.name}</h2>
-                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">{l.version}</span>
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">{l.runtime === 'none' ? 'Notions' : l.version}</span>
                 </div>
                 <LangArt id={l.id} />
               </div>
@@ -99,6 +117,9 @@ export default function Learn() {
           );
         })}
       </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

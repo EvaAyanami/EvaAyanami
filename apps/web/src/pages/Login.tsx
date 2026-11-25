@@ -8,19 +8,21 @@ import Mascot from '../components/Mascot';
 import { Logo } from '../components/Layout';
 
 export default function Login({ mode }: { mode: 'login' | 'register' }) {
-  const { setUser, registration } = useAuth();
+  const { setUser, registration, providers } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
   const [form, setForm] = useState({ login: '', email: '', username: '', password: '', displayName: '' });
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => new URLSearchParams(window.location.search).get('erreur') ?? '');
   const [busy, setBusy] = useState(false);
-  const [ticket, setTicket] = useState<string | null>(null);
+  const params = new URLSearchParams(loc.search);
+  const [ticket, setTicket] = useState<string | null>(params.get('ticket'));
   const [otp, setOtp] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
 
-  function done(u: User, extra?: { trialDays?: number }) {
+  function done(u: User, extra?: { trialDays?: number; needsVerification?: boolean }) {
     setUser(u);
     if (extra?.trialDays) sessionStorage.setItem('cm-trial', String(extra.trialDays));
+    if (extra?.needsVerification) return nav('/verifier-email', { replace: true });
     nav(u.onboardingDone ? ((loc.state as { from?: string })?.from ?? '/') : '/bienvenue', { replace: true });
   }
 
@@ -53,13 +55,13 @@ export default function Login({ mode }: { mode: 'login' | 'register' }) {
         mode === 'login'
           ? await api<{ user?: User; twoFactor?: boolean; ticket?: string }>('/auth/login', { body: { login: form.login, password: form.password } })
           : await api<{ user: User; trialDays?: number }>('/auth/register', {
-              body: { email: form.email, username: form.username, password: form.password, displayName: form.displayName || undefined, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+              body: { email: form.email, username: form.username, password: form.password, displayName: form.displayName || undefined, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: localStorage.getItem('cm-locale') ?? navigator.language.slice(0, 2) },
             });
       if ('twoFactor' in r && r.twoFactor && r.ticket) {
         setTicket(r.ticket);
         return;
       }
-      done(r.user!, r as { trialDays?: number });
+      done(r.user!, r as { trialDays?: number; needsVerification?: boolean });
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -146,6 +148,26 @@ export default function Login({ mode }: { mode: 'login' | 'register' }) {
           <button className="btn-primary w-full py-3 text-lg" disabled={busy}>
             {mode === 'login' ? 'Se connecter' : 'Commencer l’aventure'}
           </button>
+          {(providers.google || providers.facebook) && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-ink-400"><span className="h-px flex-1 bg-ink-200 dark:bg-ink-700" /> ou <span className="h-px flex-1 bg-ink-200 dark:bg-ink-700" /></div>
+              {providers.google && (
+                <a href="/api/auth/oauth/google/start" className="btn-outline w-full">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z" /><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" /><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1z" /><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" /></svg>
+                  Continuer avec Google
+                </a>
+              )}
+              {providers.facebook && (
+                <a href="/api/auth/oauth/facebook/start" className="btn w-full bg-[#1877F2] text-white hover:bg-[#166fe0]">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white"><path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z" /></svg>
+                  Continuer avec Facebook
+                </a>
+              )}
+            </div>
+          )}
+          {mode === 'login' && (
+            <p className="text-center text-sm"><Link to="/mot-de-passe-oublie" className="font-bold text-ink-500 hover:text-brand-500">Mot de passe oublié ?</Link></p>
+          )}
           {mode === 'login' ? (
             registration && (
               <p className="text-center text-sm">

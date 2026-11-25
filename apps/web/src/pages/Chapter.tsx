@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import clsx from 'clsx';
 import { BookOpen, Dumbbell, Hammer, FileCheck2, ChevronLeft, ChevronRight, Check, Lock, Sparkles, Wand2, RotateCcw, Loader2, Clock } from 'lucide-react';
-import { api, ApiError, LANG_META } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { useFeedback } from '../lib/feedback';
 import { Loading, ErrorBox, MascotSays, ProgressBar, Modal } from '../components/ui';
@@ -67,7 +67,7 @@ export default function Chapter() {
   if (loading && !data) return <Loading />;
   if (error || !data) return <ErrorBox message={error ?? 'Erreur'} onRetry={reload} />;
   const { chapter } = data;
-  const lang = LANG_META[chapter.language];
+  const lang = langMeta(chapter.language);
   const nS = chapter.sections.length;
 
   const goSection = (i: number) => {

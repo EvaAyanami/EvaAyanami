@@ -9,6 +9,7 @@ import { config } from '../config.js';
 import { loadContent, type ExerciseDef, type TestCase } from '../lib/content.js';
 import { fillTemplate, normalizeOutput, outputMatches } from '../lib/grading.js';
 import { runCode } from '../lib/runner.js';
+import { runWebChecks } from '../lib/webcheck.js';
 
 const args = process.argv.slice(2);
 const langFilter = args.includes('--lang') ? args[args.indexOf('--lang') + 1] : undefined;
@@ -31,8 +32,29 @@ async function passes(lang: string, src: string, tests: TestCase[]) {
   return null;
 }
 
+const runtimeOf = new Map<string, string>();
+
+function webJob(id: string, html: string, checks: Parameters<typeof runWebChecks>[1], starter?: string) {
+  jobs.push({
+    id,
+    run: async () => {
+      const failed = runWebChecks(html, checks).filter((r) => !r.passed);
+      if (failed.length) return `solution HTML/CSS : vérifications échouées → ${failed.map((f) => f.message).join(' | ')}`;
+      if (starter !== undefined && runWebChecks(starter, checks).every((r) => r.passed)) return 'le code de départ passe déjà toutes les vérifications';
+      return null;
+    },
+  });
+}
+
 function addExercise(lang: string, ex: ExerciseDef) {
   if (textFilter && !ex.id.includes(textFilter)) return;
+  const rt = runtimeOf.get(lang) ?? 'runner';
+  if (rt === 'none') return;
+  if (rt === 'web') {
+    if (ex.type === 'code') webJob(ex.id, ex.solution, ex.checks, ex.starter);
+    if (ex.type === 'fill' && ex.checks?.length) webJob(ex.id, fillTemplate(ex.code, ex.blanks.map((b) => b[0])), ex.checks);
+    return;
+  }
   switch (ex.type) {
     case 'code':
       jobs.push({ id: ex.id, run: () => passes(lang, ex.solution, ex.tests) });
@@ -66,6 +88,7 @@ function addExercise(lang: string, ex: ExerciseDef) {
 }
 
 const bundle = await loadContent(config.contentDir);
+for (const l of bundle.languages) runtimeOf.set(l.id, l.runtime);
 for (const lvl of bundle.levels) {
   if (langFilter && lvl.language !== langFilter) continue;
   for (const ch of lvl.chapters) for (const ex of [...ch.exercises, ch.project, ...ch.exam.questions]) addExercise(lvl.language, ex);

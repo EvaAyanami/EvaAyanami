@@ -43,5 +43,21 @@ export const config = {
     adsenseSlotReward: env('ADSENSE_SLOT_REWARD'), // bloc affiché pendant la pub récompensée
     adsenseSlotBanner: env('ADSENSE_SLOT_BANNER'), // bannière discrète pour les comptes gratuits
   },
+  /** Envoi d'e-mails (vérification d'adresse, mot de passe oublié). */
+  smtp: {
+    host: env('SMTP_HOST'),
+    port: Number(env('SMTP_PORT', '587')),
+    secure: env('SMTP_SECURE', 'false') === 'true',
+    user: env('SMTP_USER'),
+    pass: env('SMTP_PASS'),
+    from: env('SMTP_FROM', 'Codemori <no-reply@codemori.local>'),
+  },
+  /** Vérification de l'adresse e-mail obligatoire à l'inscription (nécessite SMTP). */
+  requireEmailVerification: env('REQUIRE_EMAIL_VERIFICATION', 'true') === 'true',
+  /** Connexion avec Google / Facebook (gratuit ; nécessite une adresse publique en HTTPS). */
+  oauth: {
+    google: { clientId: env('GOOGLE_CLIENT_ID'), clientSecret: env('GOOGLE_CLIENT_SECRET') },
+    facebook: { clientId: env('FACEBOOK_CLIENT_ID'), clientSecret: env('FACEBOOK_CLIENT_SECRET') },
+  },
   runLimitPerMinute: Number(env('RUN_LIMIT_PER_MINUTE', '20')),
 };

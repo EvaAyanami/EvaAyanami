@@ -24,7 +24,7 @@ interface Props {
   minimal?: boolean;
 }
 
-const MONACO_LANG: Record<string, string> = { rust: 'rust', cpp: 'cpp', java: 'java' };
+const MONACO_LANG: Record<string, string> = { rust: 'rust', cpp: 'cpp', java: 'java', python: 'python', php: 'php', web: 'html', opengl: 'cpp', vulkan: 'cpp' };
 
 export default function CodeEditor({ value, onChange, language, readOnly, height = 360, diagnostics, highlightLines, onLineClick, onRun, minimal }: Props) {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);

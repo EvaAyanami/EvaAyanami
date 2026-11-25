@@ -8,6 +8,7 @@ import { levelFromXp } from '../lib/levels.js';
 import { addDays } from '../lib/srs.js';
 import { hasPremium, premiumBadge, premiumHistory } from '../lib/plan.js';
 import { effectiveAvatar } from '../lib/avatar.js';
+import { FLAME_MILESTONES, flameState } from '../lib/flames.js';
 import { parse } from './auth.js';
 
 const MAX_FRIENDS = 200;
@@ -67,7 +68,7 @@ export default async function friendRoutes(app: FastifyInstance) {
     const friends = accepted
       .map((r) => {
         const o = r.requesterId === me.id ? r.addressee : r.requester;
-        return { friendshipId: r.id, since: r.acceptedAt, weeklyXp: week.get(o.id) ?? 0, ...card(o, former) };
+        return { friendshipId: r.id, since: r.acceptedAt, weeklyXp: week.get(o.id) ?? 0, flame: flameState(r, r.requesterId === me.id), ...card(o, former) };
       })
       .sort((a, b) => Number(b.online) - Number(a.online) || b.weeklyXp - a.weeklyXp);
     const ranking = [...friends.map((f) => ({ id: f.id, tag: f.tag, displayName: f.displayName, weeklyXp: f.weeklyXp, me: false, badge: f.badge })), { id: me.id, tag: `${me.username}#${me.discriminator}`, displayName: me.displayName, weeklyXp: week.get(me.id) ?? 0, me: true, badge: premiumBadge(me, former.has(me.id)) }].sort(
@@ -75,6 +76,7 @@ export default async function friendRoutes(app: FastifyInstance) {
     );
     return {
       me: { tag: `${me.username}#${me.discriminator}` },
+      milestones: FLAME_MILESTONES,
       friends,
       ranking,
       incoming: rows.filter((r) => r.status === 'PENDING' && r.addresseeId === me.id).map((r) => ({ friendshipId: r.id, createdAt: r.createdAt, ...card(r.requester, former) })),

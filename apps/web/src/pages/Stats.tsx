@@ -1,5 +1,5 @@
 import { useApi } from '../lib/hooks';
-import { formatDuration, LANG_META, TYPE_LABEL } from '../lib/api';
+import { formatDuration, LANG_META, langMeta, TYPE_LABEL } from '../lib/api';
 import { PageTitle, Loading, ErrorBox, Bars, ProgressBar, LangBadge } from '../components/ui';
 import { Link } from 'react-router-dom';
 
@@ -58,7 +58,7 @@ export default function Stats() {
           {data.byLanguage.length === 0 && <p className="muted text-sm">Pas encore de données.</p>}
           {data.byLanguage.map((l) => (
             <div key={l.language} className="mb-3">
-              <div className="flex justify-between text-sm font-bold"><span>{LANG_META[l.language]?.icon} {LANG_META[l.language]?.name}</span><span>{l.solved} réussis · {Math.round(l.successRate * 100)} %</span></div>
+              <div className="flex justify-between text-sm font-bold"><span>{langMeta(l.language)?.icon} {langMeta(l.language)?.name}</span><span>{l.solved} réussis · {Math.round(l.successRate * 100)} %</span></div>
               <ProgressBar value={l.successRate} className="mt-1 h-2" />
             </div>
           ))}

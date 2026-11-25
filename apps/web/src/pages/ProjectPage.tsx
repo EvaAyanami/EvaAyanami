@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { Check, ChevronLeft, Target, ShieldAlert, ListChecks, Lock } from 'lucide-react';
 import { useApi } from '../lib/hooks';
-import { LANG_META } from '../lib/api';
+import { LANG_META, langMeta } from '../lib/api';
 import { Loading, ErrorBox, ProgressBar } from '../components/ui';
 import Markdown from '../components/Markdown';
 import Exercise, { type PublicExercise, type GradeResult } from '../components/Exercise';
@@ -59,7 +59,7 @@ export default function ProjectPage() {
         <div className="flex gap-1 rounded-2xl bg-ink-100 p-1 dark:bg-ink-800">
           {data.languages.map((l) => (
             <button key={l} onClick={() => setSp({ language: l })} className={clsx('rounded-xl px-3 py-1.5 text-sm font-extrabold', l === data.language ? 'bg-white shadow dark:bg-ink-900' : 'text-ink-500')}>
-              {LANG_META[l].icon} {LANG_META[l].name}
+              {langMeta(l).icon} {langMeta(l).name}
             </button>
           ))}
         </div>

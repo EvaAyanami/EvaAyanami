@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useId } from 'react';
 
 export interface AvatarData {
+  gender: string;
   skin: string;
   hairStyle: string;
   hairColor: string;
@@ -21,7 +22,7 @@ export interface AvatarData {
 }
 
 export const DEFAULT_AVATAR: AvatarData = {
-  skin: 'clair', hairStyle: 'court', hairColor: 'brun', eyes: 'rond', eyeColor: 'noisette', mouth: 'sourire',
+  gender: 'neutre', skin: 'clair', hairStyle: 'court', hairColor: 'brun', eyes: 'rond', eyeColor: 'noisette', mouth: 'sourire',
   outfit: 'uniforme', outfitColor: 'marine', accessory: 'barrette', background: 'ciel', blush: true,
 };
 
@@ -146,7 +147,15 @@ export default function Avatar({ avatar, size = 48, variant = 'portrait', mood =
               <rect x="106" y="196" width="14" height="26" rx="6" fill={skin} />
               <path d="M76 216h22v8a4 4 0 0 1-4 4H80a4 4 0 0 1-4-4z" fill="#f1f5ff" stroke="#c7d2f0" />
               <path d="M102 216h22v8a4 4 0 0 1-4 4h-14a4 4 0 0 1-4-4z" fill="#f1f5ff" stroke="#c7d2f0" />
-              <path d="M70 186 L130 186 L136 204 L64 204 Z" fill={o2} />
+              {a.gender === 'codeuse' ? (
+                <path d="M70 186 L130 186 L138 206 L62 206 Z" fill={o2} />
+              ) : a.gender === 'codeur' ? (
+                <g fill={o2}>
+                  <path d="M72 186 H128 V206 H104 L100 194 L96 206 H72 Z" />
+                </g>
+              ) : (
+                <path d="M71 186 H129 L132 202 H68 Z" fill={o2} />
+              )}
             </>
           )}
           <path d="M66 152 Q100 140 134 152 L138 190 Q100 198 62 190 Z" fill={`url(#${id('outfit')})`} />
@@ -167,7 +176,7 @@ export default function Avatar({ avatar, size = 48, variant = 'portrait', mood =
                 <ellipse cx="132" cy="120" rx="9" ry="5" fill="#ff8fa8" opacity="0.45" />
               </>
             )}
-            <Eyes shape={a.eyes} mood={mood} iris={`url(#${id('iris')})`} />
+            <Eyes shape={a.eyes} mood={mood} iris={`url(#${id('iris')})`} lashes={a.gender === 'codeuse'} />
             {mood === 'sad' && (
               <g stroke={hairDark} strokeWidth="3" strokeLinecap="round">
                 <path d="M66 78 Q74 74 84 76" transform="rotate(-10 75 76)" />
@@ -323,7 +332,7 @@ function FrontHair({ style, fill, dark }: { style: string; fill: string; dark: s
   }
 }
 
-function Eyes({ shape, mood, iris }: { shape: string; mood: AvatarMood; iris: string }) {
+function Eyes({ shape, mood, iris, lashes }: { shape: string; mood: AvatarMood; iris: string; lashes?: boolean }) {
   if (mood === 'happy' || mood === 'celebrate' || shape === 'rieur') {
     return (
       <g stroke="#2a1b3d" strokeWidth="4" strokeLinecap="round" fill="none">
@@ -342,6 +351,14 @@ function Eyes({ shape, mood, iris }: { shape: string; mood: AvatarMood; iris: st
       <circle cx={cx - 3.5} cy={98} r="3.4" fill="#fff" />
       <circle cx={cx + 3.5} cy={108} r="1.7" fill="#fff" opacity="0.85" />
       <path d={`M${cx - 13} ${102 - ry + 1} Q${cx} ${102 - ry - 5} ${cx + 13} ${102 - ry + 2}`} stroke="#2a1b3d" strokeWidth="3.2" fill="none" strokeLinecap="round" />
+      {lashes && (
+        <path
+          d={cx < 100 ? `M${cx - 12} ${102 - ry + 2} l-5 -3 M${cx - 9} ${102 - ry - 1} l-3 -4` : `M${cx + 12} ${102 - ry + 3} l5 -3 M${cx + 9} ${102 - ry} l3 -4`}
+          stroke="#2a1b3d"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+        />
+      )}
     </g>
   );
   return <g>{[eye(77), eye(123)]}</g>;

@@ -81,6 +81,15 @@ model User {
   avatar           Json?
   bio              String?
   weeklyWins       WeeklyWinner[]
+  /// Langue de l'interface : fr, en, de, es
+  locale           String              @default("fr")
+  emailVerified    Boolean             @default(false)
+  emailTokens      EmailToken[]
+  oauthAccounts    OAuthAccount[]
+  duelsCreated     QuizDuel[]          @relation("DuelCreator")
+  duelsReceived    QuizDuel[]          @relation("DuelOpponent")
+  feedbacks        Feedback[]
+  feedbackVotes    FeedbackVote[]
   friendsSent      Friendship[]        @relation("FriendRequester")
   friendsReceived  Friendship[]        @relation("FriendAddressee")
 }
@@ -108,6 +117,11 @@ model Language {
   fileName    String
   order       Int       @default(0)
   enabled     Boolean   @default(true)
+  /// code | web | graphics | hardware
+  category    String    @default("code")
+  /// runner (compilé/exécuté dans le bac à sable) | web (HTML/CSS analysé) | none (notions)
+  runtime     String    @default("runner")
+  icon        String    @default("💻")
   chapters    Chapter[]
 }
 
@@ -503,6 +517,13 @@ model Friendship {
   status      FriendStatus @default(PENDING)
   createdAt   DateTime     @default(now())
   acceptedAt  DateTime?
+  /// Flamme d'amitié : jours consécutifs où LES DEUX amis ont appris
+  flame       Int          @default(0)
+  flameBest   Int          @default(0)
+  flameDate   String?
+  aDate       String?
+  bDate       String?
+  milestones  Int[]        @default([])
 
   @@unique([requesterId, addresseeId])
   @@index([addresseeId])
@@ -516,4 +537,83 @@ model WeeklyWinner {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   xp        Int
   createdAt DateTime @default(now())
+}
+
+/// Jetons envoyés par e-mail (vérification de l'adresse, mot de passe oublié).
+model EmailToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Comptes liés (connexion avec Google, Facebook…).
+model OAuthAccount {
+  id         String   @id @default(cuid())
+  provider   String
+  providerId String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+/// Mini-jeu : duel de quiz (culture code et hardware) entre amis.
+model QuizDuel {
+  id              String    @id @default(cuid())
+  creatorId       String
+  creator         User      @relation("DuelCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  opponentId      String?
+  opponent        User?     @relation("DuelOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  theme           String    @default("mix")
+  questions       String[]
+  creatorAnswers  Json?
+  opponentAnswers Json?
+  creatorScore    Int?
+  opponentScore   Int?
+  creatorTimeMs   Int?
+  opponentTimeMs  Int?
+  status          String    @default("waiting")
+  createdAt       DateTime  @default(now())
+  finishedAt      DateTime?
+
+  @@index([creatorId])
+  @@index([opponentId])
+}
+
+/// Avis envoyés aux développeurs : bugs, idées, améliorations.
+model Feedback {
+  id         String         @id @default(cuid())
+  userId     String?
+  user       User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  kind       String
+  title      String
+  body       String
+  page       String?
+  status     String         @default("new")
+  adminReply String?
+  votes      Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  voters     FeedbackVote[]
+
+  @@index([status, createdAt])
+}
+
+model FeedbackVote {
+  id         String   @id @default(cuid())
+  feedbackId String
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([feedbackId, userId])
 }

@@ -63,6 +63,29 @@ export const LANGUAGES: Record<string, LanguageSpec> = {
     compileTimeout: 40,
     runTimeout: 8,
   },
+  python: {
+    id: 'python',
+    label: 'Python',
+    fileName: 'main.py',
+    image: env('RUNNER_IMAGE_PYTHON', 'codemori/sandbox-python:latest'),
+    // Vérification de la syntaxe (équivalent d'une « compilation ») puis exécution.
+    compile: 'python3 -m py_compile main.py',
+    run: 'python3 -X utf8 -B main.py',
+    memory: env('RUNNER_MEMORY_PYTHON', '256m'),
+    compileTimeout: 15,
+    runTimeout: 6,
+  },
+  php: {
+    id: 'php',
+    label: 'PHP',
+    fileName: 'main.php',
+    image: env('RUNNER_IMAGE_PHP', 'codemori/sandbox-php:latest'),
+    compile: 'php -d display_errors=stderr -l main.php >/dev/null',
+    run: 'php -d display_errors=stderr -d error_reporting=E_ALL main.php',
+    memory: env('RUNNER_MEMORY_PHP', '256m'),
+    compileTimeout: 15,
+    runTimeout: 6,
+  },
 };
 
 export function getLanguage(id: string): LanguageSpec | undefined {

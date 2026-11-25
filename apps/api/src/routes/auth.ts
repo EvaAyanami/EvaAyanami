@@ -6,6 +6,7 @@ import { createSession, destroySession, hashPassword, publicUser, requireUser, v
 import { HttpError, badRequest } from '../lib/http.js';
 import { getSettings } from '../lib/settings.js';
 import { extendPremium } from '../lib/plan.js';
+import { consumeToken, sendPasswordReset, sendVerification, smtpConfigured, verificationRequired } from '../lib/mail.js';
 import { createHash, randomBytes } from 'node:crypto';
 import QRCode from 'qrcode';
 import { decryptSecret, encryptSecret, hashRecovery, newRecoveryCodes, newTotpSecret, otpauthUri, verifyTotp } from '../lib/totp.js';
@@ -42,6 +43,7 @@ const registerSchema = z.object({
   displayName: z.string().min(1).max(40).optional(),
   password: z.string().min(8, 'Mot de passe trop court (8 caractères minimum)').max(200),
   timezone: z.string().max(60).optional(),
+  locale: z.string().max(5).optional(),
 });
 
 export function parse<S extends z.ZodTypeAny>(schema: S, data: unknown): z.output<S> {
@@ -71,13 +73,16 @@ export default async function authRoutes(app: FastifyInstance) {
         role: isFirst ? 'ADMIN' : 'USER',
         timezone: body.timezone || 'Europe/Paris',
         dailyGoalXp: settings.defaultDailyGoal,
+        emailVerified: isFirst || !verificationRequired(),
+        locale: ['fr', 'en', 'de', 'es'].includes(String(body.locale)) ? String(body.locale) : 'fr',
       },
     });
+    if (!user.emailVerified) await sendVerification(user).catch((e) => req.log.error(e, 'envoi du mail de vérification'));
     // Essai Premium de bienvenue : on découvre tout avant de choisir.
     let fresh = user;
     if (settings.premiumEnabled && settings.trialDays > 0 && user.role !== 'ADMIN') fresh = await extendPremium(user.id, settings.trialDays, 'trial');
     await createSession(fresh, req, reply);
-    return { user: publicUser(fresh), trialDays: fresh === user ? 0 : settings.trialDays };
+    return { user: publicUser(fresh), trialDays: fresh === user ? 0 : settings.trialDays, needsVerification: !fresh.emailVerified };
   });
 
   app.post('/auth/login', { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } }, async (req, reply) => {
@@ -186,13 +191,67 @@ export default async function authRoutes(app: FastifyInstance) {
     return { recoveryCodes: codes };
   });
 
+  /* ---------- Vérification de l'adresse e-mail ---------- */
+  app.post('/auth/verify-email', { config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (req, reply) => {
+    const body = parse(z.object({ token: z.string().min(20).max(200) }), req.body);
+    const u = await consumeToken(body.token, 'verify');
+    if (!u) throw badRequest('Lien invalide ou expiré. Demande un nouvel e-mail depuis la page de connexion.');
+    const fresh = await prisma.user.update({ where: { id: u.id }, data: { emailVerified: true } });
+    // Connexion directe depuis le lien (sauf si la double authentification est activée)
+    if (!req.user && !fresh.totpEnabled && !fresh.disabled) await createSession(fresh, req, reply);
+    return { ok: true, user: req.user || !fresh.totpEnabled ? publicUser(fresh) : null };
+  });
+
+  app.post('/auth/verify-email/resend', { config: { rateLimit: { max: 3, timeWindow: '10 minutes' } } }, async (req) => {
+    const u = requireUser(req);
+    if (u.emailVerified) return { ok: true, already: true };
+    const sent = await sendVerification(u);
+    return { ok: true, sent };
+  });
+
+  /** Changer l'adresse e-mail avant vérification (faute de frappe à l'inscription). */
+  app.post('/auth/email', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req) => {
+    const u = requireUser(req);
+    const body = parse(z.object({ email: z.string().email('Adresse e-mail invalide').max(200), password: z.string().min(1) }), req.body);
+    if (!(await verifyPassword(u.passwordHash, body.password))) throw badRequest('Mot de passe incorrect');
+    const email = body.email.toLowerCase();
+    if (await prisma.user.findFirst({ where: { email, NOT: { id: u.id } } })) throw badRequest('Cette adresse e-mail est déjà utilisée');
+    const fresh = await prisma.user.update({ where: { id: u.id }, data: { email, emailVerified: !verificationRequired() } });
+    if (!fresh.emailVerified) await sendVerification(fresh);
+    return { user: publicUser(fresh) };
+  });
+
+  /* ---------- Mot de passe oublié ---------- */
+  app.post('/auth/forgot', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (req) => {
+    const body = parse(z.object({ email: z.string().email('Adresse e-mail invalide').max(200) }), req.body);
+    const u = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
+    if (u && !u.disabled) await sendPasswordReset(u).catch((e) => req.log.error(e, 'envoi du mail de réinitialisation'));
+    // Même réponse que l'adresse existe ou non (pas d'énumération des comptes).
+    return { ok: true, smtp: smtpConfigured() };
+  });
+
+  app.post('/auth/reset', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (req) => {
+    const body = parse(z.object({ token: z.string().min(20).max(200), password: z.string().min(8, 'Mot de passe trop court (8 caractères minimum)').max(200) }), req.body);
+    const u = await consumeToken(body.token, 'reset');
+    if (!u) throw badRequest('Lien invalide ou expiré. Refais une demande.');
+    await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(body.password), failedLogins: 0, lockedUntil: null, emailVerified: true } });
+    await prisma.session.deleteMany({ where: { userId: u.id } });
+    return { ok: true };
+  });
+
   app.post('/auth/logout', async (req, reply) => {
     await destroySession(req, reply);
     return { ok: true };
   });
 
   app.get('/auth/me', async (req) => {
-    return { user: req.user ? publicUser(req.user) : null, appName: config.appName, registration: config.allowRegistration };
+    return {
+      user: req.user ? publicUser(req.user) : null,
+      appName: config.appName,
+      registration: config.allowRegistration,
+      providers: { google: !!config.oauth.google.clientId, facebook: !!config.oauth.facebook.clientId },
+      emailVerification: verificationRequired(),
+    };
   });
 
   app.post('/auth/password', async (req) => {

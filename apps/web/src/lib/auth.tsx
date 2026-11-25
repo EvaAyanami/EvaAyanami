@@ -13,6 +13,8 @@ export interface User {
   formerPremium: boolean;
   avatar: import('../components/Avatar').AvatarData;
   hasAvatar: boolean;
+  locale: 'fr' | 'en' | 'de' | 'es';
+  emailVerified: boolean;
   displayName: string;
   role: 'USER' | 'ADMIN';
   theme: 'light' | 'dark' | 'system';
@@ -29,6 +31,8 @@ interface AuthCtx {
   user: User | null;
   loading: boolean;
   registration: boolean;
+  providers: { google: boolean; facebook: boolean };
+  emailVerification: boolean;
   refresh: () => Promise<void>;
   setUser: (u: User | null) => void;
   logout: () => Promise<void>;
@@ -40,11 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [registration, setRegistration] = useState(true);
+  const [providers, setProviders] = useState({ google: false, facebook: false });
+  const [emailVerification, setEmailVerification] = useState(false);
   const refresh = useCallback(async () => {
     try {
-      const r = await api<{ user: User | null; registration: boolean }>('/auth/me');
+      const r = await api<{ user: User | null; registration: boolean; providers?: { google: boolean; facebook: boolean }; emailVerification?: boolean }>('/auth/me');
       setUser(r.user);
       setRegistration(r.registration);
+      if (r.providers) setProviders(r.providers);
+      setEmailVerification(!!r.emailVerification);
     } catch {
       setUser(null);
     } finally {
@@ -58,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api('/auth/logout', { method: 'POST', body: {} });
     setUser(null);
   };
-  return <Ctx.Provider value={{ user, loading, registration, refresh, setUser, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, registration, providers, emailVerification, refresh, setUser, logout }}>{children}</Ctx.Provider>;
 }
 
 export const useAuth = () => useContext(Ctx);

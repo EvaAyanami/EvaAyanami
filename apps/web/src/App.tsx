@@ -5,6 +5,8 @@ import { Loading } from './components/ui';
 import { useAuth } from './lib/auth';
 import { applyTheme } from './lib/theme';
 import Login from './pages/Login';
+import { VerifyEmail, ForgotPassword, ResetPassword } from './pages/AccountPages';
+import { useI18n } from './lib/i18n';
 
 const Home = lazy(() => import('./pages/Home'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
@@ -28,12 +30,17 @@ const Friends = lazy(() => import('./pages/Friends'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const AvatarEditor = lazy(() => import('./pages/AvatarEditor'));
 const BestCoder = lazy(() => import('./pages/BestCoder'));
+const Faq = lazy(() => import('./pages/Faq'));
+const Community = lazy(() => import('./pages/Community'));
+const QuizPlay = lazy(() => import('./pages/QuizPlay'));
+const FeedbackPage = lazy(() => import('./pages/Feedback'));
 
 function Protected({ children, admin }: { children: JSX.Element; admin?: boolean }) {
-  const { user, loading } = useAuth();
+  const { user, loading, emailVerification } = useAuth();
   const loc = useLocation();
   if (loading) return <Loading />;
   if (!user) return <Navigate to="/connexion" state={{ from: loc.pathname }} replace />;
+  if (emailVerification && !user.emailVerified) return <Navigate to="/verifier-email" replace />;
   if (!user.onboardingDone && loc.pathname !== '/bienvenue') return <Navigate to="/bienvenue" replace />;
   if (admin && user.role !== 'ADMIN') return <Navigate to="/" replace />;
   return children;
@@ -41,9 +48,14 @@ function Protected({ children, admin }: { children: JSX.Element; admin?: boolean
 
 export default function App() {
   const { user, loading } = useAuth();
+  const { locale, setLocale } = useI18n();
   useEffect(() => {
     if (user) applyTheme(user.theme);
   }, [user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  // La langue choisie sur le compte suit l'utilisateur d'un appareil à l'autre.
+  useEffect(() => {
+    if (user?.locale && user.locale !== locale) setLocale(user.locale);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <Loading text="Démarrage de Codemori…" />;
   return (
@@ -51,6 +63,9 @@ export default function App() {
       <Routes>
         <Route path="/connexion" element={user ? <Navigate to="/" replace /> : <Login mode="login" />} />
         <Route path="/inscription" element={user ? <Navigate to="/" replace /> : <Login mode="register" />} />
+        <Route path="/verifier-email" element={<VerifyEmail />} />
+        <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
+        <Route path="/nouveau-mot-de-passe" element={<ResetPassword />} />
         <Route path="/bienvenue" element={<Protected><Onboarding /></Protected>} />
         <Route element={<Protected><Layout /></Protected>}>
           <Route index element={<Home />} />
@@ -75,6 +90,10 @@ export default function App() {
           <Route path="u/:tag" element={<UserProfile />} />
           <Route path="avatar" element={<AvatarEditor />} />
           <Route path="meilleur-codeur" element={<BestCoder />} />
+          <Route path="faq" element={<Faq />} />
+          <Route path="communaute" element={<Community />} />
+          <Route path="blind-test/:id" element={<QuizPlay />} />
+          <Route path="avis" element={<FeedbackPage />} />
           <Route path="admin/*" element={<Protected admin><Admin /></Protected>} />
           <Route path="*" element={<NotFound />} />
         </Route>

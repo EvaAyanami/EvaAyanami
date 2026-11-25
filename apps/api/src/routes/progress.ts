@@ -11,7 +11,7 @@ import { levelFromXp, localDate, weekKey, LEVEL_NAMES } from '../lib/levels.js';
 import { chapterStatuses, nextLesson } from '../lib/progress.js';
 import { addDays } from '../lib/srs.js';
 import { parse } from './auth.js';
-import { LANGS } from './exercises.js';
+
 
 export async function weakPoints(userId: string, limit = 6) {
   const rows = await prisma.$queryRaw<{ concept: string; language: string; total: bigint; ok: bigint }[]>`
@@ -164,7 +164,7 @@ export default async function progressRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { language?: string } }>('/review/queue', async (req) => {
     const user = requireUser(req);
     const settings = await getSettings();
-    const language = req.query.language && LANGS.includes(req.query.language) ? req.query.language : undefined;
+    const language = req.query.language && /^[a-z]{2,12}$/.test(req.query.language) ? req.query.language : undefined;
     const size = settings.reviewSessionSize;
     const now = new Date();
     let items = await prisma.reviewItem.findMany({

@@ -12,8 +12,8 @@ import YAML from 'yaml';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
+import { clearLanguageCache } from './languages.js';
 
-const LANGS = ['rust', 'cpp', 'java'] as const;
 
 /** Chaîne tolérante : YAML transforme `42` ou `true` en nombre/booléen. */
 const str = z.preprocess((v) => (typeof v === 'number' || typeof v === 'boolean' ? String(v) : v), z.string());
@@ -28,6 +28,20 @@ const testCase = z.object({
 export type TestCase = z.infer<typeof testCase>;
 
 const rule = z.object({ pattern: z.string(), message: z.string(), flags: z.string().optional() });
+
+/** Vérifications d'un document HTML/CSS (piste Web) : analyse du DOM et des styles, sans exécution. */
+const webCheck = z.object({
+  type: z.enum(['exists', 'absent', 'count', 'text', 'attr', 'css', 'doctype', 'lang']),
+  selector: z.string().optional(),
+  min: z.number().int().optional(),
+  max: z.number().int().optional(),
+  contains: str.optional(),
+  name: z.string().optional(),
+  value: str.optional(),
+  property: z.string().optional(),
+  message: z.string(),
+});
+export type WebCheck = z.infer<typeof webCheck>;
 export type Rule = z.infer<typeof rule>;
 
 const base = {
@@ -54,6 +68,7 @@ const fill = z.object({
   code: z.string().refine((c) => c.includes('{{?}}'), 'le code doit contenir au moins un trou {{?}}'),
   blanks: z.array(z.array(str).min(1)),
   tests: z.array(testCase).optional(),
+  checks: z.array(webCheck).optional(),
 });
 const order = z.object({
   ...base,
@@ -83,7 +98,8 @@ const code = z.object({
   type: z.literal('code'),
   starter: z.string(),
   solution: z.string(),
-  tests: z.array(testCase).min(1),
+  tests: z.array(testCase).default([]),
+  checks: z.array(webCheck).default([]),
   require: z.array(rule).default([]),
   forbid: z.array(rule).default([]),
 });
@@ -101,13 +117,14 @@ const chapterSchema = z.object({
   concepts: z.array(z.string()).default([]),
   sections: z.array(section).min(1),
   exercises: z.array(exerciseSchema).min(1),
-  project: code.extend({ title: z.string() }),
+  /** Mini-projet : un exercice de code (pistes de programmation) ou de tout autre type (pistes de notions). */
+  project: exerciseSchema.and(z.object({ title: z.string() })),
   exam: z.object({ pass: z.number().int().default(70), questions: z.array(exerciseSchema).min(3) }),
 });
 export type ChapterDef = z.infer<typeof chapterSchema>;
 
 const levelFileSchema = z.object({
-  language: z.enum(LANGS),
+  language: z.string(),
   level: z.number().int().min(1).max(5),
   chapters: z.array(chapterSchema),
 });
@@ -133,7 +150,7 @@ const projectSchema = z.object({
   description: z.string(),
   objectives: z.array(z.string()),
   constraints: z.array(z.string()),
-  languages: z.array(z.enum(LANGS)),
+  languages: z.array(z.enum(['rust', 'cpp', 'java'])),
   steps: z.array(projectStep).min(1),
 });
 export type ProjectDef = z.infer<typeof projectSchema>;
@@ -147,10 +164,13 @@ const languageSchema = z.object({
   version: z.string(),
   fileName: z.string(),
   order: z.number().int(),
+  category: z.enum(['code', 'web', 'graphics', 'hardware']).default('code'),
+  runtime: z.enum(['runner', 'web', 'none']).default('runner'),
+  icon: z.string().default('💻'),
 });
 
 const placementSchema = z.object({
-  language: z.enum(LANGS),
+  language: z.string(),
   questions: z.array(exerciseSchema.and(z.object({ level: z.number().int().min(1).max(5) }))),
 });
 
@@ -217,6 +237,7 @@ export async function loadContent(dir: string): Promise<ContentBundle> {
     };
     if (rel === 'languages.yaml') bundle.languages = parse(z.array(languageSchema), data) ?? [];
     else if (rel === 'achievements.yaml') bundle.achievements = parse(z.array(achievementSchema), data) ?? [];
+    else if (rel === 'quiz.yaml') continue; // banque du mini-jeu, chargée par lib/quiz.ts
     else if (rel === 'glossary.yaml') bundle.glossary = (data as GlossaryEntry[]) ?? [];
     else if (rel.startsWith('placement')) {
       const p = parse(placementSchema, data);
@@ -249,6 +270,24 @@ export async function loadContent(dir: string): Promise<ContentBundle> {
       }
     }
   }
+  const runtimes = new Map(bundle.languages.map((l) => [l.id, l.runtime]));
+  for (const lvl of bundle.levels) {
+    const rt = runtimes.get(lvl.language);
+    if (!rt) {
+      errors.push(`${lvl.file}: langage inconnu « ${lvl.language} » (absent de languages.yaml)`);
+      continue;
+    }
+    for (const ch of lvl.chapters)
+      for (const ex of [...ch.exercises, ch.project, ...ch.exam.questions]) {
+        if (ex.type === 'code' || ex.type === 'bugfix') {
+          if (rt === 'none') errors.push(`${lvl.file}: ${ex.id} — pas d'exercice de code dans une piste de notions`);
+          if (rt === 'runner' && !ex.tests.length) errors.push(`${lvl.file}: ${ex.id} — tests manquants`);
+          if (rt === 'web' && ex.type === 'code' && !ex.checks.length) errors.push(`${lvl.file}: ${ex.id} — vérifications (checks) manquantes`);
+          if (rt === 'web' && ex.type === 'bugfix') errors.push(`${lvl.file}: ${ex.id} — « bugfix » non disponible pour le web`);
+        }
+        if (ex.type === 'predict' && rt === 'web') errors.push(`${lvl.file}: ${ex.id} — « predict » non disponible pour le web`);
+      }
+  }
   for (const p of bundle.projects) for (const s of p.steps) check(s.id, p.file);
   for (const p of bundle.placement) for (const q of p.questions) check(q.id, `placement-${p.language}`);
   if (errors.length) throw new Error(`Contenu invalide :\n${errors.join('\n')}`);
@@ -271,7 +310,7 @@ export function splitExercise(ex: ExerciseDef): { content: Prisma.InputJsonValue
     case 'fill':
       return {
         content: { code: ex.code, blankCount: ex.blanks.length, compiled: !!ex.tests?.length },
-        solution: { blanks: ex.blanks, tests: ex.tests ?? [], explanation: ex.explanation },
+        solution: { blanks: ex.blanks, tests: ex.tests ?? [], checks: ex.checks ?? [], explanation: ex.explanation },
       };
     case 'order':
       return {
@@ -290,8 +329,8 @@ export function splitExercise(ex: ExerciseDef): { content: Prisma.InputJsonValue
       };
     case 'code':
       return {
-        content: { starter: ex.starter, visibleTests: ex.tests.filter((t) => !t.hidden), rules: ex.require.map((r) => r.message) },
-        solution: { solution: ex.solution, tests: ex.tests, require: ex.require, forbid: ex.forbid, explanation: ex.explanation },
+        content: { starter: ex.starter, visibleTests: ex.tests.filter((t) => !t.hidden), rules: ex.require.map((r) => r.message), checks: ex.checks.map((c) => c.message) },
+        solution: { solution: ex.solution, tests: ex.tests, checks: ex.checks, require: ex.require, forbid: ex.forbid, explanation: ex.explanation },
       };
   }
 }
@@ -333,6 +372,7 @@ export async function importContent(bundle: ContentBundle, { force = false, log 
   let exercises = 0;
   for (const l of bundle.languages) {
     await prisma.language.upsert({ where: { id: l.id }, create: l, update: l });
+    clearLanguageCache();
   }
   const orderCounter = new Map<string, number>();
   for (const lvl of bundle.levels) {

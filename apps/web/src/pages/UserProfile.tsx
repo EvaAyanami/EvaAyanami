@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Flame, Trophy, Crown, UserPlus, Check, Clock, Pencil, BookOpen, FolderKanban, Dumbbell } from 'lucide-react';
-import { api, ApiError, LANG_META, LEVEL_NAMES } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { useFeedback } from '../lib/feedback';
 import { PremiumBadge } from '../lib/plan';
@@ -101,12 +101,12 @@ export default function UserProfile() {
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="card">
           <h2 className="section-title mb-3">Niveaux</h2>
-          {['rust', 'cpp', 'java'].map((l) => {
+          {(p.skills.length ? p.skills.map((x) => x.language) : ['rust', 'cpp', 'java']).map((l) => {
             const s = p.skills.find((x) => x.language === l);
             return (
               <div key={l} className="mb-3">
                 <div className="mb-1 flex justify-between text-sm font-black">
-                  <span>{LANG_META[l].icon} {LANG_META[l].name}</span>
+                  <span>{langMeta(l).icon} {langMeta(l).name}</span>
                   <span className="muted">{LEVEL_NAMES[s?.level ?? 1]}</span>
                 </div>
                 <ProgressBar value={(s?.level ?? 1) / 5} />

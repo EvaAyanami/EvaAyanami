@@ -1,3 +1,4 @@
+import { touchFlames, type FlameEvent } from './flames.js';
 import type { User } from '@prisma/client';
 import { prisma } from '../db.js';
 import { levelFromXp, localDate, previousDay, weekKey } from './levels.js';
@@ -15,6 +16,7 @@ export interface Rewards {
   dailyGoalReached: boolean;
   achievements: { id: string; title: string; description: string; icon: string; xp: number }[];
   challenges: { title: string; xpReward: number }[];
+  flames?: FlameEvent[];
 }
 
 type Metric = 'xp' | 'exercises' | 'reviews' | 'chapters' | 'code';
@@ -152,6 +154,7 @@ export async function reward(
     dailyGoalReached: dailyXp >= user.dailyGoalXp && dailyXp - opts.xp - bonus - achXp < user.dailyGoalXp,
     achievements,
     challenges,
+    flames: active ? await touchFlames(updated).catch(() => []) : [],
   };
 }
 

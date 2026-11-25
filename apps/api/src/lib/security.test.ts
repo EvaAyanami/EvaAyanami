@@ -53,3 +53,19 @@ test('identifiant ami pseudo#1234', () => {
   assert.equal(parseTag('a#1234'), null);
   assert.equal(parseTag('kiri 1234'), null);
 });
+
+test('état des flammes d’amitié', async () => {
+  const { flameState } = await import('./flames.js');
+  const base = { flame: 5, flameBest: 9, milestones: [3] } as any;
+  const today = '2026-11-26';
+  assert.equal(flameState({ ...base, flameDate: today, aDate: today, bDate: today }, true, today).status, 'lit');
+  const s = flameState({ ...base, flameDate: '2026-11-25', aDate: today, bDate: '2026-11-25' }, true, today);
+  assert.equal(s.status, 'waiting_friend');
+  assert.equal(s.flame, 5);
+  assert.ok(s.atRisk);
+  assert.equal(s.next?.days, 7);
+  assert.equal(flameState({ ...base, flameDate: '2026-11-25', aDate: '2026-11-25', bDate: today }, true, today).status, 'waiting_me');
+  const out = flameState({ ...base, flameDate: '2026-11-20', aDate: '2026-11-20', bDate: '2026-11-20' }, true, today);
+  assert.equal(out.status, 'out');
+  assert.equal(out.flame, 0);
+});

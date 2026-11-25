@@ -8,12 +8,14 @@ import { useAuth, type User } from '../lib/auth';
 import { useFeedback } from '../lib/feedback';
 import { useApi } from '../lib/hooks';
 import { PageTitle, Loading } from '../components/ui';
-import Avatar, { DEFAULT_AVATAR, SKIN, HAIR, IRIS, OUTFIT, BACKGROUND, type AvatarData } from '../components/Avatar';
+import Avatar, { DEFAULT_AVATAR, type AvatarData } from '../components/Avatar';
 import Duo, { type Scene } from '../components/Duo';
+import AvatarWizard, { avatarLabel, swatch } from '../components/AvatarWizard';
 
 type Key = keyof Omit<AvatarData, 'blush'>;
 
 const TABS: { key: Key; label: string; emoji: string }[] = [
+  { key: 'gender', label: 'Genre', emoji: '🧑‍💻' },
   { key: 'skin', label: 'Peau', emoji: '🙂' },
   { key: 'hairStyle', label: 'Coiffure', emoji: '💇' },
   { key: 'hairColor', label: 'Cheveux', emoji: '🎨' },
@@ -26,28 +28,7 @@ const TABS: { key: Key; label: string; emoji: string }[] = [
   { key: 'background', label: 'Fond', emoji: '🌌' },
 ];
 
-const NAMES: Record<string, string> = {
-  porcelaine: 'Porcelaine', clair: 'Clair', peche: 'Pêche', dore: 'Doré', cannelle: 'Cannelle', cacao: 'Cacao',
-  court: 'Court', carre: 'Carré', long: 'Long', queue: 'Queue', couettes: 'Couettes', herisse: 'Hérissé', boucle: 'Bouclé', chignon: 'Chignon', rase: 'Ras',
-  bleu: 'Bleu', noir: 'Noir', brun: 'Brun', chatain: 'Châtain', blond: 'Blond', roux: 'Roux', rose: 'Rose', violet: 'Violet', vert: 'Vert', blanc: 'Blanc', arcenciel: 'Arc-en-ciel', or: 'Or',
-  rond: 'Ronds', amande: 'Amande', rieur: 'Rieurs', determine: 'Déterminés',
-  rubis: 'Rubis', saphir: 'Saphir', emeraude: 'Émeraude', ambre: 'Ambre', noisette: 'Noisette', gris: 'Gris',
-  sourire: 'Sourire', grand: 'Grand sourire', chat: 'Chat', neutre: 'Neutre', langue: 'Taquin',
-  uniforme: 'Uniforme', sweat: 'Sweat', tshirt: 'T-shirt', chemise: 'Chemise', kimono: 'Kimono', cape: 'Cape royale', armure: 'Armure',
-  marine: 'Marine', rouge: 'Rouge', orange: 'Orange',
-  aucun: 'Aucun', barrette: 'Barrette </>', lunettes: 'Lunettes', casque: 'Casque', noeud: 'Nœud', bandeau: 'Bandeau', etoile: 'Étoile', couronne: 'Couronne', aureole: 'Auréole', cornes: 'Cornes',
-  ciel: 'Ciel', menthe: 'Menthe', lavande: 'Lavande', nuit: 'Nuit', code: 'Code', galaxie: 'Galaxie', aurore: 'Aurore',
-};
-const label = (k: Key, v: string) => (k === 'accessory' && v === 'chat' ? 'Oreilles de chat' : NAMES[v] ?? v);
-
-function swatch(k: Key, v: string): string | null {
-  if (k === 'skin') return SKIN[v]?.[0] ?? null;
-  if (k === 'hairColor') return v === 'arcenciel' ? 'linear-gradient(135deg,#ff7eb6,#ffd166,#5eead4,#60a5fa,#a78bfa)' : HAIR[v]?.[0] ?? null;
-  if (k === 'eyeColor') return IRIS[v]?.[1] ?? null;
-  if (k === 'outfitColor') return OUTFIT[v]?.[0] ?? null;
-  if (k === 'background') return `linear-gradient(135deg,${(BACKGROUND[v] ?? []).join(',')})`;
-  return null;
-}
+const label = (k: Key, v: string) => avatarLabel(k, v);
 
 const SCENES: { scene: Scene; label: string }[] = [
   { scene: 'wave', label: 'Coucou' },
@@ -68,6 +49,7 @@ export default function AvatarEditor() {
   const [scene, setScene] = useState<Scene>('wave');
   const [sceneKey, setSceneKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [wizard, setWizard] = useState(() => !user?.hasAvatar || new URLSearchParams(location.search).has('assistant'));
   const canPremium = !!user?.premium || user?.role === 'ADMIN';
 
   useEffect(() => {
@@ -93,10 +75,14 @@ export default function AvatarEditor() {
     setSceneKey((k) => k + 1);
   }
 
-  async function save() {
+  async function save(override?: AvatarData) {
     setSaving(true);
     try {
-      await api('/me/avatar', { method: 'PUT', body: { avatar: a, bio } });
+      await api('/me/avatar', { method: 'PUT', body: { avatar: override ?? a, bio } });
+      if (override) {
+        setA(override);
+        setWizard(false);
+      }
       const r = await api<{ user: User | null }>('/auth/me');
       if (r.user) setUser(r.user);
       else await refresh();
@@ -110,6 +96,13 @@ export default function AvatarEditor() {
 
   if (!opts.data || !user) return <Loading />;
   const values = opts.data.options[tab];
+  if (wizard)
+    return (
+      <div>
+        <PageTitle title="Créer mon avatar" subtitle="Réponds à quelques questions, ou laisse le hasard choisir pour toi !" />
+        <AvatarWizard initial={a} options={opts.data.options} premium={opts.data.premium} canPremium={canPremium} onDone={(x) => save(x)} onCancel={() => setWizard(false)} />
+      </div>
+    );
 
   return (
     <div>
@@ -126,7 +119,8 @@ export default function AvatarEditor() {
               <div className="muted font-mono text-sm">{user.tag}</div>
             </div>
             <div className="mt-4 flex w-full gap-2">
-              <button className="btn-outline flex-1" onClick={randomize}><Dices size={16} /> Au hasard</button>
+              <button className="btn-outline flex-1" onClick={randomize}><Dices size={16} /> J’ai de la chance</button>
+              <button className="btn-ghost" onClick={() => setWizard(true)} title="Assistant de création">🪄</button>
               <button className="btn-ghost" onClick={() => setA({ ...DEFAULT_AVATAR })} title="Par défaut"><Undo2 size={16} /></button>
             </div>
           </div>
@@ -214,7 +208,7 @@ export default function AvatarEditor() {
           )}
 
           <div className="mt-5 flex gap-2">
-            <button className="btn-primary" onClick={save} disabled={saving || (usesPremium && !canPremium)}><Save size={16} /> Enregistrer</button>
+            <button className="btn-primary" onClick={() => save()} disabled={saving || (usesPremium && !canPremium)}><Save size={16} /> Enregistrer</button>
             <Link to={`/u/${encodeURIComponent(user.tag)}`} className="btn-ghost">Voir mon profil public</Link>
           </div>
         </div>

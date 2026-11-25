@@ -37,6 +37,20 @@ services:
     restart: "no"
     network_mode: none
 
+  sandbox-python:
+    image: ghcr.io/evaayanami/codemori-sandbox-python:latest
+    pull_policy: always
+    entrypoint: ["/bin/true"]
+    restart: "no"
+    network_mode: none
+
+  sandbox-php:
+    image: ghcr.io/evaayanami/codemori-sandbox-php:latest
+    pull_policy: always
+    entrypoint: ["/bin/true"]
+    restart: "no"
+    network_mode: none
+
   # --- Base de données ---------------------------------------------------------
   db:
     image: postgres:16-alpine
@@ -65,6 +79,8 @@ services:
       RUNNER_IMAGE_RUST: ghcr.io/evaayanami/codemori-sandbox-rust:latest
       RUNNER_IMAGE_CPP: ghcr.io/evaayanami/codemori-sandbox-cpp:latest
       RUNNER_IMAGE_JAVA: ghcr.io/evaayanami/codemori-sandbox-java:latest
+      RUNNER_IMAGE_PYTHON: ghcr.io/evaayanami/codemori-sandbox-python:latest
+      RUNNER_IMAGE_PHP: ghcr.io/evaayanami/codemori-sandbox-php:latest
     volumes:
       # Le runner crée un conteneur isolé (sans réseau) par exécution.
       - /var/run/docker.sock:/var/run/docker.sock
@@ -73,6 +89,8 @@ services:
       sandbox-rust: { condition: service_completed_successfully }
       sandbox-cpp: { condition: service_completed_successfully }
       sandbox-java: { condition: service_completed_successfully }
+      sandbox-python: { condition: service_completed_successfully }
+      sandbox-php: { condition: service_completed_successfully }
 
   # --- Application (API + interface web) ----------------------------------------
   app:

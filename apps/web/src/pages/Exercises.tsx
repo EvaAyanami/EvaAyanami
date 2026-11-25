@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { Check, Search } from 'lucide-react';
 import { useApi, useDebounced } from '../lib/hooks';
-import { LANG_META, LEVEL_NAMES, TYPE_LABEL } from '../lib/api';
+import { LANG_META, langMeta, LEVEL_NAMES, TYPE_LABEL } from '../lib/api';
 import { PageTitle, Loading, ErrorBox, LangBadge, Empty } from '../components/ui';
 
 interface List {
@@ -60,7 +60,7 @@ export default function Exercises() {
             {data.items.map((e) => (
               <Link key={e.id} to={`/exercice/${e.id}`} className="card flex items-center gap-3 !p-3 transition hover:shadow-lg">
                 <div className={clsx('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl', e.solved ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' : 'bg-ink-100 dark:bg-ink-800')}>
-                  {e.solved ? <Check size={18} /> : LANG_META[e.language]?.icon}
+                  {e.solved ? <Check size={18} /> : langMeta(e.language)?.icon}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-extrabold">{e.title}</div>

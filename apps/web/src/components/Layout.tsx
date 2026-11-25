@@ -2,10 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Home, GraduationCap, Map, Dumbbell, Code2, FolderKanban, RotateCcw, Trophy, BarChart3, UserRound, Shield, Flame, Sun, Moon, Menu, X, LogOut, MessageCircleHeart, Users, Crown, Medal,
+  Home, GraduationCap, Map, Dumbbell, Code2, FolderKanban, RotateCcw, Trophy, BarChart3, UserRound, Shield, Flame, Sun, Moon, Menu, X, LogOut, MessageCircleHeart, Users, Crown,
 } from 'lucide-react';
 import { EnergyPill, FreeBanner, remaining, usePlan } from '../lib/plan';
 import Avatar from './Avatar';
+import LocaleSwitch from './LocaleSwitch';
+import { t } from '../lib/i18n';
 import clsx from 'clsx';
 import { useAuth } from '../lib/auth';
 import { applyTheme, isDark } from '../lib/theme';
@@ -22,15 +24,14 @@ export const NAV = [
   { to: '/ide', label: 'IDE', icon: Code2 },
   { to: '/projets', label: 'Projets', icon: FolderKanban },
   { to: '/revisions', label: 'Révisions', icon: RotateCcw },
-  { to: '/amis', label: 'Amis', icon: Users },
-  { to: '/meilleur-codeur', label: 'Meilleur codeur', icon: Medal },
+  { to: '/communaute', label: 'Communauté', icon: Users },
   { to: '/succes', label: 'Succès', icon: Trophy },
   { to: '/statistiques', label: 'Statistiques', icon: BarChart3 },
   { to: '/profil', label: 'Profil', icon: UserRound },
   { to: '/premium', label: 'Premium', icon: Crown },
 ];
 
-const MOBILE = ['/', '/apprendre', '/exercices', '/amis', '/profil'];
+const MOBILE = ['/', '/apprendre', '/exercices', '/communaute', '/profil'];
 
 export function Logo({ className }: { className?: string }) {
   return (
@@ -81,7 +82,7 @@ function SideLink({ to, label, icon: Icon, end, onClick, group = 'side' }: { to:
           <motion.span className="relative" whileHover={{ rotate: [0, -12, 10, 0], scale: 1.15 }} transition={{ duration: 0.4 }}>
             <Icon size={20} />
           </motion.span>
-          <span className="relative">{label}</span>
+          <span className="relative">{t(label)}</span>
         </>
       )}
     </NavLink>
@@ -141,6 +142,12 @@ export default function Layout({ children }: { children?: ReactNode }) {
             <SideLink key={l.to} {...l} />
           ))}
         </nav>
+        <div className="mt-2 flex gap-1 px-1 text-xs font-bold">
+          <NavLink to="/faq" className="rounded-lg px-2 py-1 text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800">❔ {t('FAQ')}</NavLink>
+          <NavLink to="/avis" className="rounded-lg px-2 py-1 text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800">💬 {t('Avis')}</NavLink>
+          <div className="flex-1" />
+          <LocaleSwitch />
+        </div>
         <PremiumCard />
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-ink-50 p-2 dark:bg-ink-800/60">
           <NavLink to="/avatar" title="Mon avatar">
@@ -251,7 +258,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
                 <motion.span animate={isActive ? { y: -2, scale: 1.12 } : { y: 0, scale: 1 }}>
                   <Icon size={22} />
                 </motion.span>
-                {label}
+                {t(label)}
               </>
             )}
           </NavLink>

@@ -133,7 +133,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       users: users.map((u) => ({
         id: u.id, email: u.email, username: u.username, displayName: u.displayName, role: u.role, disabled: u.disabled,
         xp: u.xp, level: levelFromXp(u.xp).level, streak: u.streak, createdAt: u.createdAt, lastActiveAt: u.lastActiveAt, lockedUntil: u.lockedUntil,
-        tag: `${u.username}#${u.discriminator}`, twoFactor: u.totpEnabled, premiumUntil: u.premiumUntil, premiumSource: u.premiumSource,
+        tag: `${u.username}#${u.discriminator}`, twoFactor: u.totpEnabled, emailVerified: u.emailVerified, premiumUntil: u.premiumUntil, premiumSource: u.premiumSource,
       })),
     };
   });
@@ -141,7 +141,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.patch<{ Params: { id: string } }>('/admin/users/:id', async (req) => {
     const admin = requireAdmin(req);
     const body = parse(
-      z.object({ role: z.enum(['USER', 'ADMIN']).optional(), disabled: z.boolean().optional(), password: z.string().min(8).optional(), unlock: z.boolean().optional(), resetProgress: z.boolean().optional() }),
+      z.object({ role: z.enum(['USER', 'ADMIN']).optional(), disabled: z.boolean().optional(), password: z.string().min(8).optional(), unlock: z.boolean().optional(), resetProgress: z.boolean().optional(), verifyEmail: z.boolean().optional() }),
       req.body,
     );
     const u = await prisma.user.findUnique({ where: { id: req.params.id } });
@@ -168,6 +168,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         ...(body.disabled !== undefined ? { disabled: body.disabled } : {}),
         ...(body.password ? { passwordHash: await hashPassword(body.password) } : {}),
         ...(body.unlock ? { lockedUntil: null, failedLogins: 0 } : {}),
+        ...(body.verifyEmail ? { emailVerified: true } : {}),
       },
     });
     if (body.disabled || body.password) await prisma.session.deleteMany({ where: { userId: u.id } });
@@ -221,7 +222,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   const exMeta = z.object({
     kind: z.enum(['practice', 'exam', 'miniproject', 'placement']),
     chapterId: z.string().nullable().optional(),
-    language: z.enum(['rust', 'cpp', 'java']),
+    language: z.string().max(20),
     level: z.number().int().min(1).max(5),
     order: z.number().int().min(0).default(0),
   });

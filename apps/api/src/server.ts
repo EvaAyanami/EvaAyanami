@@ -24,6 +24,7 @@ async function bootstrap() {
           displayName: 'Administrateur',
           passwordHash: await hashPassword(config.adminPassword),
           role: 'ADMIN',
+          emailVerified: true,
         },
       });
       console.log(`Compte administrateur créé : ${config.adminEmail}`);

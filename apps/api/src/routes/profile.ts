@@ -11,7 +11,7 @@ import { logActivity, checkAchievements } from '../lib/gamification.js';
 import { LEVEL_NAMES } from '../lib/levels.js';
 import { parse } from './auth.js';
 import { applySkillLevel } from './placement.js';
-import { LANGS } from './exercises.js';
+import { languages, languageIds, requireRunnable } from '../lib/languages.js';
 
 /** Modèles de fichiers de l'IDE. */
 export const TEMPLATES: Record<string, { fileName: string; code: string }> = {
@@ -63,6 +63,54 @@ public class Main {
 }
 `,
   },
+  python: {
+    fileName: 'main.py',
+    code: `import sys
+
+# Lecture de toute l'entrée standard
+entree = sys.stdin.read().strip()
+
+print("Bonjour depuis Python ! 🐍")
+if entree:
+    print(f"Tu as saisi : {entree}")
+`,
+  },
+  php: {
+    fileName: 'main.php',
+    code: `<?php
+declare(strict_types=1);
+
+// Lecture de toute l'entrée standard
+$entree = trim(stream_get_contents(STDIN));
+
+echo "Bonjour depuis PHP ! 🐘\\n";
+if ($entree !== '') {
+    echo "Tu as saisi : $entree\\n";
+}
+`,
+  },
+  web: {
+    fileName: 'index.html',
+    code: `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Ma page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #eef4ff; color: #1f2538; padding: 2rem; }
+    h1 { color: #3b6cf6; }
+    .carte { background: white; border-radius: 1rem; padding: 1rem 1.5rem; box-shadow: 0 4px 12px rgb(0 0 0 / 0.08); }
+  </style>
+</head>
+<body>
+  <h1>Bonjour depuis HTML & CSS ! 🌐</h1>
+  <div class="carte">
+    <p>Modifie le code : l'aperçu se met à jour en direct.</p>
+  </div>
+</body>
+</html>
+`,
+  },
 };
 
 export default async function profileRoutes(app: FastifyInstance) {
@@ -75,6 +123,7 @@ export default async function profileRoutes(app: FastifyInstance) {
         timezone: z.string().max(60).optional(),
         dailyGoalXp: z.number().int().min(10).max(500).optional(),
         leaderboardOptIn: z.boolean().optional(),
+        locale: z.enum(['fr', 'en', 'de', 'es']).optional(),
       }),
       req.body,
     );
@@ -92,7 +141,8 @@ export default async function profileRoutes(app: FastifyInstance) {
   app.get('/me/skills', async (req) => {
     const user = requireUser(req);
     const skills = await prisma.skillProfile.findMany({ where: { userId: user.id } });
-    return LANGS.map((l) => {
+    const langs = await languageIds();
+    return langs.map((l) => {
       const s = skills.find((x) => x.languageId === l);
       return { language: l, level: s?.level ?? 1, levelName: LEVEL_NAMES[s?.level ?? 1], source: s?.source ?? 'default', details: s?.details ?? null, updatedAt: s?.updatedAt ?? null };
     });
@@ -102,7 +152,7 @@ export default async function profileRoutes(app: FastifyInstance) {
   app.put<{ Params: { lang: string } }>('/me/skills/:lang', async (req) => {
     const user = requireUser(req);
     if (user.role !== 'ADMIN') throw forbidden("Ton niveau évolue avec l'évaluation et les examens. Seul un administrateur peut le modifier.");
-    if (!LANGS.includes(req.params.lang)) throw badRequest('Langage inconnu');
+    if (!(await languageIds()).includes(req.params.lang)) throw badRequest('Langage inconnu');
     const body = parse(z.object({ level: z.number().int().min(1).max(5) }), req.body);
     await applySkillLevel(user.id, req.params.lang, body.level, 'manual');
     await logActivity(user.id, 'skill', `Niveau ${req.params.lang} réglé sur « ${LEVEL_NAMES[body.level]} »`);
@@ -134,7 +184,8 @@ export default async function profileRoutes(app: FastifyInstance) {
 
   app.post('/ide/run', { config: { rateLimit: { max: config.runLimitPerMinute, timeWindow: '1 minute' } } }, async (req) => {
     const user = requireUser(req);
-    const body = parse(z.object({ language: z.enum(['rust', 'cpp', 'java']), code: z.string().min(1).max(100_000), stdin: z.string().max(100_000).default(''), compileOnly: z.boolean().default(false) }), req.body);
+    const body = parse(z.object({ language: z.string().max(20), code: z.string().min(1).max(100_000), stdin: z.string().max(100_000).default(''), compileOnly: z.boolean().default(false) }), req.body);
+    await requireRunnable(body.language);
     await consumeRun(user);
     const raw = await runCode(body.language, body.code, body.compileOnly ? [] : [body.stdin]);
     const run = raw.tests[0];
@@ -159,7 +210,7 @@ export default async function profileRoutes(app: FastifyInstance) {
 
   app.post('/ide/snippets', async (req) => {
     const user = requireUser(req);
-    const body = parse(z.object({ id: z.string().optional(), language: z.enum(['rust', 'cpp', 'java']), name: z.string().min(1).max(80), code: z.string().max(100_000) }), req.body);
+    const body = parse(z.object({ id: z.string().optional(), language: z.string().max(20), name: z.string().min(1).max(80), code: z.string().max(100_000) }), req.body);
     if (body.id) {
       const s = await prisma.snippet.findFirst({ where: { id: body.id, userId: user.id } });
       if (s) return prisma.snippet.update({ where: { id: s.id }, data: { name: body.name, code: body.code, language: body.language } });

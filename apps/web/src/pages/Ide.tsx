@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Play, Hammer, RotateCcw, Save, Trash2, FilePlus2, Loader2, Maximize2, Minimize2, Terminal, FileCode2 } from 'lucide-react';
-import { api, ApiError, LANG_META } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta } from '../lib/api';
+import WebPreview from '../components/WebPreview';
 import { useFeedback } from '../lib/feedback';
 import { PageTitle } from '../components/ui';
 import Markdown from '../components/Markdown';
@@ -36,11 +37,12 @@ export default function Ide() {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [current, setCurrent] = useState<Snippet | null>(null);
   const [full, setFull] = useState(false);
+  const isWeb = langMeta(lang).runtime === 'web';
 
   useEffect(() => {
     api<Record<string, { code: string }>>('/ide/templates').then((t) => {
       setTemplates(t);
-      setCode(localStorage.getItem(LS(lang)) ?? t[lang].code);
+      setCode(localStorage.getItem(LS(lang)) ?? t[lang]?.code ?? '');
     });
     api<Snippet[]>('/ide/snippets').then(setSnippets);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,8 +109,8 @@ export default function Ide() {
       {!full && <PageTitle title="IDE" subtitle="Un environnement libre pour expérimenter : ton code est compilé et exécuté dans un bac à sable isolé." />}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <aside className="card !p-3">
-          <div className="mb-3 grid grid-cols-3 gap-1 rounded-2xl bg-ink-100 p-1 dark:bg-ink-800">
-            {Object.entries(LANG_META).map(([id, m]) => (
+          <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-ink-100 p-1 dark:bg-ink-800">
+            {Object.entries(LANG_META).filter(([, m]) => m.runtime !== 'none').map(([id, m]) => (
               <button key={id} onClick={() => switchLang(id)} className={clsx('rounded-xl py-1.5 text-xs font-black', lang === id ? 'bg-white shadow dark:bg-ink-900' : 'text-ink-500')} title={m.name}>
                 {m.icon} {m.name}
               </button>
@@ -121,7 +123,7 @@ export default function Ide() {
               setCode(templates[lang]?.code ?? '');
             }}
           >
-            <FilePlus2 size={14} /> Nouveau ({LANG_META[lang].file})
+            <FilePlus2 size={14} /> Nouveau ({langMeta(lang).file})
           </button>
           <div className="muted mb-1 mt-3 text-xs font-extrabold uppercase">Mes fichiers</div>
           <div className="scrollbar-thin max-h-72 space-y-1 overflow-y-auto">
@@ -148,14 +150,18 @@ export default function Ide() {
         </aside>
         <div className="card flex flex-col overflow-hidden !p-0">
           <div className="flex flex-wrap items-center gap-1 border-b border-ink-200 px-3 py-2 dark:border-ink-800">
-            <span className="rounded-lg bg-ink-100 px-2 py-1 font-mono text-xs font-bold dark:bg-ink-800">{current?.name ?? LANG_META[lang].file}</span>
+            <span className="rounded-lg bg-ink-100 px-2 py-1 font-mono text-xs font-bold dark:bg-ink-800">{current?.name ?? langMeta(lang).file}</span>
             <div className="flex-1" />
-            <button className="btn-ghost btn-sm" onClick={() => exec(true)} disabled={!!busy}>
-              {busy === 'compile' ? <Loader2 size={16} className="animate-spin" /> : <Hammer size={16} />} Compiler
-            </button>
-            <button className="btn-primary btn-sm" onClick={() => exec(false)} disabled={!!busy}>
-              {busy === 'run' ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} Exécuter
-            </button>
+            {!isWeb && (
+              <>
+                <button className="btn-ghost btn-sm" onClick={() => exec(true)} disabled={!!busy}>
+                  {busy === 'compile' ? <Loader2 size={16} className="animate-spin" /> : <Hammer size={16} />} {lang === 'python' || lang === 'php' ? 'Vérifier' : 'Compiler'}
+                </button>
+                <button className="btn-primary btn-sm" onClick={() => exec(false)} disabled={!!busy}>
+                  {busy === 'run' ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} Exécuter
+                </button>
+              </>
+            )}
             <button className="btn-ghost btn-sm" onClick={save} title="Enregistrer">
               <Save size={16} />
             </button>
@@ -167,8 +173,11 @@ export default function Ide() {
             </button>
           </div>
           <Suspense fallback={<div className="h-[460px]" />}>
-            <CodeEditor value={code} onChange={setCode} language={lang} height={full ? 'calc(100vh - 320px)' : 460} diagnostics={result?.compile.diagnostics} onRun={() => exec(false)} />
+            <CodeEditor value={code} onChange={setCode} language={lang} height={full ? 'calc(100vh - 320px)' : 460} diagnostics={result?.compile.diagnostics} onRun={() => !isWeb && exec(false)} />
           </Suspense>
+          {isWeb ? (
+            <div className="h-80 border-t border-ink-200 dark:border-ink-800"><WebPreview html={code} title="Aperçu en direct" /></div>
+          ) : (
           <div className="grid border-t border-ink-200 dark:border-ink-800 md:grid-cols-[1fr_2fr]">
             <div className="flex flex-col border-b border-ink-800 bg-ink-900 md:border-b-0 md:border-r">
               <div className="px-3 py-1.5 text-xs font-bold text-ink-400">Entrée (stdin)</div>
@@ -204,6 +213,7 @@ export default function Ide() {
               )}
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

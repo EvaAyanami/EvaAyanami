@@ -2,11 +2,12 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder, motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { Check, X, Play, Hammer, RotateCcw, Send, Lightbulb, Maximize2, Minimize2, GripVertical, EyeOff, Loader2, Save, Terminal, ChevronRight } from 'lucide-react';
-import { api, ApiError, TYPE_LABEL, LANG_META } from '../lib/api';
+import { api, ApiError, TYPE_LABEL, LANG_META, langMeta } from '../lib/api';
 import { useFeedback, type Rewards } from '../lib/feedback';
 import Markdown from './Markdown';
 import { MascotSays } from './ui';
 import Duo from './Duo';
+import WebPreview, { fillTemplate as fillWeb } from './WebPreview';
 import type { Mood } from './Mascot';
 import type { EditorDiagnostic } from './CodeEditor';
 
@@ -243,6 +244,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
         : pick(RETRY);
 
   const isCodeLike = ex.type === 'code' || (ex.type === 'bugfix' && bugStep >= 2);
+  const isWeb = langMeta(lang).runtime === 'web';
   const diagnostics = result?.compile?.diagnostics ?? run?.compile.diagnostics;
   const canHint = mode !== 'collect' && !ex.generated && ex.kind !== 'exam';
 
@@ -258,7 +260,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           <Check size={12} /> Réussi
         </span>
       )}
-      {lang && <span className="chip">{LANG_META[lang]?.icon} {LANG_META[lang]?.name}</span>}
+      {lang && <span className="chip">{langMeta(lang)?.icon} {langMeta(lang)?.name}</span>}
     </div>
   );
 
@@ -418,19 +420,23 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           {/* Zones 2 et 3 : éditeur + console */}
           <div className="card flex flex-col overflow-hidden !p-0">
             <div className="flex flex-wrap items-center gap-1 border-b border-ink-200 px-3 py-2 dark:border-ink-800">
-              <span className="mr-2 rounded-lg bg-ink-100 px-2 py-1 font-mono text-xs font-bold dark:bg-ink-800">{LANG_META[lang]?.file}</span>
+              <span className="mr-2 rounded-lg bg-ink-100 px-2 py-1 font-mono text-xs font-bold dark:bg-ink-800">{langMeta(lang)?.file}</span>
               {saved !== 'idle' && (
                 <span className="muted flex items-center gap-1 text-xs">
                   <Save size={12} /> {saved === 'saving' ? 'Sauvegarde…' : 'Sauvegardé'}
                 </span>
               )}
               <div className="flex-1" />
-              <button className="btn-ghost btn-sm" onClick={() => execute(true)} disabled={!!busy} title="Compiler">
-                <Hammer size={16} /> <span className="hidden sm:inline">Compiler</span>
-              </button>
-              <button className="btn-ghost btn-sm" onClick={() => execute(false)} disabled={!!busy} title="Exécuter (Ctrl+Entrée)">
-                <Play size={16} /> <span className="hidden sm:inline">Exécuter</span>
-              </button>
+              {!isWeb && (
+                <>
+                  <button className="btn-ghost btn-sm" onClick={() => execute(true)} disabled={!!busy} title="Compiler">
+                    <Hammer size={16} /> <span className="hidden sm:inline">Compiler</span>
+                  </button>
+                  <button className="btn-ghost btn-sm" onClick={() => execute(false)} disabled={!!busy} title="Exécuter (Ctrl+Entrée)">
+                    <Play size={16} /> <span className="hidden sm:inline">Exécuter</span>
+                  </button>
+                </>
+              )}
               <button
                 className="btn-ghost btn-sm"
                 onClick={() => {
@@ -450,9 +456,20 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
               )}
             </div>
             <Suspense fallback={<div className="h-[360px] p-4 text-sm text-ink-400">Chargement de l’éditeur…</div>}>
-              <CodeEditor value={code} onChange={setCode} language={lang} height={fullscreen ? 'calc(100vh - 330px)' : compact ? 300 : 420} diagnostics={diagnostics} onRun={() => execute(false)} />
+              <CodeEditor value={code} onChange={setCode} language={lang} height={fullscreen ? 'calc(100vh - 330px)' : compact ? 300 : 420} diagnostics={diagnostics} onRun={() => (isWeb ? submit() : execute(false))} />
             </Suspense>
-            <div className="h-56 border-t border-ink-200 dark:border-ink-800">{consoleOut}</div>
+            {isWeb ? (
+              <div className="grid border-t border-ink-200 dark:border-ink-800 md:grid-cols-2">
+                <div className="h-64"><WebPreview html={code} title="Aperçu en direct" /></div>
+                <div className="scrollbar-thin h-64 overflow-auto bg-ink-950 p-3 font-mono text-xs leading-5 text-ink-100">
+                  {busy === 'submit' && <div className="text-cyan-400">Vérification du document…</div>}
+                  {!busy && !result && <div className="text-ink-500">L’aperçu se met à jour pendant que tu tapes. Clique sur « Valider » pour vérifier les consignes.</div>}
+                  {!busy && result && <CompileAndTests result={result} dark />}
+                </div>
+              </div>
+            ) : (
+              <div className="h-56 border-t border-ink-200 dark:border-ink-800">{consoleOut}</div>
+            )}
           </div>
         </div>
       </div>
@@ -525,6 +542,11 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
             ))}
           </pre>
           {ex.compiled && <p className="muted mt-2 text-xs">Ce programme sera réellement compilé et exécuté pour vérifier ta réponse.</p>}
+          {isWeb && /<[a-z]/i.test(ex.code ?? '') && (
+            <div className="mt-3 h-48 overflow-hidden rounded-2xl border-2 border-ink-200 dark:border-ink-700">
+              <WebPreview html={fillWeb(ex.code!, blanks)} title="Aperçu du document complété" />
+            </div>
+          )}
         </div>
       )}
 
@@ -606,7 +628,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           <button className="btn-success" onClick={submit} disabled={!ready || !!busy || (!!result?.correct && ex.type !== 'fill')}>
             {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Valider
           </button>
-          {ex.type === 'fill' && ex.compiled && (
+          {ex.type === 'fill' && ex.compiled && !isWeb && (
             <button className="btn-outline" onClick={() => execute(false)} disabled={!ready || !!busy}>
               <Play size={16} /> Exécuter
             </button>

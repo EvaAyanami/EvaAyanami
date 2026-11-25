@@ -10,6 +10,7 @@ import { logActivity, reward } from '../lib/gamification.js';
 import { LEVEL_NAMES } from '../lib/levels.js';
 import { parse } from './auth.js';
 import { LANGS } from './exercises.js';
+import { languageIds } from '../lib/languages.js';
 
 /** Questionnaire d'auto-évaluation présenté à la première connexion. */
 export const QUESTIONNAIRE = [
@@ -175,7 +176,7 @@ export default async function placementRoutes(app: FastifyInstance) {
     const user = requireUser(req);
     // Après l'accueil, « commencer de zéro » ne touche plus aux niveaux déjà établis.
     const existing = user.onboardingDone ? (await prisma.skillProfile.findMany({ where: { userId: user.id } })).map((s) => s.languageId) : [];
-    for (const l of LANGS) if (!existing.includes(l)) await applySkillLevel(user.id, l, 1, 'manual');
+    for (const l of await languageIds()) if (!existing.includes(l)) await applySkillLevel(user.id, l, 1, 'manual');
     await prisma.user.update({ where: { id: user.id }, data: { onboardingDone: true } });
     const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
     const rewards = await reward(fresh, { xp: 0 });
