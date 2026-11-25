@@ -27,6 +27,10 @@ Chaque solution de référence, chaque test caché et chaque sortie attendue est
 - **Projets** : 22 projets progressifs (calculatrice, serveur HTTP, client/serveur TCP réel, moteur SQL, système de fichiers virtuel, ordonnanceur, serveur compatible Redis, moteur de stockage avec reprise après crash, outil diff…), réalisables dans le langage de son choix, étape par étape, avec tests automatiques.
 - **Assistant pédagogique** : indices en 3 niveaux, explication d’erreurs, reformulation, comparaison entre langages, génération d’exercices de révision. Fonctionne **sans IA** ; peut utiliser une API compatible OpenAI ou un modèle local **Ollama**.
 - **Administration** : utilisateurs, chapitres, exercices (avec vérification en un clic dans le bac à sable), projets, récompenses, paramètres pédagogiques, journal des erreurs, import/export du contenu.
+- **Avatars** façon « Mii » dans le style de Kiri (coiffures, couleurs, tenues, accessoires) et petites scènes animées entre Kiri et ton avatar : coucou, tape-m'en cinq, fête, réconfort, trophée.
+- **Communauté** : amis avec identifiant `pseudo#1234`, profils publics, classement entre amis, **meilleur codeur de la semaine** et temple de la renommée.
+- **Premium** : offre gratuite généreuse (énergie façon Duolingo, quotas d'exécution, pubs récompensées facultatives), essai offert, **boutique de clés** (1, 2 ou 3 mois), clés à vendre aussi sur Discord, paiement Stripe (carte, Apple Pay, Google Pay), publicités AdSense rémunérées, anti-bloqueur avec une Kiri triste… puis fâchée. Badge Premium et historique sur le profil.
+- **Sécurité** : double authentification (TOTP + codes de secours), niveaux verrouillés (anti-triche).
 - Thème clair/sombre, interface responsive, aucune ressource externe (polices embarquées).
 
 ## Démarrage rapide (production)
@@ -64,6 +68,7 @@ Des images prêtes à l’emploi sont publiées sur `ghcr.io` par la CI : colle 
 | [docs/contenu.md](docs/contenu.md) | Format des cours, exercices, projets et tests ; vérification |
 | [docs/administration.md](docs/administration.md) | Panneau d’administration et paramètres pédagogiques |
 | [docs/assistant-ia.md](docs/assistant-ia.md) | Assistant sans IA, API compatible OpenAI, Ollama |
+| [docs/monetisation.md](docs/monetisation.md) | Premium, boutique de clés, Stripe, vente sur Discord, AdSense, 2FA |
 | [docs/developpement.md](docs/developpement.md) | Lancer le projet en local, tests, structure du code |
 
 ## Pile technique

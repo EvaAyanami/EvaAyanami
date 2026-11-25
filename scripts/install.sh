@@ -44,6 +44,7 @@ else
     -e "s|^PUBLIC_URL=.*|PUBLIC_URL=https://${DOMAIN}|" \
     -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(secret 24)|" \
     -e "s|^RUNNER_TOKEN=.*|RUNNER_TOKEN=$(secret 32)|" \
+    -e "s|^APP_SECRET=.*|APP_SECRET=$(secret 32)|" \
     -e "s|^ADMIN_EMAIL=.*|ADMIN_EMAIL=${ADMIN_EMAIL}|" \
     -e "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${ADMIN_PASSWORD}|" \
     .env

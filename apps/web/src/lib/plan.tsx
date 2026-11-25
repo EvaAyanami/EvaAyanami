@@ -279,7 +279,7 @@ export function FreeBanner() {
       </div>
     );
   return (
-    <Link to="/premium" className="group mt-8 flex items-center gap-3 overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 via-brand-500 to-cyan-500 p-4 text-white shadow-lg transition hover:shadow-xl">
+    <Link to="/premium" className="group mt-8 flex items-center gap-3 overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 via-brand-500 to-cyan-500 p-4 text-white shadow-lg transition hover:shadow-xl lg:mr-20">
       <Mascot mood="happy" size={56} crown />
       <div className="flex-1">
         <div className="font-black">Envie d’aller plus loin ?</div>

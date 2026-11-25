@@ -58,3 +58,41 @@
 .scrollbar-thin::-webkit-scrollbar-thumb { @apply rounded-full bg-ink-300 dark:bg-ink-700; }
 
 .monaco-cm .monaco-editor, .monaco-cm .monaco-editor-background { border-radius: 0; }
+
+/* ---------- Premium ---------- */
+.premium-shine {
+  position: relative;
+  overflow: hidden;
+}
+.premium-shine::after {
+  content: '';
+  position: absolute;
+  inset: -50% auto -50% -60%;
+  width: 40%;
+  transform: rotate(20deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.65), transparent);
+  animation: premium-shine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes premium-shine {
+  0%, 55% { left: -60%; }
+  100% { left: 130%; }
+}
+.premium-ring {
+  background: conic-gradient(from 0deg, #fbbf24, #f472b6, #a78bfa, #22d3ee, #fbbf24);
+  animation: premium-spin 6s linear infinite;
+}
+.premium-ring > svg { border-radius: 9999px; animation: premium-spin 6s linear infinite reverse; }
+@keyframes premium-spin { to { transform: rotate(360deg); } }
+.premium-text {
+  background: linear-gradient(90deg, #f59e0b, #f472b6, #8b5cf6, #f59e0b);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: premium-text 4s linear infinite;
+}
+@keyframes premium-text { to { background-position: 200% center; } }
+@media (prefers-reduced-motion: reduce) {
+  .premium-shine::after, .premium-ring, .premium-ring > svg, .premium-text { animation: none; }
+}

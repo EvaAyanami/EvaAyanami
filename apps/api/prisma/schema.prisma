@@ -19,7 +19,7 @@ model User {
   email            String    @unique
   username         String    @unique
   /// Identifiant d'ami à 4 chiffres : « pseudo#0420 »
-  discriminator    String    @default(dbgenerated("lpad((floor(random() * 9999) + 1)::int::text, 4, '0')"))
+  discriminator    String    @default(dbgenerated("lpad((((floor((random() * (9999)::double precision)) + (1)::double precision))::integer)::text, 4, '0'::text)"))
   displayName      String
   passwordHash     String
   role             Role      @default(USER)

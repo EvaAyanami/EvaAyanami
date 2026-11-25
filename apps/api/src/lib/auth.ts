@@ -5,6 +5,7 @@ import type { User } from '@prisma/client';
 import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { HttpError } from './http.js';
+import { effectiveAvatar } from './avatar.js';
 
 export const COOKIE = 'cm_session';
 
@@ -95,6 +96,8 @@ export function publicUser(u: User) {
     premium: !!u.premiumUntil && u.premiumUntil > new Date(),
     premiumUntil: u.premiumUntil,
     formerPremium: !!u.premiumUntil && u.premiumUntil <= new Date(),
+    avatar: effectiveAvatar(u.avatar, (!!u.premiumUntil && u.premiumUntil > new Date()) || u.role === 'ADMIN'),
+    hasAvatar: !!u.avatar,
     displayName: u.displayName,
     role: u.role,
     theme: u.theme,

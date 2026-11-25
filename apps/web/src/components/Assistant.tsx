@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Send, X, Sparkles, Loader2, BookOpen, GitCompare, Bug } from 'lucide-react';
@@ -22,6 +23,7 @@ export default function Assistant() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [ai, setAi] = useState<boolean | null>(null);
+  const [premiumOnly, setPremiumOnly] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function Assistant() {
   }, [assistantRequest]);
 
   useEffect(() => {
-    if (open && ai === null) api<{ ai: boolean }>('/assistant/status').then((s) => setAi(s.ai)).catch(() => setAi(false));
+    if (open && ai === null) api<{ ai: boolean; premiumOnly?: boolean }>('/assistant/status').then((s) => { setAi(s.ai); setPremiumOnly(!!s.premiumOnly); }).catch(() => setAi(false));
   }, [open, ai]);
 
   useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [msgs, busy]);
@@ -94,6 +96,8 @@ export default function Assistant() {
                     <span className="flex items-center gap-1">
                       <Sparkles size={12} /> Assistante IA
                     </span>
+                  ) : premiumOnly ? (
+                    <Link to="/premium" className="underline">Assistante pédagogique · IA avec Premium 👑</Link>
                   ) : (
                     'Assistante pédagogique'
                   )}

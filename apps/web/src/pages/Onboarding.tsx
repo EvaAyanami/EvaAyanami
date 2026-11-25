@@ -57,7 +57,7 @@ export default function Onboarding() {
       setRun({ runId: r.runId, language: r.language, question: r.question, index: r.index, total: r.total });
       setStep('test');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setBusy(false);
     }
@@ -76,7 +76,7 @@ export default function Onboarding() {
         else await finishTest();
       }, r.correct ? 900 : 1800);
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setBusy(false);
     }

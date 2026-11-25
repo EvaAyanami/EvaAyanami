@@ -11,6 +11,8 @@ export interface User {
   premium: boolean;
   premiumUntil: string | null;
   formerPremium: boolean;
+  avatar: import('../components/Avatar').AvatarData;
+  hasAvatar: boolean;
   displayName: string;
   role: 'USER' | 'ADMIN';
   theme: 'light' | 'dark' | 'system';

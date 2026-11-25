@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { Users, BookOpen, Trophy, Settings, AlertOctagon, Database, LayoutDashboard, FolderKanban, Plus, Save, Trash2, PlayCircle, ChevronLeft, Download, Upload } from 'lucide-react';
+import { Users, BookOpen, Trophy, Settings, AlertOctagon, Database, LayoutDashboard, FolderKanban, Plus, Save, Trash2, PlayCircle, ChevronLeft, Download, Upload, Crown } from 'lucide-react';
 import { api, ApiError, LANG_META, LEVEL_NAMES, TYPE_LABEL } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { useFeedback } from '../../lib/feedback';
 import { PageTitle, Loading, ErrorBox, Bars, Modal } from '../../components/ui';
+import Monetization from './Monetization';
 
 const TABS = [
   { to: '', label: 'Vue d’ensemble', icon: LayoutDashboard, end: true },
@@ -13,6 +14,7 @@ const TABS = [
   { to: 'cours', label: 'Cours & exercices', icon: BookOpen },
   { to: 'projets', label: 'Projets', icon: FolderKanban },
   { to: 'recompenses', label: 'Récompenses', icon: Trophy },
+  { to: 'monetisation', label: 'Monétisation', icon: Crown },
   { to: 'parametres', label: 'Paramètres', icon: Settings },
   { to: 'journaux', label: 'Journaux', icon: AlertOctagon },
   { to: 'contenu', label: 'Import / export', icon: Database },
@@ -37,6 +39,7 @@ export default function Admin() {
         <Route path="projets" element={<ProjectsTab />} />
         <Route path="recompenses" element={<AchievementsTab />} />
         <Route path="parametres" element={<SettingsTab />} />
+        <Route path="monetisation" element={<Monetization />} />
         <Route path="journaux" element={<Logs />} />
         <Route path="contenu" element={<ContentTab />} />
       </Routes>
@@ -109,7 +112,7 @@ function UsersTab() {
       toast(msg, 'success');
       reload();
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   };
   return (
@@ -125,7 +128,7 @@ function UsersTab() {
           <tbody>
             {data?.users.map((u) => (
               <tr key={u.id} className="border-t border-ink-100 dark:border-ink-800">
-                <td className="p-2"><div className="font-bold">{u.displayName} {u.disabled && <span className="chip bg-rose-100 text-rose-600">désactivé</span>}</div><div className="muted text-xs">@{u.username} · {u.email}</div></td>
+                <td className="p-2"><div className="font-bold">{u.displayName} {u.disabled && <span className="chip bg-rose-100 text-rose-600">désactivé</span>}</div><div className="muted text-xs">{u.tag} · {u.email}</div><div className="mt-0.5 flex flex-wrap gap-1">{u.premiumUntil && new Date(u.premiumUntil) > new Date() && <span className="chip bg-amber-100 text-amber-700">👑 jusqu’au {new Date(u.premiumUntil).toLocaleDateString('fr-FR')}</span>}{u.twoFactor && <span className="chip bg-emerald-100 text-emerald-700">2FA</span>}</div></td>
                 <td className="p-2">{u.role === 'ADMIN' ? '🛡️ Admin' : 'Apprenant'}</td>
                 <td className="p-2">{u.xp} (niv. {u.level})</td>
                 <td className="p-2 text-xs">{new Date(u.lastActiveAt).toLocaleString('fr-FR')}</td>
@@ -134,6 +137,9 @@ function UsersTab() {
                   <button className="btn-outline btn-sm" onClick={() => act(u.id, { disabled: !u.disabled }, u.disabled ? 'Compte réactivé' : 'Compte désactivé')}>{u.disabled ? 'Réactiver' : 'Désactiver'}</button>
                   {u.lockedUntil && new Date(u.lockedUntil) > new Date() && <button className="btn-outline btn-sm" onClick={() => act(u.id, { unlock: true }, 'Compte déverrouillé')}>Déverrouiller</button>}
                   <button className="btn-outline btn-sm" onClick={() => { const p = prompt('Nouveau mot de passe (8 caractères min.) :'); if (p) act(u.id, { password: p }, 'Mot de passe réinitialisé'); }}>Mot de passe</button>
+                  <button className="btn-outline btn-sm" onClick={async () => { const d = prompt('Offrir combien de jours de Premium ? (0 = retirer le Premium)', '30'); if (d === null) return; try { await api(`/admin/users/${u.id}/premium`, { body: Number(d) > 0 ? { days: Number(d) } : { revoke: true } }); toast('Premium mis à jour', 'success'); reload(); } catch (e) { toast((e as ApiError).message, 'error'); } }}>👑 Premium</button>
+                  <button className="btn-outline btn-sm" onClick={async () => { const lang = prompt('Langage (rust, cpp ou java) :'); if (!lang) return; const lvl = prompt('Niveau (1 à 5) :'); if (!lvl) return; try { await api(`/admin/users/${u.id}/skills/${lang.trim()}`, { method: 'PUT', body: { level: Number(lvl) } }); toast('Niveau modifié', 'success'); } catch (e) { toast((e as ApiError).message, 'error'); } }}>Niveau</button>
+                  {u.twoFactor && <button className="btn-outline btn-sm" onClick={async () => { if (!confirm('Désactiver la double authentification de ce compte (téléphone perdu) ?')) return; await api(`/admin/users/${u.id}/reset-2fa`, { body: {} }); toast('2FA réinitialisée', 'success'); reload(); }}>Reset 2FA</button>}
                   <button className="btn-outline btn-sm" onClick={() => confirm('Réinitialiser toute la progression ?') && act(u.id, { resetProgress: true }, 'Progression réinitialisée')}>Reset</button>
                   <button className="btn-danger btn-sm" onClick={async () => { if (confirm(`Supprimer ${u.email} ?`)) { await api(`/admin/users/${u.id}`, { method: 'DELETE' }).catch((e) => toast(e.message, 'error')); reload(); } }}><Trash2 size={14} /></button>
                 </td>
@@ -160,7 +166,7 @@ function Chapters() {
       const c = await api<any>('/admin/chapters', { body: { slug, languageId: lang, level: 1, order: 99, title, summary: '', concepts: [], sections: [{ title: 'Introduction', body: 'À rédiger…' }], minutes: 20, published: false, examPass: 70 } });
       nav(`/admin/cours/${c.id}`);
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
       reload();
     }
   }
@@ -221,7 +227,7 @@ function ChapterEditor() {
       });
       toast('Chapitre enregistré', 'success');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   }
 
@@ -245,7 +251,7 @@ function ChapterEditor() {
       if (!edit.id) setEdit(null);
       reload();
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   }
 
@@ -446,7 +452,7 @@ function SettingsTab() {
       toast('Paramètres enregistrés', 'success');
       reload();
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   }
   return (
@@ -501,7 +507,7 @@ function ContentTab() {
       setLogs(r.logs);
       toast('Import terminé', 'success');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
       setLogs([(e as ApiError).message]);
     } finally {
       setBusy(false);

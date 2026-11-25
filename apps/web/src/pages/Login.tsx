@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useAuth, type User } from '../lib/auth';
 import Mascot from '../components/Mascot';
@@ -13,6 +14,34 @@ export default function Login({ mode }: { mode: 'login' | 'register' }) {
   const [form, setForm] = useState({ login: '', email: '', username: '', password: '', displayName: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ticket, setTicket] = useState<string | null>(null);
+  const [otp, setOtp] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+
+  function done(u: User, extra?: { trialDays?: number }) {
+    setUser(u);
+    if (extra?.trialDays) sessionStorage.setItem('cm-trial', String(extra.trialDays));
+    nav(u.onboardingDone ? ((loc.state as { from?: string })?.from ?? '/') : '/bienvenue', { replace: true });
+  }
+
+  async function submitOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const r = await api<{ user: User; recoveryUsed: boolean; recoveryLeft: number }>('/auth/login/2fa', { body: { ticket, code: otp } });
+      if (r.recoveryUsed) alert(`Code de secours utilisé. Il t’en reste ${r.recoveryLeft}. Pense à en régénérer depuis ton profil.`);
+      done(r.user);
+    } catch (err) {
+      setError((err as ApiError).message);
+      if ((err as ApiError).message.includes('reconnecte')) {
+        setTicket(null);
+        setOtp('');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function submit(e: React.FormEvent) {
@@ -22,12 +51,15 @@ export default function Login({ mode }: { mode: 'login' | 'register' }) {
     try {
       const r =
         mode === 'login'
-          ? await api<{ user: User }>('/auth/login', { body: { login: form.login, password: form.password } })
-          : await api<{ user: User }>('/auth/register', {
+          ? await api<{ user?: User; twoFactor?: boolean; ticket?: string }>('/auth/login', { body: { login: form.login, password: form.password } })
+          : await api<{ user: User; trialDays?: number }>('/auth/register', {
               body: { email: form.email, username: form.username, password: form.password, displayName: form.displayName || undefined, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
             });
-      setUser(r.user);
-      nav(r.user.onboardingDone ? ((loc.state as { from?: string })?.from ?? '/') : '/bienvenue', { replace: true });
+      if ('twoFactor' in r && r.twoFactor && r.ticket) {
+        setTicket(r.ticket);
+        return;
+      }
+      done(r.user!, r as { trialDays?: number });
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -43,6 +75,39 @@ export default function Login({ mode }: { mode: 'login' | 'register' }) {
           <h2 className="mt-4 text-3xl text-ink-900 dark:text-white">Apprends Rust, C++ et Java</h2>
           <p className="muted mt-2 max-w-sm text-lg">De tes tout premiers pas jusqu’à l’expertise, avec Kiri à tes côtés et un vrai compilateur à chaque exercice.</p>
         </div>
+        {ticket ? (
+          <motion.form key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} onSubmit={submitOtp} className="card space-y-4 p-6 sm:p-8">
+            <Logo />
+            <div className="flex items-center gap-3">
+              <ShieldCheck size={36} className="text-emerald-500" />
+              <div>
+                <h1 className="text-2xl">Double authentification</h1>
+                <p className="muted text-sm">{useRecovery ? 'Saisis un de tes codes de secours (ex. abcd-efgh-ijkl).' : 'Ouvre ton application d’authentification et saisis le code à 6 chiffres.'}</p>
+              </div>
+            </div>
+            <input
+              autoFocus
+              className="input text-center font-mono text-2xl tracking-[0.4em]"
+              inputMode={useRecovery ? 'text' : 'numeric'}
+              autoComplete="one-time-code"
+              maxLength={useRecovery ? 20 : 7}
+              placeholder={useRecovery ? 'xxxx-xxxx-xxxx' : '123456'}
+              value={otp}
+              onChange={(e) => {
+                const v = useRecovery ? e.target.value : e.target.value.replace(/\D/g, '');
+                setOtp(v);
+              }}
+            />
+            {error && <div className="animate-shake rounded-2xl bg-rose-50 px-4 py-2 text-sm font-bold text-rose-600 dark:bg-rose-950/30">{error}</div>}
+            <button className="btn-primary w-full py-3 text-lg" disabled={busy || otp.length < 6}>Valider</button>
+            <div className="flex justify-between text-sm">
+              <button type="button" className="font-bold text-brand-500" onClick={() => { setUseRecovery(!useRecovery); setOtp(''); }}>
+                {useRecovery ? 'Utiliser l’application' : 'Utiliser un code de secours'}
+              </button>
+              <button type="button" className="muted font-bold" onClick={() => { setTicket(null); setOtp(''); setError(''); }}>Retour</button>
+            </div>
+          </motion.form>
+        ) : (
         <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onSubmit={submit} className="card space-y-4 p-6 sm:p-8">
           <Logo />
           <div className="md:hidden">
@@ -93,6 +158,7 @@ export default function Login({ mode }: { mode: 'login' | 'register' }) {
             </p>
           )}
         </motion.form>
+        )}
       </div>
     </div>
   );

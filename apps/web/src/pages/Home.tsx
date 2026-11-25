@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Flame, Star, Target, Clock, CheckCircle2, Percent, BookOpenCheck, RotateCcw, ArrowRight, Swords, AlertTriangle, PlayCircle } from 'lucide-react';
+import { Flame, Star, Target, Clock, CheckCircle2, Percent, BookOpenCheck, RotateCcw, ArrowRight, Swords, AlertTriangle, PlayCircle, Crown, Trophy } from 'lucide-react';
 import { useApi, useIdle } from '../lib/hooks';
 import { formatDuration, LANG_META } from '../lib/api';
-import { PageTitle, ProgressBar, Ring, Loading, ErrorBox, MascotSays, Bars, LangBadge } from '../components/ui';
+import Duo from '../components/Duo';
+import { Podium, type BestCoderData } from './BestCoder';
+import { PageTitle, ProgressBar, Ring, Loading, ErrorBox, Bars, LangBadge } from '../components/ui';
 import type { Mood } from '../components/Mascot';
 
 interface Dashboard {
@@ -43,6 +46,46 @@ function Stat({ icon: Icon, label, value, color }: { icon: typeof Star; label: s
   );
 }
 
+/** Message d'accueil de l'essai Premium (juste après l'inscription). */
+function TrialWelcome() {
+  const [days, setDays] = useState(() => {
+    try {
+      return Number(sessionStorage.getItem('cm-trial') ?? 0);
+    } catch {
+      return 0;
+    }
+  });
+  if (!days) return null;
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="premium-shine flex items-center gap-3 rounded-3xl bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 p-4 text-amber-950 shadow-lg">
+      <Crown size={32} />
+      <div className="flex-1">
+        <div className="font-black">Cadeau de bienvenue : {days} jours de Premium offerts !</div>
+        <div className="text-sm font-bold opacity-80">Énergie illimitée, zéro pub, IA de Kiri, avatars exclusifs… profites-en pour tout découvrir.</div>
+      </div>
+      <button className="btn-ghost btn-sm" onClick={() => { sessionStorage.removeItem('cm-trial'); setDays(0); }}>OK</button>
+    </motion.div>
+  );
+}
+
+function BestCoderWidget() {
+  const { data } = useApi<BestCoderData>('/community/best-coder');
+  if (!data || (!data.leaders.length && !data.lastWinner)) return null;
+  const me = data.leaders.find((l) => l.me);
+  return (
+    <Link to="/meilleur-codeur" className="card group block transition hover:shadow-lg">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="section-title flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> Meilleur codeur de la semaine</h2>
+        <span className="muted text-xs font-bold">{me ? `Tu es ${me.rank}ᵉ` : 'Gagne de l’XP pour entrer dans la course'}</span>
+      </div>
+      {data.leaders.length ? <Podium leaders={data.leaders} /> : <p className="muted text-sm">La course vient de commencer !</p>}
+      {data.lastWinner && (
+        <p className="muted mt-3 text-center text-xs font-bold">Semaine dernière : 🏆 {data.lastWinner.displayName} ({data.lastWinner.xp} XP)</p>
+      )}
+    </Link>
+  );
+}
+
 export default function Home() {
   const { data, error, loading, reload } = useApi<Dashboard>('/dashboard');
   const idle = useIdle(90_000);
@@ -79,10 +122,13 @@ export default function Home() {
         <div className="space-y-4 lg:col-span-2">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-violet-600 !p-0 text-white">
             <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+              <div className="shrink-0 self-center">
+                <Duo scene={mood === 'celebrate' ? 'celebrate' : data.streak >= 3 ? 'cheer' : mood === 'sleep' ? 'comfort' : 'wave'} size={88} />
+              </div>
               <div className="flex-1">
-                <MascotSays mood={mood} size={100} className="[&>div:last-child]:border-white/30 [&>div:last-child]:bg-white/15 [&>div:last-child]:text-white">
+                <motion.div key={message} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="relative rounded-3xl rounded-tl-md border-2 border-white/30 bg-white/15 px-4 py-3 font-semibold text-white sm:rounded-bl-md sm:rounded-tl-3xl">
                   {message}
-                </MascotSays>
+                </motion.div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {data.resume && (
                     <Link to={data.resume.path} className="btn bg-white text-brand-600 shadow-[0_4px_0_0_rgba(0,0,0,0.15)] hover:bg-brand-50">
@@ -98,6 +144,9 @@ export default function Home() {
               </div>
             </div>
           </motion.div>
+
+          <TrialWelcome />
+          <BestCoderWidget />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat icon={Flame} label="Série quotidienne" value={`${data.streak} j`} color="bg-orange-100 text-orange-500 dark:bg-orange-900/30" />

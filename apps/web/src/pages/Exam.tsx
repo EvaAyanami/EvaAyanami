@@ -52,7 +52,7 @@ export default function Exam() {
       else if (r.skipped) celebrate(r.rewards, { title: 'Chapitre validé par l’examen !', text: 'Tu maîtrises déjà cette notion : le chapitre suivant est débloqué.' });
       else celebrate(r.rewards);
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setBusy(false);
     }

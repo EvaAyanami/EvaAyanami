@@ -4,7 +4,7 @@ import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { requireAdmin } from '../lib/auth.js';
 import { badRequest, notFound } from '../lib/http.js';
-import { extendPremium, premiumHistory, setPremiumUntil, stripeConfigured } from '../lib/plan.js';
+import { extendPremium, paymentsConfigured, premiumHistory, setPremiumUntil, stripeConfigured } from '../lib/plan.js';
 import { parse } from './auth.js';
 import { newKey } from '../lib/stripe.js';
 import { applySkillLevel } from './placement.js';
@@ -42,7 +42,7 @@ export default async function adminBillingRoutes(app: FastifyInstance) {
     return {
       premium, former, codes, adViewsDay, adRewardsDay, ads,
       sales: { count: sales._count, totalCents: sales._sum.amountCents ?? 0 },
-      stripe: { configured: stripeConfigured(), webhook: !!config.stripe.webhookSecret, webhookUrl: `${config.publicUrl.replace(/\/$/, '')}/api/billing/webhook` },
+      stripe: { configured: stripeConfigured(), payments: paymentsConfigured(), webhook: !!config.stripe.webhookSecret, webhookUrl: `${config.publicUrl.replace(/\/$/, '')}/api/billing/webhook` },
       adsProvider: config.ads.provider,
       adsense: { client: config.ads.adsenseClient || null, slotReward: !!config.ads.adsenseSlotReward, slotBanner: !!config.ads.adsenseSlotBanner },
     };

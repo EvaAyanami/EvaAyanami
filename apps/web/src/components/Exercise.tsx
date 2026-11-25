@@ -6,6 +6,7 @@ import { api, ApiError, TYPE_LABEL, LANG_META } from '../lib/api';
 import { useFeedback, type Rewards } from '../lib/feedback';
 import Markdown from './Markdown';
 import { MascotSays } from './ui';
+import Duo from './Duo';
 import type { Mood } from './Mascot';
 import type { EditorDiagnostic } from './CodeEditor';
 
@@ -52,6 +53,7 @@ export interface GradeResult {
   help?: { title: string; explanation: string; tip: string }[];
   rewards?: Rewards;
   failStreak?: number;
+  energyDelta?: number;
   firstSolve?: boolean;
   chapterCompleted?: boolean;
   projectCompleted?: boolean;
@@ -196,7 +198,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
         else celebrate(r.rewards);
       }
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setBusy(null);
     }
@@ -214,7 +216,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
       setRun(r);
       if (compileOnly && r.compile.ok) toast('Compilation réussie ✔', 'success');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setBusy(null);
     }
@@ -227,7 +229,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
       const h = await api<{ level: number; title: string; text: string; solution?: string; note?: string }>(`/exercises/${ex.id}/hint`, { body: { level, language: lang } });
       setHints((x) => [...x, h]);
     } catch (e) {
-      toast((e as ApiError).message, 'info');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'info'));
     }
   }
 
@@ -311,7 +313,24 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
       )}
       {result.explanation && <Markdown className="mt-2 text-sm">{result.explanation}</Markdown>}
       <CompileAndTests result={result} />
-      {mascotText && <MascotSays mood={mood} size={70} className="mt-3">{mascotText}</MascotSays>}
+      {result.correct && result.firstSolve ? (
+        <div className="mt-3 flex items-end gap-2">
+          <Duo scene="highfive" size={64} className="shrink-0" />
+          {mascotText && <div className="mb-4 rounded-3xl rounded-bl-md border-2 border-ink-200 bg-white px-4 py-3 font-semibold shadow-soft dark:border-ink-700 dark:bg-ink-900">{mascotText}</div>}
+        </div>
+      ) : !result.correct && (result.failStreak ?? 0) >= 3 ? (
+        <div className="mt-3 flex items-end gap-2">
+          <Duo scene="comfort" size={64} className="shrink-0" />
+          {mascotText && <div className="mb-4 rounded-3xl rounded-bl-md border-2 border-ink-200 bg-white px-4 py-3 font-semibold shadow-soft dark:border-ink-700 dark:bg-ink-900">{mascotText}</div>}
+        </div>
+      ) : (
+        mascotText && <MascotSays mood={mood} size={70} className="mt-3">{mascotText}</MascotSays>
+      )}
+      {result.energyDelta ? (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className={clsx('mt-2 text-sm font-black', result.energyDelta > 0 ? 'text-sky-500' : 'text-rose-500')}>
+          ⚡ {result.energyDelta > 0 ? '+1 énergie (révision réussie)' : '−1 énergie'}
+        </motion.div>
+      ) : null}
     </motion.div>
   );
 

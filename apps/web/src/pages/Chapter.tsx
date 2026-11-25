@@ -99,7 +99,7 @@ export default function Chapter() {
       const r = await api<{ answer: string; source: string }>('/assistant/reformulate', { body: { chapterSlug: chapter.slug, section } });
       setReform({ text: r.answer, source: r.source });
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setReformBusy(false);
     }
@@ -110,7 +110,7 @@ export default function Chapter() {
     try {
       setExtra(await api<{ items: PublicExercise[]; source: string }>('/assistant/practice', { body: { chapterSlug: chapter.slug } }));
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setExtraBusy(false);
     }

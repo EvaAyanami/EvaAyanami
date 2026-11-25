@@ -85,6 +85,7 @@ export default async function communityRoutes(app: FastifyInstance) {
     const u = requireUser(req);
     const body = parse(z.object({ avatar: avatarSchema, bio: z.string().max(160).optional() }), req.body);
     const used = premiumItemsUsed(body.avatar as Avatar);
+    // (les administrateurs ont accès à tout pour tester)
     if (used.length && !hasPremium(u) && u.role !== 'ADMIN') throw new HttpError(402, 'Certains éléments choisis sont réservés aux membres Premium 👑', { code: 'PREMIUM_ONLY' });
     await prisma.user.update({ where: { id: u.id }, data: { avatar: body.avatar, ...(body.bio !== undefined ? { bio: body.bio.trim() || null } : {}) } });
     return { ok: true, avatar: body.avatar };

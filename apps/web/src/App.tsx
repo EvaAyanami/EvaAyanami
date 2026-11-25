@@ -23,6 +23,11 @@ const Stats = lazy(() => import('./pages/Stats'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Admin = lazy(() => import('./pages/admin/Admin'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const Premium = lazy(() => import('./pages/Premium'));
+const Friends = lazy(() => import('./pages/Friends'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const AvatarEditor = lazy(() => import('./pages/AvatarEditor'));
+const BestCoder = lazy(() => import('./pages/BestCoder'));
 
 function Protected({ children, admin }: { children: JSX.Element; admin?: boolean }) {
   const { user, loading } = useAuth();
@@ -63,6 +68,13 @@ export default function App() {
           <Route path="succes" element={<Achievements />} />
           <Route path="statistiques" element={<Stats />} />
           <Route path="profil" element={<Profile />} />
+          <Route path="premium" element={<Premium />} />
+          <Route path="boutique" element={<Premium />} />
+          <Route path="abonnement" element={<Premium />} />
+          <Route path="amis" element={<Friends />} />
+          <Route path="u/:tag" element={<UserProfile />} />
+          <Route path="avatar" element={<AvatarEditor />} />
+          <Route path="meilleur-codeur" element={<BestCoder />} />
           <Route path="admin/*" element={<Protected admin><Admin /></Protected>} />
           <Route path="*" element={<NotFound />} />
         </Route>

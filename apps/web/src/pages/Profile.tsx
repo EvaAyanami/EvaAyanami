@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { Save, KeyRound, Trash2, Compass } from 'lucide-react';
+import { Save, KeyRound, Trash2, Compass, Crown, Pencil, Eye, Copy, Lock } from 'lucide-react';
+import { motion } from 'framer-motion';
+import Avatar from '../components/Avatar';
+import TwoFactorCard from '../components/TwoFactorCard';
+import { PremiumBadge, remaining, usePlan } from '../lib/plan';
 import { api, ApiError, LANG_META, LEVEL_NAMES } from '../lib/api';
 import { useAuth, type User } from '../lib/auth';
 import { useApi } from '../lib/hooks';
@@ -34,6 +38,7 @@ export default function Profile() {
     leaderboardOptIn: user!.leaderboardOptIn,
   }));
   const [pw, setPw] = useState({ current: '', next: '' });
+  const { plan } = usePlan();
   if (!user) return <Loading />;
 
   async function save() {
@@ -43,7 +48,7 @@ export default function Profile() {
       applyTheme(r.user.theme);
       toast('Profil enregistré', 'success');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   }
 
@@ -60,7 +65,7 @@ export default function Profile() {
       setPw({ current: '', next: '' });
       toast('Mot de passe modifié', 'success');
     } catch (err) {
-      toast((err as ApiError).message, 'error');
+      ((err as ApiError).status !== 402 && toast((err as ApiError).message, 'error'));
     }
   }
 
@@ -72,13 +77,44 @@ export default function Profile() {
       await logout().catch(() => {});
       nav('/connexion');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   }
 
   return (
     <div>
-      <PageTitle title="Profil" subtitle={`@${user.username} · ${user.email}`} />
+      <PageTitle title="Profil" subtitle={`${user.tag} · ${user.email}`} />
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={clsx('mb-4 flex flex-col items-center gap-4 rounded-4xl p-5 shadow-soft sm:flex-row', user.premium ? 'bg-gradient-to-br from-amber-100 via-rose-50 to-violet-100 dark:from-amber-950/40 dark:via-ink-900 dark:to-violet-950/40' : 'bg-white dark:bg-ink-900')}
+      >
+        <Link to="/avatar" className="group relative">
+          <Avatar avatar={user.avatar} size={110} ring={user.premium ? 'premium' : 'none'} />
+          <span className="absolute bottom-1 right-1 rounded-full bg-brand-500 p-2 text-white shadow transition group-hover:scale-110"><Pencil size={14} /></span>
+        </Link>
+        <div className="flex-1 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <span className={clsx('text-2xl font-black', user.premium && 'premium-text')}>{user.displayName}</span>
+            <PremiumBadge kind={user.premium ? 'premium' : user.formerPremium ? 'former' : null} size="md" />
+          </div>
+          <button className="muted font-mono text-sm" onClick={() => navigator.clipboard?.writeText(user.tag).then(() => toast('Identifiant copié', 'success'))}>
+            {user.tag} <Copy size={12} className="inline" />
+          </button>
+          {user.premium ? (
+            <p className="mt-1 text-sm font-bold">
+              <Crown size={14} className="inline text-amber-500" /> Premium{plan?.trial ? ' (essai)' : ''} : encore <b>{remaining(user.premiumUntil)}</b>
+            </p>
+          ) : (
+            <p className="muted mt-1 text-sm font-bold">{user.formerPremium ? 'Ton Premium est terminé.' : 'Compte gratuit.'} <Link to="/premium" className="text-brand-500">Voir Premium</Link></p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Link to="/avatar" className="btn-outline btn-sm"><Pencil size={14} /> Mon avatar</Link>
+          <Link to={`/u/${encodeURIComponent(user.tag)}`} className="btn-ghost btn-sm"><Eye size={14} /> Profil public</Link>
+          <Link to="/premium" className="btn-ghost btn-sm"><Crown size={14} /> Premium et clés</Link>
+        </div>
+      </motion.div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card space-y-3">
           <h2 className="section-title">Préférences</h2>
@@ -114,7 +150,9 @@ export default function Profile() {
 
         <div className="card">
           <h2 className="section-title">Niveau par langage</h2>
-          <p className="muted mb-3 text-sm">Ton niveau est distinct pour chaque langage. Le modifier débloque les chapitres correspondants (les catégories inférieures sont marquées « passées »).</p>
+          <p className="muted mb-3 text-sm">
+            <Lock size={12} className="inline" /> Ton niveau est distinct pour chaque langage. Il évolue avec l’évaluation de départ et les examens des chapitres{user.role === 'ADMIN' ? ' (en tant qu’administrateur, tu peux le régler ici).' : ' : il ne peut pas être modifié à la main.'}
+          </p>
           {skills.data?.map((s) => (
             <div key={s.language} className="mb-4">
               <div className="mb-1 flex items-center justify-between">
@@ -123,7 +161,7 @@ export default function Profile() {
               </div>
               <div className="grid grid-cols-5 gap-1">
                 {[1, 2, 3, 4, 5].map((l) => (
-                  <button key={l} onClick={() => l !== s.level && setLevel(s.language, l)} title={LEVEL_NAMES[l]} className={clsx('rounded-xl py-2 text-xs font-black', l === s.level ? 'bg-brand-500 text-white' : l < s.level ? 'bg-brand-100 text-brand-600 dark:bg-brand-900/40 dark:text-brand-300' : 'bg-ink-100 dark:bg-ink-800')}>
+                  <button key={l} disabled={user.role !== 'ADMIN'} onClick={() => l !== s.level && setLevel(s.language, l)} title={LEVEL_NAMES[l]} className={clsx('rounded-xl py-2 text-xs font-black disabled:cursor-default', l === s.level ? 'bg-brand-500 text-white' : l < s.level ? 'bg-brand-100 text-brand-600 dark:bg-brand-900/40 dark:text-brand-300' : 'bg-ink-100 dark:bg-ink-800')}>
                     {l}
                   </button>
                 ))}
@@ -131,7 +169,7 @@ export default function Profile() {
               <div className="mt-1 text-xs font-bold text-brand-500">{s.levelName}</div>
             </div>
           ))}
-          <Link to="/bienvenue" className="btn-outline w-full"><Compass size={16} /> Refaire l’évaluation</Link>
+          <Link to="/bienvenue" className="btn-outline w-full"><Compass size={16} /> Refaire l’évaluation (1 fois par semaine)</Link>
         </div>
 
         <div className="card lg:col-span-2">
@@ -153,6 +191,8 @@ export default function Profile() {
           <input className="input" type="password" placeholder="Nouveau mot de passe (8 caractères min.)" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} autoComplete="new-password" minLength={8} />
           <button className="btn-outline" disabled={!pw.current || pw.next.length < 8}><KeyRound size={16} /> Modifier</button>
         </form>
+
+        <TwoFactorCard />
 
         <div className="card">
           <h2 className="section-title text-rose-500">Zone sensible</h2>

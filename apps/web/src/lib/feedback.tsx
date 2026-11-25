@@ -5,7 +5,7 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Flame, Star, Trophy, Target, X } from 'lucide-react';
-import Mascot from '../components/Mascot';
+import Duo from '../components/Duo';
 import { useAuth } from './auth';
 
 export interface Rewards {
@@ -141,7 +141,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                 <X size={18} />
               </button>
               <div className="mx-auto -mt-2 w-fit">
-                <Mascot mood="celebrate" size={140} />
+                <Duo scene={celebration.rewards?.levelUp || celebration.rewards?.achievements.length ? 'celebrate' : 'highfive'} size={110} />
               </div>
               <h2 className="mt-2 text-2xl text-ink-900 dark:text-white">{celebration.title}</h2>
               <p className="muted mt-1">{celebration.text}</p>

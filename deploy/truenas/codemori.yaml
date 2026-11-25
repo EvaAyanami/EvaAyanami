@@ -92,6 +92,16 @@ services:
       ADMIN_PASSWORD: ChangeMoiTresVite2026        # À CHANGER (8 caractères minimum)
       ALLOW_REGISTRATION: "true"
       AI_PROVIDER: none
+      # --- Paiements et publicités (facultatif, voir docs/monetisation.md) ---
+      # Boutique de clés par carte / Apple Pay / Google Pay :
+      # STRIPE_SECRET_KEY: sk_live_...
+      # STRIPE_WEBHOOK_SECRET: whsec_...   # renouvellements d'abonnement (URL publique requise)
+      # STRIPE_PRICE_ID: price_...         # abonnement mensuel (en plus des clés)
+      # Publicités rémunérées (site public avec nom de domaine, compte AdSense validé) :
+      # ADS_PROVIDER: adsense
+      # ADSENSE_CLIENT: ca-pub-XXXXXXXXXXXXXXXX
+      # ADSENSE_SLOT_REWARD: "1234567890"
+      # ADSENSE_SLOT_BANNER: "0987654321"
     networks: [interne, web]
     depends_on:
       db: { condition: service_healthy }

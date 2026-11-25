@@ -53,6 +53,8 @@ Dans la liste des conteneurs, `sandbox-rust`, `sandbox-cpp` et `sandbox-java` ap
 | Inscriptions | `ALLOW_REGISTRATION` | `"false"` pour un usage familial ou fermé |
 | Assistant IA | `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL` | voir [assistant-ia.md](assistant-ia.md). Avec l’app *Ollama* de TrueNAS : `AI_PROVIDER: ollama`, `AI_BASE_URL: http://IP-DU-NAS:30068` (le port de ton app Ollama) |
 
+| Paiements, publicités | `STRIPE_*`, `ADS_PROVIDER`, `ADSENSE_*` | lignes commentées dans le YAML ; voir [monetisation.md](monetisation.md). La boutique de clés fonctionne même en réseau local |
+
 Pour modifier un réglage : *Apps → codemori → Edit*, puis *Save*.
 
 ## 5. Accès en HTTPS (facultatif, recommandé hors du réseau local)

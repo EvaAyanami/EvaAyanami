@@ -76,7 +76,7 @@ export default function Ide() {
       const r = await api<RunResult>('/ide/run', { body: { language: lang, code, stdin, compileOnly } });
       setResult(r);
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
       setBusy(null);
     }
@@ -91,7 +91,7 @@ export default function Ide() {
       setSnippets((list) => [s, ...list.filter((x) => x.id !== s.id)]);
       toast('Fichier enregistré', 'success');
     } catch (e) {
-      toast((e as ApiError).message, 'error');
+      ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
   }
 
