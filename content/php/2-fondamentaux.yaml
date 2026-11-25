@@ -1,0 +1,143 @@
+language: php
+level: 2
+chapters:
+  - slug: php-fonctions-tableaux
+    title: Fonctions et tableaux
+    summary: Fonctions typées, tableaux indexés et associatifs, et les fonctions de tableau indispensables.
+    minutes: 30
+    concepts: [fonctions, tableaux, tableaux-associatifs]
+    sections:
+      - title: Des fonctions typées
+        body: |
+          ```php
+          <?php
+          declare(strict_types=1);   // refuse les conversions de type implicites
+
+          function aire(float $largeur, float $hauteur = 1.0): float
+          {
+              return $largeur * $hauteur;
+          }
+
+          echo aire(3, 4), "\n";     // 12
+          echo aire(largeur: 5), "\n"; // arguments nommés (PHP 8)
+          ```
+
+          Avec `strict_types`, appeler `aire("3", 4)` provoque une `TypeError` au lieu d’une conversion silencieuse.
+      - title: Les tableaux
+        body: |
+          En PHP, un tableau peut être une **liste** ou un **dictionnaire** (tableau associatif) :
+
+          ```php
+          <?php
+          $notes = [12, 15, 9];
+          $notes[] = 18;                   // ajoute à la fin
+          echo count($notes), " ", array_sum($notes), "\n";   // 4 54
+
+          $stock = ["pommes" => 3, "poires" => 5];
+          $stock["kiwis"] = 2;
+          foreach ($stock as $fruit => $qte) {
+              echo "$fruit : $qte\n";
+          }
+          echo $stock["bananes"] ?? 0, "\n";   // ?? : valeur par défaut
+          ```
+
+          Fonctions utiles : `sort`, `rsort`, `in_array`, `array_keys`, `array_map`, `array_filter`, `implode`, `explode`.
+    exercises:
+      - id: php-ft-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          $t = [3, 1, 2];
+          sort($t);
+          echo implode(",", $t), "\n";
+        output: "1,2,3"
+      - id: php-ft-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          $carres = array_map(fn($x) => $x * $x, [1, 2, 3]);
+          $pairs = array_filter([1, 2, 3, 4], fn($x) => $x % 2 === 0);
+          echo implode(" ", $carres), " | ", implode(" ", $pairs), "\n";
+        output: "1 4 9 | 2 4"
+      - id: php-ft-q1
+        type: mcq
+        prompt: Que fait l’opérateur `??` ?
+        choices: [Donne une valeur par défaut si la clé ou la variable n’existe pas (ou vaut null), Compare deux valeurs, Concatène deux tableaux, Lance une exception]
+        answer: 0
+      - id: php-ft-code
+        type: code
+        title: La moyenne
+        prompt: 'Écris `moyenne(array $notes): float`. Le programme lit une ligne de notes séparées par des espaces et affiche la moyenne arrondie à 2 décimales.'
+        starter: |
+          <?php
+          declare(strict_types=1);
+
+          function moyenne(array $notes): float
+          {
+              // à toi
+          }
+
+          $notes = array_map('intval', explode(' ', trim(fgets(STDIN))));
+          echo round(moyenne($notes), 2), "\n";
+        solution: |
+          <?php
+          declare(strict_types=1);
+
+          function moyenne(array $notes): float
+          {
+              return array_sum($notes) / count($notes);
+          }
+
+          $notes = array_map('intval', explode(' ', trim(fgets(STDIN))));
+          echo round(moyenne($notes), 2), "\n";
+        tests:
+          - { input: '12 15 9', output: '12' }
+          - { input: '10 11', output: '10.5', hidden: true }
+          - { input: '1 2 2', output: '1.67', hidden: true }
+    project:
+      id: php-ft-projet
+      type: code
+      title: Compteur de mots
+      difficulty: 2
+      prompt: |
+        Lis une ligne de mots en minuscules séparés par des espaces et affiche chaque mot avec son nombre d’occurrences, **dans l’ordre de première apparition**, au format `mot: n`.
+      starter: |
+        <?php
+        $mots = explode(' ', trim(fgets(STDIN)));
+        $compte = [];
+      solution: |
+        <?php
+        $mots = explode(' ', trim(fgets(STDIN)));
+        $compte = [];
+        foreach ($mots as $m) {
+            $compte[$m] = ($compte[$m] ?? 0) + 1;
+        }
+        foreach ($compte as $m => $n) {
+            echo "$m: $n\n";
+        }
+      tests:
+        - { input: 'le chat et le chien et le lapin', output: "le: 3\nchat: 1\net: 2\nchien: 1\nlapin: 1" }
+        - { input: 'php', output: 'php: 1', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: php-ft-ex1
+          type: mcq
+          prompt: Que fait `declare(strict_types=1);` ?
+          choices: [Interdit les conversions de type implicites aux appels de fonctions, Active le mode débogage, Rend les variables constantes, Accélère PHP]
+          answer: 0
+        - id: php-ft-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            <?php
+            $t = explode("-", "a-b-c");
+            echo count($t), " ", $t[1], "\n";
+          output: "3 b"
+        - id: php-ft-ex3
+          type: mcq
+          prompt: Comment ajouter un élément à la fin d’un tableau `$t` ?
+          choices: ['$t[] = $x;', '$t += $x;', '$t.push($x);', 'add($t, $x);']
+          answer: 0

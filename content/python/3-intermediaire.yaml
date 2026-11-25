@@ -1,0 +1,308 @@
+language: python
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: py-chaines-comprehensions
+    title: Chaînes de caractères et compréhensions
+    summary: Manipuler du texte, tuples et ensembles, et écrire des compréhensions de listes élégantes.
+    minutes: 30
+    concepts: [chaines, comprehensions, ensembles, tuples]
+    sections:
+      - title: Le texte en Python
+        body: |
+          ```python
+          s = "Bonjour Kiri"
+          print(s.upper(), s.lower())
+          print(s[0], s[-4:])        # B Kiri
+          print(s.replace("Kiri", "Ada"))
+          print("-".join(["a", "b", "c"]))  # a-b-c
+          print(s.count("o"), "Kiri" in s)  # 2 True
+          ```
+
+          Les chaînes sont **immuables** : chaque méthode renvoie une **nouvelle** chaîne.
+      - title: Les compréhensions
+        body: |
+          Une compréhension construit une collection en une ligne :
+
+          ```python
+          carres = [x * x for x in range(6)]              # [0, 1, 4, 9, 16, 25]
+          pairs = [x for x in range(10) if x % 2 == 0]   # [0, 2, 4, 6, 8]
+          longueurs = {mot: len(mot) for mot in ["kiri", "code"]}  # dictionnaire
+          ```
+      - title: Tuples et ensembles
+        body: |
+          - **Tuple** `(1, 2)` : comme une liste mais **immuable**, idéal pour des coordonnées ou plusieurs valeurs de retour.
+          - **Ensemble** `{1, 2, 3}` : pas de doublons, test d’appartenance très rapide, opérations `|` (union), `&` (intersection), `-` (différence).
+
+          ```python
+          vus = set()
+          for x in [3, 1, 3, 2, 1]:
+              vus.add(x)
+          print(sorted(vus))   # [1, 2, 3]
+          ```
+    exercises:
+      - id: py-cc-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          print([x * 2 for x in range(5) if x % 2 == 1])
+        output: "[2, 6]"
+      - id: py-cc-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          s = "programmation"
+          print(s[:3], s.count("m"), len(set(s)))
+        output: "pro 2 9"
+      - id: py-cc-q1
+        type: mcq
+        prompt: Quelle collection supprime automatiquement les doublons ?
+        choices: [set, list, tuple, str]
+        answer: 0
+      - id: py-cc-code
+        type: code
+        title: Palindrome
+        prompt: Lis un mot et affiche `oui` s’il se lit pareil dans les deux sens (en ignorant les majuscules), sinon `non`.
+        starter: |
+          mot = input().strip()
+        solution: |
+          mot = input().strip().lower()
+          print("oui" if mot == mot[::-1] else "non")
+        tests:
+          - { input: 'Radar', output: 'oui' }
+          - { input: 'kiri', output: 'non' }
+          - { input: 'Ressasser', output: 'oui', hidden: true }
+        hints: ['`mot[::-1]` renverse une chaîne.']
+    project:
+      id: py-cc-projet
+      type: code
+      title: Code de César
+      difficulty: 3
+      prompt: |
+        Lis un décalage `k` (entier) puis une ligne de texte en minuscules. Affiche le texte chiffré : chaque lettre de `a` à `z` est décalée de `k` positions dans l’alphabet (en revenant au début après `z`). Les autres caractères restent identiques.
+      starter: |
+        k = int(input())
+        texte = input()
+      solution: |
+        k = int(input())
+        texte = input()
+        res = []
+        for c in texte:
+            if "a" <= c <= "z":
+                res.append(chr((ord(c) - ord("a") + k) % 26 + ord("a")))
+            else:
+                res.append(c)
+        print("".join(res))
+      tests:
+        - { input: "3\nbonjour kiri", output: 'erqmrxu nlul' }
+        - { input: "1\nzoo !", output: 'app !', hidden: true }
+        - { input: "26\nabc", output: 'abc', hidden: true }
+      hints: ['`ord("a")` donne 97 et `chr(97)` redonne "a".']
+    exam:
+      pass: 70
+      questions:
+        - id: py-cc-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            print({1, 2, 3} & {2, 3, 4})
+          output: "{2, 3}"
+        - id: py-cc-ex2
+          type: mcq
+          prompt: Que renvoie `"a,b,c".split(",")` ?
+          choices: ["['a', 'b', 'c']", "'abc'", "('a', 'b', 'c')", "{'a', 'b', 'c'}"]
+          answer: 0
+        - id: py-cc-ex3
+          type: code
+          title: Initiales
+          prompt: Lis une ligne de mots et affiche leurs initiales en majuscules, collées.
+          starter: |
+            mots = input().split()
+          solution: |
+            mots = input().split()
+            print("".join(m[0].upper() for m in mots))
+          tests:
+            - { input: 'ada lovelace', output: 'AL' }
+            - { input: 'grace brewster murray hopper', output: 'GBMH', hidden: true }
+
+  # ------------------------------------------------------------------
+  - slug: py-classes
+    title: Classes et objets
+    summary: Créer ses propres types — attributs, méthodes, __init__, __str__, héritage et dataclasses.
+    minutes: 35
+    concepts: [classes, objets, heritage, dataclass]
+    sections:
+      - title: Une classe
+        body: |
+          ```python
+          class Compte:
+              def __init__(self, titulaire, solde=0):
+                  self.titulaire = titulaire   # attributs
+                  self.solde = solde
+
+              def deposer(self, montant):
+                  self.solde += montant
+
+              def __str__(self):
+                  return f"{self.titulaire} : {self.solde} €"
+
+          c = Compte("Kiri")
+          c.deposer(50)
+          print(c)          # Kiri : 50 €
+          ```
+
+          - `__init__` initialise l’objet ; `self` désigne l’objet lui-même.
+          - `__str__` définit l’affichage avec `print`.
+      - title: L’héritage
+        body: |
+          ```python
+          class Animal:
+              def __init__(self, nom):
+                  self.nom = nom
+              def parler(self):
+                  return "..."
+
+          class Chat(Animal):
+              def parler(self):            # redéfinition
+                  return f"{self.nom} : miaou"
+
+          print(Chat("Neko").parler())
+          ```
+      - title: Les dataclasses
+        body: |
+          Pour une classe qui sert surtout à **stocker des données**, `dataclass` génère `__init__`, `__repr__` et `__eq__` :
+
+          ```python
+          from dataclasses import dataclass
+
+          @dataclass
+          class Point:
+              x: int
+              y: int
+
+          print(Point(1, 2) == Point(1, 2))   # True
+          ```
+    exercises:
+      - id: py-cl-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          class Compteur:
+              def __init__(self):
+                  self.n = 0
+              def incr(self):
+                  self.n += 1
+                  return self
+          c = Compteur()
+          c.incr().incr().incr()
+          print(c.n)
+        output: "3"
+      - id: py-cl-q1
+        type: mcq
+        prompt: Que représente `self` ?
+        choices: [L’objet sur lequel la méthode est appelée, La classe parente, Une variable globale, Le module]
+        answer: 0
+      - id: py-cl-fill
+        type: fill
+        prompt: Complète pour que `print(p)` affiche `(3, 4)`.
+        code: |
+          class Point:
+              def __init__(self, x, y):
+                  self.x = x
+                  self.y = y
+              def {{?}}(self):
+                  return f"({self.x}, {self.y})"
+          p = Point(3, 4)
+          print(p)
+        blanks: [[__str__]]
+        tests:
+          - { input: '', output: '(3, 4)' }
+      - id: py-cl-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          class A:
+              def nom(self):
+                  return "A"
+          class B(A):
+              pass
+          class C(A):
+              def nom(self):
+                  return "C"
+          print(B().nom(), C().nom())
+        output: "A C"
+    project:
+      id: py-cl-projet
+      type: code
+      title: Le compte bancaire
+      difficulty: 3
+      prompt: |
+        Écris une classe `Compte` avec `deposer(m)` et `retirer(m)`. Un retrait plus grand que le solde est **refusé** : la méthode renvoie `False` sans rien changer (sinon `True`).
+
+        Le programme lit des opérations (une par ligne, jusqu’à la fin de l’entrée) de la forme `D 50` ou `R 20`, affiche `refusé` pour chaque retrait refusé, puis le solde final sous la forme `Solde : 30`.
+      starter: |
+        import sys
+
+        class Compte:
+            def __init__(self):
+                self.solde = 0
+
+        c = Compte()
+        for ligne in sys.stdin.read().splitlines():
+            op, montant = ligne.split()
+            # à toi !
+        print(f"Solde : {c.solde}")
+      solution: |
+        import sys
+
+        class Compte:
+            def __init__(self):
+                self.solde = 0
+
+            def deposer(self, m):
+                self.solde += m
+
+            def retirer(self, m):
+                if m > self.solde:
+                    return False
+                self.solde -= m
+                return True
+
+        c = Compte()
+        for ligne in sys.stdin.read().splitlines():
+            op, montant = ligne.split()
+            if op == "D":
+                c.deposer(int(montant))
+            elif not c.retirer(int(montant)):
+                print("refusé")
+        print(f"Solde : {c.solde}")
+      tests:
+        - { input: "D 50\nR 20\nR 100\nD 5", output: "refusé\nSolde : 35" }
+        - { input: "R 1", output: "refusé\nSolde : 0", hidden: true }
+        - { input: "D 10\nR 10", output: "Solde : 0", hidden: true }
+      require:
+        - { pattern: 'def\s+retirer', message: Définir la méthode retirer }
+    exam:
+      pass: 70
+      questions:
+        - id: py-cl-ex1
+          type: mcq
+          prompt: Quelle méthode est appelée à la création d’un objet ?
+          choices: [__init__, __new_object__, __str__, constructor]
+          answer: 0
+        - id: py-cl-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            from dataclasses import dataclass
+            @dataclass
+            class P:
+                x: int
+            print(P(1) == P(1), P(1) is P(1))
+          output: "True False"
+          explanation: '`==` compare les valeurs (généré par dataclass) ; `is` compare l’identité des objets.'
+        - id: py-cl-ex3
+          type: mcq
+          prompt: Comment `Chat` hérite-t-il de `Animal` ?
+          choices: ['class Chat(Animal):', 'class Chat extends Animal:', 'class Chat : Animal', 'class Chat inherits Animal:']
+          answer: 0

@@ -1,0 +1,292 @@
+language: python
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: py-exceptions
+    title: Exceptions et programmes robustes
+    summary: try / except / else / finally, lever ses propres exceptions et valider les entrées.
+    minutes: 30
+    concepts: [exceptions, validation]
+    sections:
+      - title: Attraper une erreur
+        body: |
+          ```python
+          try:
+              n = int(input())
+              print(100 / n)
+          except ValueError:
+              print("Ce n'est pas un nombre")
+          except ZeroDivisionError:
+              print("Division par zéro")
+          else:
+              print("Tout s'est bien passé")   # si aucune exception
+          finally:
+              print("Fin")                     # toujours exécuté
+          ```
+
+          On attrape seulement les exceptions **qu’on sait traiter**, jamais un `except:` vide qui cacherait les vrais bugs.
+      - title: Lever ses propres exceptions
+        body: |
+          ```python
+          class SoldeInsuffisant(Exception):
+              pass
+
+          def retirer(solde, montant):
+              if montant > solde:
+                  raise SoldeInsuffisant(f"il manque {montant - solde} €")
+              return solde - montant
+          ```
+
+          Une exception remonte d’appel en appel jusqu’à un `try` qui l’attrape — ou fait planter le programme avec une **trace d’appels** (*traceback*).
+    exercises:
+      - id: py-ex-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          try:
+              x = [1, 2][5]
+          except IndexError:
+              print("indice")
+          finally:
+              print("fin")
+        output: "indice\nfin"
+      - id: py-ex-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          def f():
+              try:
+                  return "try"
+              finally:
+                  print("finally")
+          print(f())
+        output: "finally\ntry"
+        explanation: '`finally` s’exécute même quand on sort par `return`.'
+      - id: py-ex-q1
+        type: mcq
+        prompt: Pourquoi éviter `except:` sans type ?
+        choices: [Il cache aussi les vrais bugs et même Ctrl+C, Il est plus lent, Il est interdit en Python 3, Il ne fonctionne qu’une fois]
+        answer: 0
+      - id: py-ex-code
+        type: code
+        title: Saisie sécurisée
+        prompt: |
+          Lis des lignes jusqu’à la fin de l’entrée. Pour chacune, affiche le double du nombre entier qu’elle contient, ou `invalide` si ce n’est pas un entier.
+        starter: |
+          import sys
+          for ligne in sys.stdin.read().splitlines():
+              pass
+        solution: |
+          import sys
+          for ligne in sys.stdin.read().splitlines():
+              try:
+                  print(int(ligne) * 2)
+              except ValueError:
+                  print("invalide")
+        tests:
+          - { input: "4\nabc\n-1", output: "8\ninvalide\n-2" }
+          - { input: "3.5", output: "invalide", hidden: true }
+        require:
+          - { pattern: '\bexcept\s+ValueError', message: Attraper ValueError }
+    project:
+      id: py-ex-projet
+      type: code
+      title: Calculatrice robuste
+      difficulty: 3
+      prompt: |
+        Chaque ligne de l’entrée contient une opération `a op b` (entiers, `op` parmi `+ - * /`). Affiche le résultat (division décimale arrondie à 2 décimales), ou un message :
+
+        - `erreur : division par zéro`
+        - `erreur : opération invalide` (opérateur inconnu, nombres invalides ou mauvais format)
+      starter: |
+        import sys
+
+        def calculer(ligne):
+            ...
+
+        for ligne in sys.stdin.read().splitlines():
+            print(calculer(ligne))
+      solution: |
+        import sys
+
+        def calculer(ligne):
+            try:
+                a, op, b = ligne.split()
+                a, b = int(a), int(b)
+            except ValueError:
+                return "erreur : opération invalide"
+            if op == "+":
+                return a + b
+            if op == "-":
+                return a - b
+            if op == "*":
+                return a * b
+            if op == "/":
+                try:
+                    return round(a / b, 2)
+                except ZeroDivisionError:
+                    return "erreur : division par zéro"
+            return "erreur : opération invalide"
+
+        for ligne in sys.stdin.read().splitlines():
+            print(calculer(ligne))
+      tests:
+        - { input: "2 + 3\n7 / 2\n1 / 0\n4 % 2\nx * 2", output: "5\n3.5\nerreur : division par zéro\nerreur : opération invalide\nerreur : opération invalide" }
+        - { input: "10 / 3\n6 * -2", output: "3.33\n-12", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: py-ex-ex1
+          type: mcq
+          prompt: Quel bloc s’exécute seulement si aucune exception n’a été levée ?
+          choices: [else, finally, except, raise]
+          answer: 0
+        - id: py-ex-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            try:
+                raise ValueError("oups")
+            except ValueError as e:
+                print("attrapé :", e)
+          output: "attrapé : oups"
+        - id: py-ex-ex3
+          type: mcq
+          prompt: Comment créer sa propre exception ?
+          choices: ['class MonErreur(Exception): pass', 'def MonErreur(): raise', 'exception MonErreur', 'MonErreur = Error()']
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: py-iterateurs-generateurs
+    title: Itérateurs, générateurs et fonctions d’ordre supérieur
+    summary: yield, expressions génératrices, lambda, sorted avec key, zip, enumerate et le module itertools.
+    minutes: 30
+    concepts: [generateurs, lambda, iterateurs]
+    sections:
+      - title: Les générateurs
+        body: |
+          Une fonction avec `yield` produit ses valeurs **une par une, à la demande**, sans tout stocker en mémoire :
+
+          ```python
+          def fibonacci():
+              a, b = 0, 1
+              while True:
+                  yield a
+                  a, b = b, a + b
+
+          for i, f in enumerate(fibonacci()):
+              if i == 8:
+                  break
+              print(f, end=" ")    # 0 1 1 2 3 5 8 13
+          ```
+
+          Une **expression génératrice** ressemble à une compréhension avec des parenthèses : `sum(x * x for x in range(10**6))` ne crée jamais la liste.
+      - title: Fonctions qui prennent des fonctions
+        body: |
+          ```python
+          joueurs = [("Ada", 120), ("Kiri", 300), ("Linus", 210)]
+          par_score = sorted(joueurs, key=lambda j: j[1], reverse=True)
+          noms = [n for n, _ in par_score]          # ['Kiri', 'Linus', 'Ada']
+
+          for nom, score in zip(["a", "b"], [1, 2]):  # parcourt deux listes ensemble
+              print(nom, score)
+          ```
+
+          `lambda x: ...` crée une petite fonction anonyme. `enumerate` donne l’indice et la valeur ; `zip` associe plusieurs séquences.
+    exercises:
+      - id: py-gen-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          def compte(n):
+              for i in range(n):
+                  yield i * 10
+          print(list(compte(4)))
+        output: "[0, 10, 20, 30]"
+      - id: py-gen-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          mots = ["kiwi", "a", "banane", "fig"]
+          print(sorted(mots, key=len))
+        output: "['a', 'fig', 'kiwi', 'banane']"
+      - id: py-gen-q1
+        type: mcq
+        prompt: Quel est l’avantage d’un générateur ?
+        choices: [Il produit les valeurs à la demande sans tout garder en mémoire, Il est toujours plus rapide qu’une liste, Il peut être parcouru plusieurs fois, Il trie automatiquement]
+        answer: 0
+      - id: py-gen-code
+        type: code
+        title: Classement
+        prompt: |
+          Lis des lignes `nom score` jusqu’à la fin de l’entrée et affiche le classement par score décroissant (en cas d’égalité, par nom alphabétique), au format `1. Kiri (300)`.
+        starter: |
+          import sys
+          joueurs = []
+          for ligne in sys.stdin.read().splitlines():
+              nom, score = ligne.split()
+              joueurs.append((nom, int(score)))
+        solution: |
+          import sys
+          joueurs = []
+          for ligne in sys.stdin.read().splitlines():
+              nom, score = ligne.split()
+              joueurs.append((nom, int(score)))
+          for i, (nom, score) in enumerate(sorted(joueurs, key=lambda j: (-j[1], j[0])), start=1):
+              print(f"{i}. {nom} ({score})")
+        tests:
+          - { input: "Ada 120\nKiri 300\nLinus 210", output: "1. Kiri (300)\n2. Linus (210)\n3. Ada (120)" }
+          - { input: "Zoe 5\nAbel 5\nMax 9", output: "1. Max (9)\n2. Abel (5)\n3. Zoe (5)", hidden: true }
+    project:
+      id: py-gen-projet
+      type: code
+      title: Nombres premiers à la demande
+      difficulty: 3
+      prompt: |
+        Écris un **générateur** `premiers()` qui produit 2, 3, 5, 7, 11… sans fin. Le programme lit `n` et affiche les `n` premiers nombres premiers séparés par des espaces.
+      starter: |
+        def premiers():
+            ...
+
+        n = int(input())
+      solution: |
+        from itertools import islice
+
+        def premiers():
+            trouves = []
+            k = 2
+            while True:
+                if all(k % p for p in trouves if p * p <= k):
+                    trouves.append(k)
+                    yield k
+                k += 1
+
+        n = int(input())
+        print(*islice(premiers(), n))
+      tests:
+        - { input: '5', output: '2 3 5 7 11' }
+        - { input: '10', output: '2 3 5 7 11 13 17 19 23 29', hidden: true }
+      require:
+        - { pattern: '\byield\b', message: Utiliser yield }
+      hints: ['`itertools.islice(gen, n)` prend les n premières valeurs d’un générateur.']
+    exam:
+      pass: 70
+      questions:
+        - id: py-gen-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            print(list(zip("abc", [1, 2, 3])))
+          output: "[('a', 1), ('b', 2), ('c', 3)]"
+        - id: py-gen-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            for i, c in enumerate("ok", start=1):
+                print(i, c)
+          output: "1 o\n2 k"
+        - id: py-gen-ex3
+          type: mcq
+          prompt: '`lambda x: x * 2` est…'
+          choices: [Une fonction anonyme, Une boucle, Un générateur, Une classe]
+          answer: 0

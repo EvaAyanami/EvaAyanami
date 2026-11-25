@@ -1,0 +1,99 @@
+language: opengl
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: gl-transformations
+    title: Transformations, caméra et projection
+    summary: Les matrices modèle, vue et projection — passer d’un objet 3D à sa position à l’écran.
+    minutes: 35
+    concepts: [matrices, mvp, camera, profondeur]
+    sections:
+      - title: Déplacer, tourner, agrandir
+        body: |
+          ```anim transforms
+          ```
+
+          En 3D, chaque transformation est une **matrice 4×4**. On les combine en les multipliant : `modèle = translation × rotation × échelle` (appliquées de droite à gauche : d’abord l’échelle, puis la rotation, puis la translation).
+      - title: Les trois matrices MVP
+        body: |
+          | Matrice | Passe de… | à… |
+          |---|---|---|
+          | **Modèle** (M) | coordonnées de l’objet | monde |
+          | **Vue** (V) | monde | caméra |
+          | **Projection** (P) | caméra | écran (avec perspective) |
+
+          ```glsl
+          uniform mat4 modele, vue, projection;
+          layout (location = 0) in vec3 aPos;
+          void main() {
+              gl_Position = projection * vue * modele * vec4(aPos, 1.0);
+          }
+          ```
+
+          La bibliothèque **GLM** fournit ces matrices en C++ : `glm::perspective`, `glm::lookAt`, `glm::rotate`…
+      - title: Le test de profondeur
+        body: |
+          Pour que les objets proches cachent les objets lointains, le GPU garde un **depth buffer** (z-buffer) : la profondeur de chaque pixel déjà dessiné. Un nouveau fragment n’est écrit que s’il est **plus proche**.
+
+          ```cpp
+          glEnable(GL_DEPTH_TEST);
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // à chaque image
+          ```
+    exercises:
+      - id: gl-mvp-q1
+        type: mcq
+        prompt: Quelle matrice place la caméra ?
+        choices: [La vue, Le modèle, La projection, L’identité]
+        answer: 0
+      - id: gl-mvp-q2
+        type: mcq
+        prompt: Quelle matrice donne l’effet de perspective (les objets lointains paraissent petits) ?
+        choices: [La projection, La vue, Le modèle, La translation]
+        answer: 0
+      - id: gl-mvp-q3
+        type: mcq
+        prompt: Que se passe-t-il si on oublie GL_DEPTH_TEST ?
+        choices: ['Les objets dessinés en dernier passent devant, même s’ils sont derrière', Rien ne s’affiche, Les textures disparaissent, Le programme plante]
+        answer: 0
+      - id: gl-mvp-fill
+        type: fill
+        prompt: Complète la position finale du sommet.
+        code: gl_Position = {{?}} * {{?}} * {{?}} * vec4(aPos, 1.0);
+        blanks: [[projection], [vue], [modele]]
+      - id: gl-mvp-order
+        type: order
+        prompt: Dans quel ordre un sommet traverse-t-il les espaces de coordonnées ?
+        lines: [Espace de l’objet, Espace du monde, Espace de la caméra, Espace de l’écran (après projection)]
+    project:
+      id: gl-mvp-projet
+      type: mcq
+      title: Le cube qui tourne sur lui-même
+      difficulty: 3
+      prompt: Ton cube tourne autour de l’origine du monde au lieu de tourner sur lui-même. Ta matrice modèle vaut `rotation × translation`. Que corriger ?
+      choices: [Inverser l’ordre - translation × rotation, Ajouter une deuxième rotation, Changer la projection, Désactiver le test de profondeur]
+      answer: 0
+      explanation: Avec translation × rotation, on tourne d’abord le cube sur lui-même (à l’origine) puis on le déplace. L’ordre des multiplications de matrices compte !
+    exam:
+      pass: 70
+      questions:
+        - id: gl-mvp-ex1
+          type: mcq
+          prompt: Quelle taille ont les matrices de transformation 3D ?
+          choices: [4×4, 3×3, 2×2, 16×16]
+          answer: 0
+          explanation: La 4ᵉ dimension permet de représenter la translation par une multiplication.
+        - id: gl-mvp-ex2
+          type: mcq
+          prompt: La multiplication de matrices est-elle commutative ?
+          choices: ['Non, l’ordre change le résultat', 'Oui, toujours', Seulement en 3D, Seulement pour les rotations]
+          answer: 0
+        - id: gl-mvp-ex3
+          type: mcq
+          prompt: Que contient le depth buffer ?
+          choices: [La profondeur du fragment le plus proche pour chaque pixel, Les couleurs, Les textures, Les sommets]
+          answer: 0
+        - id: gl-mvp-ex4
+          type: mcq
+          prompt: Quelle bibliothèque C++ fournit vecteurs et matrices pour OpenGL ?
+          choices: [GLM, GLFW, GLAD, STL]
+          answer: 0

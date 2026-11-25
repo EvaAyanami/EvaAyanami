@@ -1,0 +1,315 @@
+language: python
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: py-premiers-pas
+    title: Premiers pas en Python
+    summary: Afficher, calculer, créer des variables et lire ce que tape l’utilisateur.
+    minutes: 20
+    concepts: [affichage, variables, input]
+    sections:
+      - title: Bonjour, Python !
+        body: |
+          Python est un langage **interprété** : l’interpréteur lit ton fichier et l’exécute ligne par ligne, sans étape de compilation séparée. Sa syntaxe est volontairement simple et lisible.
+
+          ```python
+          print("Bonjour, Python !")
+          print(2 + 3 * 4)        # 14 : la multiplication passe avant
+          print(7 / 2, 7 // 2, 7 % 2)   # 3.5 3 1
+          ```
+
+          - `print(...)` affiche puis passe à la ligne ; plusieurs valeurs sont séparées par un espace.
+          - `/` divise (résultat décimal), `//` divise en entier, `%` donne le reste, `**` la puissance.
+          - Tout ce qui suit `#` est un **commentaire**.
+      - title: Les variables
+        body: |
+          Une variable est un nom qui désigne une valeur. Pas besoin de déclarer son type : Python le déduit.
+
+          ```python
+          prenom = "Kiri"      # str (texte)
+          age = 16             # int (entier)
+          taille = 1.58        # float (décimal)
+          aime_coder = True    # bool (vrai/faux)
+
+          print(f"{prenom} a {age} ans")   # f-string : les {…} sont remplacés
+          ```
+
+          Les **f-strings** (`f"..."`) sont la façon la plus pratique de mélanger texte et valeurs.
+      - title: Lire au clavier
+        body: |
+          `input()` lit une ligne tapée par l’utilisateur et renvoie **toujours du texte**. Pour faire des calculs, on convertit :
+
+          ```python
+          n = int(input())       # lit un entier
+          x = float(input())     # lit un décimal
+          print(n * 2)
+          ```
+
+          > ⚠️ `"3" + "4"` vaut `"34"` (concaténation de textes), alors que `3 + 4` vaut `7`.
+    exercises:
+      - id: py-pp-q1
+        type: mcq
+        prompt: Que renvoie `input()` ?
+        choices: [Toujours du texte (str), Un entier, Un nombre décimal, Le type deviné automatiquement]
+        answer: 0
+        explanation: Il faut convertir avec `int()` ou `float()` pour calculer.
+      - id: py-pp-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          print(7 // 2, 7 % 2, 2 ** 3)
+        output: "3 1 8"
+      - id: py-pp-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          a = "3"
+          b = "4"
+          print(a + b)
+          print(int(a) + int(b))
+        output: "34\n7"
+      - id: py-pp-fill
+        type: fill
+        prompt: Complète pour afficher `Kiri a 16 ans`.
+        code: |
+          prenom = "Kiri"
+          age = 16
+          print({{?}}"{prenom} a {age} ans")
+        blanks: [['f']]
+        tests:
+          - { input: '', output: 'Kiri a 16 ans' }
+      - id: py-pp-code
+        type: code
+        title: Le double
+        prompt: |
+          Lis un entier sur l’entrée standard et affiche son **double**.
+
+          Exemple : avec `21`, le programme affiche `42`.
+        starter: |
+          n = int(input())
+          # affiche le double de n
+        solution: |
+          n = int(input())
+          print(n * 2)
+        tests:
+          - { input: '21', output: '42' }
+          - { input: '0', output: '0', hidden: true }
+          - { input: '-7', output: '-14', hidden: true }
+    project:
+      id: py-pp-projet
+      type: code
+      title: La carte de membre
+      difficulty: 1
+      prompt: |
+        Le programme lit un **prénom** puis un **âge** (une valeur par ligne). Affiche :
+
+        ```
+        Membre : <prénom>
+        Âge dans 10 ans : <âge + 10>
+        ```
+      starter: |
+        prenom = input()
+        age = int(input())
+        # affiche la carte
+      solution: |
+        prenom = input()
+        age = int(input())
+        print(f"Membre : {prenom}")
+        print(f"Âge dans 10 ans : {age + 10}")
+      tests:
+        - { input: "Kiri\n16", output: "Membre : Kiri\nÂge dans 10 ans : 26" }
+        - { input: "Ada\n36", output: "Membre : Ada\nÂge dans 10 ans : 46", hidden: true }
+      hints: [Utilise deux f-strings.]
+    exam:
+      pass: 70
+      questions:
+        - id: py-pp-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            x = 10
+            x = x + 5
+            print(x, x / 5)
+          output: "15 3.0"
+          explanation: '`/` donne toujours un float.'
+        - id: py-pp-ex2
+          type: mcq
+          prompt: Quel est le type de `1.5` ?
+          choices: [float, int, str, bool]
+          answer: 0
+        - id: py-pp-ex3
+          type: mcq
+          prompt: Comment écrire un commentaire en Python ?
+          choices: ['# commentaire', '// commentaire', '/* commentaire */', '-- commentaire']
+          answer: 0
+        - id: py-pp-ex4
+          type: code
+          title: Somme de deux nombres
+          prompt: Lis deux entiers (un par ligne) et affiche leur somme.
+          starter: |
+            a = int(input())
+          solution: |
+            a = int(input())
+            b = int(input())
+            print(a + b)
+          tests:
+            - { input: "2\n3", output: "5" }
+            - { input: "-4\n10", output: "6", hidden: true }
+
+  # ------------------------------------------------------------------
+  - slug: py-conditions-boucles
+    title: Conditions et boucles
+    summary: if / elif / else, l’indentation, les boucles for et while et la fonction range.
+    minutes: 25
+    concepts: [conditions, boucles, indentation]
+    sections:
+      - title: Les conditions et l’indentation
+        body: |
+          ```python
+          note = int(input())
+          if note >= 16:
+              print("Très bien")
+          elif note >= 10:
+              print("Admis")
+          else:
+              print("À retravailler")
+          ```
+
+          En Python, ce sont les **espaces en début de ligne** (l’indentation, 4 espaces par niveau) qui délimitent les blocs, et chaque ligne `if`/`elif`/`else` se termine par `:`.
+
+          Opérateurs : `==`, `!=`, `<`, `<=`, `>`, `>=`, et pour combiner : `and`, `or`, `not`.
+      - title: La boucle for et range
+        body: |
+          ```python
+          for i in range(5):        # 0, 1, 2, 3, 4
+              print(i)
+
+          for i in range(1, 11, 3): # 1, 4, 7, 10 (début, fin exclue, pas)
+              print(i)
+          ```
+
+          `range(a, b)` va de `a` inclus à `b` **exclu**.
+      - title: La boucle while
+        body: |
+          ```python
+          n = 1
+          while n < 100:
+              n = n * 2
+          print(n)   # 128
+          ```
+
+          `break` sort de la boucle, `continue` passe directement au tour suivant.
+    exercises:
+      - id: py-cb-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          for i in range(1, 10, 3):
+              print(i, end=" ")
+          print()
+        output: "1 4 7"
+        explanation: '`end=" "` remplace le retour à la ligne par un espace.'
+      - id: py-cb-q1
+        type: mcq
+        prompt: Qu’est-ce qui délimite un bloc en Python ?
+        choices: [L’indentation, 'Les accolades { }', Les mots begin/end, Les parenthèses]
+        answer: 0
+      - id: py-cb-order
+        type: order
+        prompt: Remets dans l’ordre ce programme qui affiche les nombres pairs de 0 à 8.
+        lines:
+          - 'for i in range(10):'
+          - '    if i % 2 == 0:'
+          - '        print(i)'
+      - id: py-cb-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          n = 1
+          while n < 100:
+              n = n * 3
+          print(n)
+        output: "243"
+      - id: py-cb-code
+        type: code
+        title: Pair ou impair
+        prompt: Lis un entier et affiche `pair` ou `impair`.
+        starter: |
+          n = int(input())
+        solution: |
+          n = int(input())
+          if n % 2 == 0:
+              print("pair")
+          else:
+              print("impair")
+        tests:
+          - { input: '4', output: 'pair' }
+          - { input: '7', output: 'impair' }
+          - { input: '0', output: 'pair', hidden: true }
+          - { input: '-3', output: 'impair', hidden: true }
+    project:
+      id: py-cb-projet
+      type: code
+      title: FizzBuzz
+      difficulty: 2
+      prompt: |
+        Lis un entier `n` et affiche les nombres de 1 à `n`, un par ligne, en remplaçant :
+
+        - les multiples de 3 par `Fizz`,
+        - les multiples de 5 par `Buzz`,
+        - les multiples de 3 **et** de 5 par `FizzBuzz`.
+      starter: |
+        n = int(input())
+        for i in range(1, n + 1):
+            pass  # à toi !
+      solution: |
+        n = int(input())
+        for i in range(1, n + 1):
+            if i % 15 == 0:
+                print("FizzBuzz")
+            elif i % 3 == 0:
+                print("Fizz")
+            elif i % 5 == 0:
+                print("Buzz")
+            else:
+                print(i)
+      tests:
+        - { input: '5', output: "1\n2\nFizz\n4\nBuzz" }
+        - { input: '15', output: "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz", hidden: true }
+      hints: [Teste d’abord le cas « multiple de 15 ».]
+    exam:
+      pass: 70
+      questions:
+        - id: py-cb-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            total = 0
+            for i in range(5):
+                total += i
+            print(total)
+          output: "10"
+        - id: py-cb-ex2
+          type: mcq
+          prompt: Que contient `range(2, 6)` ?
+          choices: ['2, 3, 4, 5', '2, 3, 4, 5, 6', '3, 4, 5, 6', '2, 4, 6']
+          answer: 0
+        - id: py-cb-ex3
+          type: mcq
+          prompt: Quel mot-clé arrête immédiatement une boucle ?
+          choices: [break, continue, stop, exit]
+          answer: 0
+        - id: py-cb-ex4
+          type: code
+          title: Compte à rebours
+          prompt: Lis un entier `n` et affiche les nombres de `n` à 1 (un par ligne), puis `Décollage !`.
+          starter: |
+            n = int(input())
+          solution: |
+            n = int(input())
+            for i in range(n, 0, -1):
+                print(i)
+            print("Décollage !")
+          tests:
+            - { input: '3', output: "3\n2\n1\nDécollage !" }
+            - { input: '1', output: "1\nDécollage !", hidden: true }

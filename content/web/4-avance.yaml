@@ -1,0 +1,250 @@
+language: web
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: web-responsive
+    title: Responsive design
+    summary: Une page qui s’adapte du téléphone à l’écran large — viewport, unités relatives et media queries.
+    minutes: 30
+    concepts: [responsive, media-queries, unites]
+    sections:
+      - title: Le viewport et les unités
+        body: |
+          Sans cette ligne dans le `<head>`, les téléphones affichent la page comme un écran de bureau en miniature :
+
+          ```html
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          ```
+
+          | Unité | Relative à… |
+          |---|---|
+          | `rem` | la taille de police de la racine (souvent 16px) |
+          | `%` | la taille du parent |
+          | `vw` / `vh` | 1 % de la largeur / hauteur de la fenêtre |
+          | `ch` | la largeur d’un caractère « 0 » |
+
+          Une bonne pratique : `max-width: 65ch` pour un texte agréable à lire, et des images `max-width: 100%`.
+      - title: Les media queries
+        body: |
+          On écrit d’abord le style **mobile**, puis on l’enrichit pour les grands écrans (*mobile first*) :
+
+          ```css
+          .grille { display: grid; grid-template-columns: 1fr; }
+
+          @media (min-width: 768px) {
+            .grille { grid-template-columns: 1fr 1fr; }
+          }
+          @media (min-width: 1200px) {
+            .grille { grid-template-columns: repeat(4, 1fr); }
+          }
+          ```
+
+          On peut aussi adapter le thème : `@media (prefers-color-scheme: dark) { … }`.
+    exercises:
+      - id: web-resp-q1
+        type: mcq
+        prompt: Que fait la balise meta viewport ?
+        choices: [Demande au mobile d’utiliser la vraie largeur de l’écran, Agrandit les images, Active le mode sombre, Ajoute un menu]
+        answer: 0
+      - id: web-resp-q2
+        type: mcq
+        prompt: Que vaut 2rem si la police racine fait 16px ?
+        choices: [32px, 16px, 2px, 200%]
+        answer: 0
+      - id: web-resp-q3
+        type: mcq
+        prompt: L’approche « mobile first » consiste à…
+        choices: ['Écrire le style mobile d’abord, puis ajouter des min-width', Faire deux sites séparés, Interdire les ordinateurs, Écrire d’abord le style bureau]
+        answer: 0
+      - id: web-resp-code
+        type: code
+        title: Images souples
+        prompt: 'Empêche toutes les images (`img`) de déborder de leur parent avec `max-width: 100%`.'
+        starter: |
+          <style>
+          </style>
+          <img src="paysage.jpg" alt="Un paysage">
+        solution: |
+          <style>
+            img { max-width: 100%; height: auto; }
+          </style>
+          <img src="paysage.jpg" alt="Un paysage">
+        checks:
+          - { type: css, selector: img, property: max-width, value: 100%, message: 'max-width: 100% sur les images' }
+    project:
+      id: web-resp-projet
+      type: code
+      title: La grille qui s’adapte
+      difficulty: 3
+      prompt: |
+        Rends la page responsive :
+
+        - ajoute la balise `<meta name="viewport" …>` dans le `head` ;
+        - `.cartes` est une grille d’**une colonne** par défaut ;
+        - à partir de **768px** (`@media (min-width: 768px)`), elle passe à **deux colonnes** ou plus.
+      starter: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <title>Cartes</title>
+          <style>
+          </style>
+        </head>
+        <body>
+          <div class="cartes">
+            <div>A</div><div>B</div><div>C</div><div>D</div>
+          </div>
+        </body>
+        </html>
+      solution: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Cartes</title>
+          <style>
+            .cartes { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+            @media (min-width: 768px) {
+              .cartes { grid-template-columns: 1fr 1fr; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="cartes">
+            <div>A</div><div>B</div><div>C</div><div>D</div>
+          </div>
+        </body>
+        </html>
+      checks:
+        - { type: attr, selector: 'meta[name=viewport]', name: content, value: '*', message: La balise meta viewport }
+        - { type: css, selector: .cartes, property: display, value: grid, message: .cartes est une grille }
+      require:
+        - { pattern: '@media\s*\(\s*min-width:\s*768px\s*\)', message: 'Une media query (min-width: 768px)' }
+    exam:
+      pass: 70
+      questions:
+        - id: web-resp-ex1
+          type: mcq
+          prompt: Que vaut 50vw ?
+          choices: [La moitié de la largeur de la fenêtre, 50 pixels, La moitié du parent, 50 caractères]
+          answer: 0
+        - id: web-resp-ex2
+          type: mcq
+          prompt: Quelle media query détecte le thème sombre du système ?
+          choices: ['(prefers-color-scheme: dark)', '(theme: dark)', '(dark-mode: on)', '(color: black)']
+          answer: 0
+        - id: web-resp-ex3
+          type: mcq
+          prompt: Pourquoi limiter la largeur d’un texte (ex. 65ch) ?
+          choices: [Des lignes trop longues sont difficiles à lire, Pour économiser de la mémoire, C’est obligatoire, Pour le référencement uniquement]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: web-semantique
+    title: HTML sémantique et accessibilité
+    summary: Les bonnes balises au bon endroit, pour les humains, les lecteurs d’écran et les moteurs de recherche.
+    minutes: 25
+    concepts: [semantique, accessibilite, seo]
+    sections:
+      - title: Des balises qui ont du sens
+        body: |
+          | Balise | Rôle |
+          |---|---|
+          | `<header>` | en-tête (de la page ou d’une section) |
+          | `<nav>` | navigation principale |
+          | `<main>` | contenu principal (un seul par page) |
+          | `<article>` | contenu autonome (un billet, une carte de produit) |
+          | `<section>` | partie thématique avec un titre |
+          | `<aside>` | contenu annexe |
+          | `<footer>` | pied de page |
+
+          Une page faite uniquement de `<div>` fonctionne, mais un lecteur d’écran ne peut pas proposer « aller au contenu principal » ou « liste des titres ».
+      - title: Les bases de l’accessibilité
+        body: |
+          - Un **texte alternatif** pour chaque image porteuse d’information (`alt=""` pour une image décorative) ;
+          - une **hiérarchie de titres** logique (h1 → h2 → h3, sans sauter de niveau) ;
+          - des **labels** pour chaque champ ;
+          - des **contrastes** suffisants entre texte et fond ;
+          - des liens explicites : « Télécharger le rapport » plutôt que « cliquez ici » ;
+          - une navigation possible **au clavier** (Tab, Entrée), avec un contour de focus visible.
+    exercises:
+      - id: web-sem-q1
+        type: mcq
+        prompt: Quelle balise contient le contenu principal de la page ?
+        choices: ['<main>', '<section>', '<article>', '<div id="main">']
+        answer: 0
+      - id: web-sem-q2
+        type: mcq
+        prompt: Quel texte de lien est le plus accessible ?
+        choices: [Télécharger le programme du cours (PDF), Cliquez ici, Ici, Lien]
+        answer: 0
+      - id: web-sem-q3
+        type: mcq
+        prompt: Quelle valeur d’alt pour une image purement décorative ?
+        choices: [Un alt vide (alt=""), « image », Le nom du fichier, Pas d’attribut alt]
+        answer: 0
+      - id: web-sem-order
+        type: order
+        prompt: Remets la structure sémantique d’une page dans l’ordre.
+        lines: ['<header>…</header>', '<nav>…</nav>', '<main>…</main>', '<footer>…</footer>']
+    project:
+      id: web-sem-projet
+      type: code
+      title: Restructurer une page
+      difficulty: 3
+      prompt: |
+        Cette page n’utilise que des `div`. Réécris-la avec `header`, `nav`, `main` (contenant au moins un `article` avec un titre `h2`) et `footer`. Garde un seul `h1` et ajoute `lang="fr"`.
+      starter: |
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="UTF-8"><title>Blog</title></head>
+        <body>
+          <div class="haut"><div class="titre">Le blog de Kiri</div></div>
+          <div class="menu"><a href="/">Accueil</a> <a href="/articles">Articles</a></div>
+          <div class="contenu">
+            <div class="billet"><div class="t">Mon premier programme</div><p>Hello world !</p></div>
+          </div>
+          <div class="bas">© 2026</div>
+        </body>
+        </html>
+      solution: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head><meta charset="UTF-8"><title>Blog</title></head>
+        <body>
+          <header><h1>Le blog de Kiri</h1></header>
+          <nav><a href="/">Accueil</a> <a href="/articles">Articles</a></nav>
+          <main>
+            <article><h2>Mon premier programme</h2><p>Hello world !</p></article>
+          </main>
+          <footer>© 2026</footer>
+        </body>
+        </html>
+      checks:
+        - { type: lang, value: fr, message: 'La langue est indiquée (lang="fr")' }
+        - { type: exists, selector: header, message: Un header }
+        - { type: exists, selector: nav, message: Un nav }
+        - { type: count, selector: main, min: 1, max: 1, message: Un seul main }
+        - { type: exists, selector: 'main article h2', message: Un article avec un titre h2 dans le main }
+        - { type: exists, selector: footer, message: Un footer }
+        - { type: count, selector: h1, min: 1, max: 1, message: Un seul h1 }
+    exam:
+      pass: 70
+      questions:
+        - id: web-sem-ex1
+          type: mcq
+          prompt: Combien de `<main>` par page ?
+          choices: [Un seul, Autant que de sections, Aucun, Deux]
+          answer: 0
+        - id: web-sem-ex2
+          type: mcq
+          prompt: Après un h2, quel titre utiliser pour une sous-partie ?
+          choices: [h3, h1, h5, Peu importe]
+          answer: 0
+        - id: web-sem-ex3
+          type: mcq
+          prompt: Pourquoi le HTML sémantique aide-t-il le référencement ?
+          choices: [Les moteurs de recherche comprennent mieux la structure du contenu, Il charge plus vite, Il est obligatoire pour Google, Il ajoute des mots-clés]
+          answer: 0

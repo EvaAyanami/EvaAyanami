@@ -1,0 +1,82 @@
+language: vulkan
+level: 1
+chapters:
+  - slug: vk-pourquoi
+    title: Pourquoi Vulkan ?
+    summary: Ce que Vulkan change par rapport à OpenGL, et pour qui il est fait.
+    minutes: 20
+    concepts: [vulkan, api-explicite]
+    sections:
+      - title: Une API explicite
+        body: |
+          **Vulkan** (Khronos Group, 2016) est le successeur moderne d’OpenGL. Là où OpenGL cache beaucoup de travail dans le **pilote** (gestion de la mémoire, synchronisation, validation), Vulkan rend **tout explicite** :
+
+          | | OpenGL | Vulkan |
+          |---|---|---|
+          | Mémoire GPU | gérée par le pilote | allouée par toi |
+          | Synchronisation | implicite | explicite (sémaphores, fences, barrières) |
+          | Multithread | difficile | conçu pour |
+          | Erreurs | vérifiées par le pilote | couches de validation à activer |
+          | Lignes pour un triangle | ~150 | ~1000 |
+
+          Ce surcoût de code donne des **performances plus prévisibles**, moins de travail caché pour le processeur et la possibilité de préparer les commandes sur **plusieurs threads**.
+      - title: Qui utilise Vulkan ?
+        body: |
+          Les moteurs de jeu (Unreal, Godot, Unity), les émulateurs, Android (API graphique principale), le Steam Deck (via Proton et DXVK)… Sur macOS, Vulkan passe par **MoltenVK** qui le traduit en Metal.
+
+          Les shaders Vulkan sont compilés à l’avance en **SPIR-V**, un format binaire intermédiaire (on les écrit souvent en GLSL ou HLSL).
+
+          > 💡 Vulkan n’est pas « mieux » dans tous les cas : pour apprendre la 3D, OpenGL reste plus simple. Vulkan est fait pour les moteurs qui veulent tout contrôler.
+    exercises:
+      - id: vk-why-q1
+        type: mcq
+        prompt: Quelle est la grande différence de Vulkan avec OpenGL ?
+        choices: ['Tout est explicite (mémoire, synchronisation)', Il ne fonctionne qu’en 2D, Il n’utilise pas le GPU, Il n’a pas de shaders]
+        answer: 0
+      - id: vk-why-q2
+        type: mcq
+        prompt: Dans quel format les shaders Vulkan sont-ils fournis au pilote ?
+        choices: [SPIR-V, GLSL brut, JavaScript, PNG]
+        answer: 0
+      - id: vk-why-q3
+        type: mcq
+        prompt: Comment Vulkan fonctionne-t-il sur macOS ?
+        choices: [Via MoltenVK qui le traduit en Metal, Nativement, Il ne fonctionne pas du tout, Via DirectX]
+        answer: 0
+      - id: vk-why-q4
+        type: mcq
+        prompt: Qu’active-t-on pour détecter les erreurs d’utilisation de l’API ?
+        choices: [Les couches de validation, Le mode sans échec, Le débogueur du pilote, 'Rien, Vulkan ne fait pas d’erreur']
+        answer: 0
+    project:
+      id: vk-why-projet
+      type: mcq
+      title: Choisir son API
+      difficulty: 2
+      prompt: Tu débutes en 3D et tu veux afficher ton premier modèle texturé rapidement. Quelle API choisir pour apprendre ?
+      choices: ['OpenGL, pour apprendre les notions avec moins de code', 'Vulkan, car il est plus récent', 'Aucune, la 3D est impossible sans moteur', DirectX 9]
+      answer: 0
+      explanation: Les notions (pipeline, shaders, matrices) sont les mêmes ; Vulkan ajoute la gestion explicite qui a du sens une fois les bases acquises.
+    exam:
+      pass: 70
+      questions:
+        - id: vk-why-ex1
+          type: mcq
+          prompt: Qui maintient Vulkan ?
+          choices: [Le Khronos Group, Microsoft, Apple, Nvidia seul]
+          answer: 0
+        - id: vk-why-ex2
+          type: mcq
+          prompt: Pourquoi Vulkan est-il plus adapté au multithread ?
+          choices: [On peut enregistrer des command buffers sur plusieurs threads, Il utilise moins de mémoire, Il n’a pas de pilote, Il tourne sur le CPU]
+          answer: 0
+        - id: vk-why-ex3
+          type: mcq
+          prompt: Sur quelle plateforme Vulkan est-il l’API graphique principale ?
+          choices: [Android, iPhone (iOS), PlayStation 2, Windows 95]
+          answer: 0
+        - id: vk-why-ex4
+          type: mcq
+          prompt: Le prix de l’explicite, c’est…
+          choices: [Beaucoup plus de code à écrire, Des performances plus faibles, L’absence de shaders, L’impossibilité d’afficher des textures]
+          answer: 0

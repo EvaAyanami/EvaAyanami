@@ -7,7 +7,7 @@
  */
 import { config } from '../config.js';
 import { loadContent, type ExerciseDef, type TestCase } from '../lib/content.js';
-import { fillTemplate, normalizeOutput, outputMatches } from '../lib/grading.js';
+import { checkRules, fillTemplate, normalizeOutput, outputMatches } from '../lib/grading.js';
 import { runCode } from '../lib/runner.js';
 import { runWebChecks } from '../lib/webcheck.js';
 
@@ -34,11 +34,11 @@ async function passes(lang: string, src: string, tests: TestCase[]) {
 
 const runtimeOf = new Map<string, string>();
 
-function webJob(id: string, html: string, checks: Parameters<typeof runWebChecks>[1], starter?: string) {
+function webJob(id: string, html: string, checks: Parameters<typeof runWebChecks>[1], starter?: string, rules?: { require: any[]; forbid: any[] }) {
   jobs.push({
     id,
     run: async () => {
-      const failed = runWebChecks(html, checks).filter((r) => !r.passed);
+      const failed = [...runWebChecks(html, checks), ...(rules ? checkRules(html, rules.require, rules.forbid) : [])].filter((r) => !r.passed);
       if (failed.length) return `solution HTML/CSS : vérifications échouées → ${failed.map((f) => f.message).join(' | ')}`;
       if (starter !== undefined && runWebChecks(starter, checks).every((r) => r.passed)) return 'le code de départ passe déjà toutes les vérifications';
       return null;
@@ -51,7 +51,7 @@ function addExercise(lang: string, ex: ExerciseDef) {
   const rt = runtimeOf.get(lang) ?? 'runner';
   if (rt === 'none') return;
   if (rt === 'web') {
-    if (ex.type === 'code') webJob(ex.id, ex.solution, ex.checks, ex.starter);
+    if (ex.type === 'code') webJob(ex.id, ex.solution, ex.checks, ex.starter, { require: ex.require, forbid: ex.forbid });
     if (ex.type === 'fill' && ex.checks?.length) webJob(ex.id, fillTemplate(ex.code, ex.blanks.map((b) => b[0])), ex.checks);
     return;
   }

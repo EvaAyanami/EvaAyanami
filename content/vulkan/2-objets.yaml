@@ -1,0 +1,84 @@
+language: vulkan
+level: 2
+chapters:
+  - slug: vk-objets
+    title: Instance, périphérique, files et swapchain
+    summary: Les objets de base d’une application Vulkan et la chaîne qui mène jusqu’à la fenêtre.
+    minutes: 30
+    concepts: [instance, device, queue, swapchain]
+    sections:
+      - title: De l’instance au périphérique logique
+        body: |
+          1. **Instance** (`VkInstance`) : la connexion entre ton application et la bibliothèque Vulkan. On y active les **couches de validation** et les extensions (par exemple pour les fenêtres).
+          2. **Périphérique physique** (`VkPhysicalDevice`) : une vraie carte graphique. On liste celles disponibles et on choisit (GPU dédié de préférence).
+          3. **Files** (*queue families*) : un GPU expose des files spécialisées — **graphique**, **calcul**, **transfert**, **présentation**.
+          4. **Périphérique logique** (`VkDevice`) : ta « session » sur le GPU choisi, avec les files demandées.
+
+          ```cpp
+          VkInstanceCreateInfo info{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+          info.enabledLayerCount = 1;
+          info.ppEnabledLayerNames = &validationLayer;   // "VK_LAYER_KHRONOS_validation"
+          vkCreateInstance(&info, nullptr, &instance);
+          ```
+
+          Remarque le style : on remplit une **structure `…CreateInfo`**, puis on appelle `vkCreate…`. Toute l’API fonctionne ainsi.
+      - title: Surface et swapchain
+        body: |
+          - **Surface** (`VkSurfaceKHR`) : le lien avec la fenêtre (créée par GLFW ou SDL).
+          - **Swapchain** (`VkSwapchainKHR`) : une file de 2 ou 3 **images** dans lesquelles on dessine à tour de rôle. Pendant qu’une image est affichée, on prépare la suivante.
+
+          Le **mode de présentation** décide du comportement : `FIFO` (synchronisé à l’écran, garanti partout, sans déchirure), `MAILBOX` (triple buffering, faible latence), `IMMEDIATE` (sans attente, déchirures possibles).
+    exercises:
+      - id: vk-obj-order
+        type: order
+        prompt: Remets dans l’ordre la création des objets.
+        lines: [Créer l’instance, Choisir le périphérique physique, Créer le périphérique logique et ses files, Créer la surface et la swapchain]
+      - id: vk-obj-q1
+        type: mcq
+        prompt: Qu’est-ce que la swapchain ?
+        choices: [Une file d’images dans lesquelles on dessine à tour de rôle, Une chaîne de shaders, Un câble HDMI, La liste des GPU]
+        answer: 0
+      - id: vk-obj-q2
+        type: mcq
+        prompt: Quel mode de présentation est garanti sur toutes les plateformes ?
+        choices: [FIFO, MAILBOX, IMMEDIATE, TURBO]
+        answer: 0
+      - id: vk-obj-fill
+        type: fill
+        prompt: 'Complète le motif général de l’API :'
+        code: |
+          VkBufferCreateInfo info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+          vk{{?}}Buffer(device, &info, nullptr, &buffer);
+        blanks: [[Create]]
+    project:
+      id: vk-obj-projet
+      type: mcq
+      title: Choisir la bonne file
+      difficulty: 2
+      prompt: Tu veux copier un gros modèle 3D de la mémoire CPU vers la mémoire GPU pendant que le rendu continue. Quelle file utiliser idéalement ?
+      choices: [Une file de transfert dédiée, La file de présentation, 'Aucune, il faut arrêter le rendu', La file de l’instance]
+      answer: 0
+      explanation: Les files de transfert permettent de copier en parallèle du rendu, sans bloquer la file graphique.
+    exam:
+      pass: 70
+      questions:
+        - id: vk-obj-ex1
+          type: mcq
+          prompt: Quel objet représente une vraie carte graphique ?
+          choices: [VkPhysicalDevice, VkDevice, VkInstance, VkQueue]
+          answer: 0
+        - id: vk-obj-ex2
+          type: mcq
+          prompt: Le VkDevice est…
+          choices: ['Le périphérique logique, ta session sur le GPU', La fenêtre, La carte mère, Un shader]
+          answer: 0
+        - id: vk-obj-ex3
+          type: mcq
+          prompt: Le mode IMMEDIATE peut provoquer…
+          choices: [Des déchirures d’image (tearing), Une erreur de compilation, La perte des textures, Un écran bleu]
+          answer: 0
+        - id: vk-obj-ex4
+          type: mcq
+          prompt: Quel objet relie Vulkan à la fenêtre ?
+          choices: [La surface (VkSurfaceKHR), Le pipeline, La fence, Le command pool]
+          answer: 0

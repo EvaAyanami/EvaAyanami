@@ -1,0 +1,173 @@
+language: python
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: py-decorateurs-typage
+    title: Décorateurs, typage et code idiomatique
+    summary: Écrire des décorateurs, annoter les types, utiliser les gestionnaires de contexte et le module collections.
+    minutes: 35
+    concepts: [decorateurs, typage, contexte, collections]
+    sections:
+      - title: Les décorateurs
+        body: |
+          Un décorateur est une fonction qui **enveloppe** une autre fonction pour ajouter un comportement :
+
+          ```python
+          from functools import wraps
+
+          def compter_appels(f):
+              @wraps(f)
+              def enveloppe(*args, **kwargs):
+                  enveloppe.appels += 1
+                  return f(*args, **kwargs)
+              enveloppe.appels = 0
+              return enveloppe
+
+          @compter_appels
+          def carre(x):
+              return x * x
+          ```
+
+          `functools.lru_cache` est un décorateur prêt à l’emploi qui **mémorise** les résultats : idéal pour la programmation dynamique.
+      - title: Le typage
+        body: |
+          Les annotations ne changent pas l’exécution, mais les éditeurs et des outils comme **mypy** les vérifient :
+
+          ```python
+          def moyenne(notes: list[float]) -> float:
+              return sum(notes) / len(notes)
+
+          def trouver(nom: str, annuaire: dict[str, int]) -> int | None:
+              return annuaire.get(nom)
+          ```
+      - title: collections et with
+        body: |
+          ```python
+          from collections import Counter, defaultdict, deque
+
+          Counter("abracadabra").most_common(2)  # [('a', 5), ('b', 2)]
+          groupes = defaultdict(list)              # liste créée automatiquement
+          file = deque([1, 2, 3]); file.popleft()  # file efficace aux deux bouts
+          ```
+
+          Le mot-clé `with` garantit qu’une ressource est libérée (fichier fermé, verrou relâché), même en cas d’exception.
+    exercises:
+      - id: py-dec-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          def double(f):
+              def g(x):
+                  return 2 * f(x)
+              return g
+
+          @double
+          def plus_un(x):
+              return x + 1
+
+          print(plus_un(4))
+        output: "10"
+      - id: py-dec-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          from collections import Counter
+          print(Counter("mississippi").most_common(2))
+        output: "[('i', 4), ('s', 4)]"
+      - id: py-dec-q1
+        type: mcq
+        prompt: Les annotations de type en Python…
+        choices: ['Documentent et permettent la vérification par des outils, mais ne sont pas vérifiées à l’exécution', Rendent le programme plus rapide, Sont obligatoires, Provoquent une erreur si le type est faux]
+        answer: 0
+      - id: py-dec-code
+        type: code
+        title: Fibonacci mémorisé
+        prompt: Lis `n` (jusqu’à 200) et affiche le n-ième nombre de Fibonacci (F(0) = 0, F(1) = 1) avec une fonction **récursive** mémorisée.
+        starter: |
+          from functools import lru_cache
+
+          def fib(n):
+              ...
+
+          print(fib(int(input())))
+        solution: |
+          from functools import lru_cache
+          import sys
+          sys.setrecursionlimit(10000)
+
+          @lru_cache(maxsize=None)
+          def fib(n):
+              return n if n < 2 else fib(n - 1) + fib(n - 2)
+
+          print(fib(int(input())))
+        tests:
+          - { input: '10', output: '55' }
+          - { input: '90', output: '2880067194370816120', hidden: true }
+          - { input: '200', output: '280571172992510140037611932413038677189525', hidden: true }
+        require:
+          - { pattern: 'lru_cache|cache', message: Mémoriser avec functools }
+    project:
+      id: py-dec-projet
+      type: code
+      title: Le plus court chemin
+      difficulty: 3
+      prompt: |
+        Une grille de `.` (libre) et `#` (mur) est donnée ligne par ligne. Le départ est `S`, l’arrivée `E`. On se déplace en haut, bas, gauche, droite. Affiche le nombre minimal de pas de `S` à `E`, ou `-1` si c’est impossible.
+
+        Utilise un **parcours en largeur** avec `collections.deque`.
+      starter: |
+        import sys
+        from collections import deque
+
+        grille = sys.stdin.read().split()
+      solution: |
+        import sys
+        from collections import deque
+
+        grille = sys.stdin.read().split()
+        h, w = len(grille), len(grille[0])
+        for y in range(h):
+            for x in range(w):
+                if grille[y][x] == "S":
+                    depart = (y, x)
+        dist = {depart: 0}
+        file = deque([depart])
+        resultat = -1
+        while file:
+            y, x = file.popleft()
+            if grille[y][x] == "E":
+                resultat = dist[(y, x)]
+                break
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < h and 0 <= nx < w and grille[ny][nx] != "#" and (ny, nx) not in dist:
+                    dist[(ny, nx)] = dist[(y, x)] + 1
+                    file.append((ny, nx))
+        print(resultat)
+      tests:
+        - { input: "S.#\n..#\n#.E", output: '4' }
+        - { input: "S#E", output: '-1', hidden: true }
+        - { input: "S....\n####.\nE....", output: '10', hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: py-dec-ex1
+          type: mcq
+          prompt: À quoi sert `@wraps(f)` dans un décorateur ?
+          choices: [Conserver le nom et la documentation de la fonction décorée, Accélérer la fonction, Mémoriser les résultats, Vérifier les types]
+          answer: 0
+        - id: py-dec-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            from collections import defaultdict
+            d = defaultdict(int)
+            for c in "aab":
+                d[c] += 1
+            print(dict(d))
+          output: "{'a': 2, 'b': 1}"
+        - id: py-dec-ex3
+          type: mcq
+          prompt: Quelle structure est la plus efficace pour une file (ajout à droite, retrait à gauche) ?
+          choices: [collections.deque, list avec pop(0), str, set]
+          answer: 0

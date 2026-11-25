@@ -1,0 +1,257 @@
+language: web
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: web-listes-formulaires
+    title: Listes, tableaux et formulaires
+    summary: Organiser l’information et récolter des données avec des formulaires accessibles.
+    minutes: 30
+    concepts: [listes, tableaux, formulaires, accessibilite]
+    sections:
+      - title: Les listes
+        body: |
+          ```html
+          <ul>                 <!-- liste à puces -->
+            <li>Rust</li>
+            <li>Python</li>
+          </ul>
+          <ol>                 <!-- liste numérotée -->
+            <li>Installer</li>
+            <li>Coder</li>
+          </ol>
+          ```
+      - title: Les tableaux
+        body: |
+          ```html
+          <table>
+            <thead>
+              <tr><th>Langage</th><th>Année</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Python</td><td>1991</td></tr>
+              <tr><td>Rust</td><td>2015</td></tr>
+            </tbody>
+          </table>
+          ```
+
+          `tr` = ligne, `th` = cellule d’en-tête, `td` = cellule de données. Les tableaux servent aux **données tabulaires**, jamais à la mise en page.
+      - title: Les formulaires
+        body: |
+          ```html
+          <form action="/inscription" method="post">
+            <label for="email">E-mail</label>
+            <input id="email" name="email" type="email" required>
+
+            <label for="niveau">Niveau</label>
+            <select id="niveau" name="niveau">
+              <option>Débutant</option>
+              <option>Avancé</option>
+            </select>
+
+            <button type="submit">S’inscrire</button>
+          </form>
+          ```
+
+          - Chaque champ a un `<label>` relié par `for` / `id` : cliquer sur le texte active le champ, et les lecteurs d’écran le lisent.
+          - Les types (`email`, `number`, `date`, `password`…) adaptent le clavier sur téléphone et la validation.
+          - `required` rend le champ obligatoire.
+    exercises:
+      - id: web-lf-q1
+        type: mcq
+        prompt: Quelle balise crée une liste numérotée ?
+        choices: ['<ol>', '<ul>', '<li>', '<dl>']
+        answer: 0
+      - id: web-lf-q2
+        type: mcq
+        prompt: Comment relier un label à son champ ?
+        choices: ['for du label = id du champ', 'name du label = name du champ', 'En les mettant côte à côte', 'Avec une classe commune']
+        answer: 0
+      - id: web-lf-fill
+        type: fill
+        prompt: Complète la ligne du tableau.
+        code: |
+          <table>
+            <{{?}}><td>Java</td><td>1995</td></{{?}}>
+          </table>
+        blanks: [[tr], [tr]]
+        checks:
+          - { type: count, selector: 'tr td', min: 2, message: Une ligne avec deux cellules }
+      - id: web-lf-code
+        type: code
+        title: Ma liste de courses
+        prompt: Crée une liste **à puces** d’au moins 3 éléments.
+        starter: |
+          <body>
+
+          </body>
+        solution: |
+          <body>
+            <ul>
+              <li>Pommes</li>
+              <li>Riz</li>
+              <li>Chocolat</li>
+            </ul>
+          </body>
+        checks:
+          - { type: exists, selector: ul, message: Une liste à puces (ul) }
+          - { type: count, selector: 'ul > li', min: 3, message: Au moins 3 éléments li dans la liste }
+    project:
+      id: web-lf-projet
+      type: code
+      title: Le formulaire d’inscription
+      difficulty: 2
+      prompt: |
+        Crée un formulaire d’inscription avec :
+
+        - un champ **e-mail** (`type="email"`) obligatoire (`required`) ;
+        - un champ **mot de passe** (`type="password"`) ;
+        - un `<label>` pour chaque champ, relié par `for` / `id` ;
+        - un bouton d’envoi (`<button type="submit">`).
+      starter: |
+        <body>
+          <form>
+
+          </form>
+        </body>
+      solution: |
+        <body>
+          <form>
+            <label for="email">E-mail</label>
+            <input id="email" name="email" type="email" required>
+            <label for="mdp">Mot de passe</label>
+            <input id="mdp" name="mdp" type="password">
+            <button type="submit">S’inscrire</button>
+          </form>
+        </body>
+      checks:
+        - { type: exists, selector: 'form input[type=email][required]', message: Un champ e-mail obligatoire }
+        - { type: exists, selector: 'form input[type=password]', message: Un champ mot de passe }
+        - { type: exists, selector: 'label[for=email]', message: 'Un label relié à l’e-mail (for="email")' }
+        - { type: exists, selector: 'input#email', message: 'Le champ e-mail a l’id « email »' }
+        - { type: count, selector: label, min: 2, message: Un label par champ }
+        - { type: exists, selector: 'form button[type=submit]', message: Un bouton d’envoi }
+    exam:
+      pass: 70
+      questions:
+        - id: web-lf-ex1
+          type: mcq
+          prompt: Quelle balise désigne une cellule d’en-tête de tableau ?
+          choices: ['<th>', '<td>', '<tr>', '<thead>']
+          answer: 0
+        - id: web-lf-ex2
+          type: mcq
+          prompt: Quel type de champ affiche un clavier numérique sur téléphone ?
+          choices: [number, text, email, password]
+          answer: 0
+        - id: web-lf-ex3
+          type: mcq
+          prompt: Faut-il utiliser un tableau pour mettre en page un site ?
+          choices: ['Non, seulement pour des données tabulaires', 'Oui, c’est la méthode moderne', Seulement sur mobile, Seulement pour les menus]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: web-modele-boite
+    title: Le modèle de boîte
+    summary: content, padding, border, margin, box-sizing et les éléments block / inline.
+    minutes: 25
+    concepts: [box-model, marges, display]
+    sections:
+      - title: Chaque élément est une boîte
+        body: |
+          De l’intérieur vers l’extérieur :
+
+          | Couche | Rôle |
+          |---|---|
+          | **content** | le contenu (texte, image) |
+          | **padding** | l’espace intérieur, entre le contenu et la bordure |
+          | **border** | la bordure |
+          | **margin** | l’espace extérieur, entre l’élément et ses voisins |
+
+          ```css
+          .carte {
+            padding: 1rem;              /* haut droite bas gauche identiques */
+            border: 2px solid #c3cbe0;
+            margin: 1rem auto;          /* auto à gauche et à droite = centré */
+            width: 300px;
+            box-sizing: border-box;     /* width inclut padding et bordure */
+          }
+          ```
+
+          Sans `box-sizing: border-box`, la largeur réelle serait 300 + 2×16 + 2×2 = 336 px !
+      - title: block et inline
+        body: |
+          - Les éléments **block** (`div`, `p`, `h1`, `section`…) prennent toute la largeur et passent à la ligne.
+          - Les éléments **inline** (`span`, `a`, `strong`…) restent dans le flux du texte ; leur `width` et leurs marges verticales sont ignorées.
+          - `display: inline-block` combine les deux ; `display: none` masque l’élément.
+    exercises:
+      - id: web-box-q1
+        type: mcq
+        prompt: Quelle couche est l’espace **intérieur** entre le contenu et la bordure ?
+        choices: [padding, margin, border, outline]
+        answer: 0
+      - id: web-box-p1
+        type: predict
+        prompt: 'Sans box-sizing: border-box, quelle est la largeur totale (en px) d’une boîte de width 200px, padding 10px et border 1px ?'
+        code: "200 + 2×10 + 2×1 = ?"
+        output: "222"
+      - id: web-box-q2
+        type: mcq
+        prompt: Comment centrer horizontalement un bloc de largeur fixe ?
+        choices: ['margin: 0 auto', 'text-align: center', 'padding: auto', 'align: center']
+        answer: 0
+      - id: web-box-code
+        type: code
+        title: Une carte bien espacée
+        prompt: 'Donne à `.carte` un `padding`, une `border` et `box-sizing: border-box`.'
+        starter: |
+          <style>
+          </style>
+          <div class="carte">Contenu</div>
+        solution: |
+          <style>
+            .carte { padding: 16px; border: 1px solid #ccc; box-sizing: border-box; }
+          </style>
+          <div class="carte">Contenu</div>
+        checks:
+          - { type: css, selector: .carte, property: padding, value: '*', message: Un padding }
+          - { type: css, selector: .carte, property: border, value: '*', message: Une bordure }
+          - { type: css, selector: .carte, property: box-sizing, value: border-box, message: 'box-sizing: border-box' }
+    project:
+      id: web-box-projet
+      type: code
+      title: La boîte centrée
+      difficulty: 2
+      prompt: |
+        Fais de `.boite` un bloc de **largeur 320px**, **centré horizontalement** avec `margin` (valeur contenant `auto`), avec un `padding` et une bordure **arrondie** (`border-radius`).
+      starter: |
+        <style>
+        </style>
+        <div class="boite">Je suis au centre !</div>
+      solution: |
+        <style>
+          .boite { width: 320px; margin: 2rem auto; padding: 1rem; border: 2px solid #3b6cf6; border-radius: 12px; }
+        </style>
+        <div class="boite">Je suis au centre !</div>
+      checks:
+        - { type: css, selector: .boite, property: width, value: 320px, message: Largeur 320px }
+        - { type: css, selector: .boite, property: margin, value: '/auto/', message: Centrée avec margin auto }
+        - { type: css, selector: .boite, property: padding, value: '*', message: Un padding }
+        - { type: css, selector: .boite, property: border-radius, value: '*', message: Des coins arrondis }
+    exam:
+      pass: 70
+      questions:
+        - id: web-box-ex1
+          type: mcq
+          prompt: Les éléments inline comme span…
+          choices: [Ignorent width et les marges verticales, Prennent toute la largeur, Passent toujours à la ligne, Ne peuvent pas contenir de texte]
+          answer: 0
+        - id: web-box-ex2
+          type: mcq
+          prompt: 'Que fait `display: none` ?'
+          choices: [Masque l’élément complètement, Le rend transparent mais garde sa place, Le met en ligne, Le supprime du HTML]
+          answer: 0
+        - id: web-box-ex3
+          type: mcq
+          prompt: Avec border-box, la largeur déclarée inclut…
+          choices: ['Le contenu, le padding et la bordure', Seulement le contenu, Aussi les marges, Rien]
+          answer: 0

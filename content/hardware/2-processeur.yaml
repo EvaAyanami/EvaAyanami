@@ -1,0 +1,192 @@
+language: hardware
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: hw-cpu-cycle
+    title: Le processeur et le cycle d’instruction
+    summary: Registres, UAL, unité de contrôle et compteur ordinal — ce qui se passe à chaque instruction.
+    minutes: 25
+    concepts: [cpu, registres, cycle-instruction]
+    sections:
+      - title: À l’intérieur du processeur
+        body: |
+          Un processeur contient principalement :
+
+          - des **registres** : quelques petites cases mémoire ultra-rapides (par exemple 16 registres de 64 bits) ;
+          - l’**UAL** (unité arithmétique et logique) : elle calcule (additions, comparaisons, opérations ET/OU…) ;
+          - l’**unité de contrôle** : elle lit les instructions et pilote le reste ;
+          - le **compteur ordinal** (PC, *program counter*) : l’adresse de la prochaine instruction ;
+          - des **caches** : de la mémoire rapide intégrée pour éviter d’attendre la RAM.
+      - title: Le cycle lecture → décodage → exécution
+        body: |
+          Un programme compilé est une suite d’**instructions machine** rangées en mémoire. Le processeur répète sans fin le même cycle :
+
+          ```anim cpu-cycle
+          ```
+
+          1. **Lecture** (*fetch*) : lire l’instruction à l’adresse du PC ;
+          2. **Décodage** : comprendre ce qu’elle demande ;
+          3. **Exécution** : faire le calcul dans l’UAL ;
+          4. **Écriture** : ranger le résultat et faire avancer le PC.
+
+          Une instruction de **saut** (*jump*) change le PC : c’est ainsi que fonctionnent les `if` et les boucles de tes programmes.
+      - title: L’horloge
+        body: |
+          Le processeur avance au rythme d’une **horloge**. Un processeur à **4 GHz** reçoit 4 milliards de « tops » par seconde. Une instruction simple prend souvent un cycle (ou moins, grâce au pipeline).
+
+          > 💡 La fréquence ne fait pas tout : le nombre d’instructions traitées par cycle (IPC), le nombre de cœurs et la taille des caches comptent autant.
+    exercises:
+      - id: hw-cpu-q1
+        type: mcq
+        prompt: Que contient le compteur ordinal (PC) ?
+        choices: [La température du processeur, L’adresse de la prochaine instruction, Le résultat du dernier calcul, Le nombre de cœurs]
+        answer: 1
+        explanation: Après chaque instruction il avance, sauf en cas de saut.
+      - id: hw-cpu-q2
+        type: mcq
+        prompt: Où se font les additions et comparaisons ?
+        choices: [Dans l’UAL, Dans la RAM, Dans le SSD, Dans le chipset]
+        answer: 0
+      - id: hw-cpu-order
+        type: order
+        prompt: Remets les étapes du cycle d’instruction dans l’ordre.
+        lines: [Lecture de l’instruction en mémoire, Décodage par l’unité de contrôle, Exécution dans l’UAL, Écriture du résultat dans un registre]
+        explanation: Fetch, decode, execute, write-back.
+      - id: hw-cpu-p1
+        type: predict
+        prompt: 'Un processeur à 3 GHz effectue combien de cycles par seconde ? (réponds en milliards)'
+        code: "3 GHz = ? milliards de cycles par seconde"
+        output: "3"
+        explanation: 1 GHz = 1 milliard de cycles par seconde.
+      - id: hw-cpu-fill
+        type: fill
+        prompt: 'Complète : après R1 = 5 et R2 = 7, l’instruction ADD R3, R1, R2 range…'
+        code: "R3 = {{?}}"
+        blanks: [['12']]
+    project:
+      id: hw-cpu-projet
+      type: predict
+      title: Exécuter un programme à la main
+      difficulty: 2
+      prompt: |
+        Exécute ce petit programme machine à la main. Que contient **R1** à la fin ?
+      code: |
+        LOAD R1, 2      ; R1 = 2
+        LOAD R2, 3      ; R2 = 3
+        ADD  R1, R1, R2 ; R1 = R1 + R2
+        ADD  R1, R1, R1 ; R1 = R1 + R1
+      output: "10"
+      hints: [Après la 3ᵉ ligne, R1 vaut 5.]
+      explanation: R1 = 2 + 3 = 5, puis 5 + 5 = 10.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-cpu-ex1
+          type: mcq
+          prompt: Quel élément du processeur est le plus rapide ?
+          choices: [Les registres, Le cache L3, La RAM, Le SSD]
+          answer: 0
+        - id: hw-cpu-ex2
+          type: mcq
+          prompt: Comment un processeur réalise-t-il une boucle ?
+          choices: [Avec une instruction de saut qui modifie le PC, En copiant le code plusieurs fois, En redémarrant, Grâce à la carte graphique]
+          answer: 0
+          explanation: Un saut conditionnel revient au début de la boucle tant que la condition est vraie.
+        - id: hw-cpu-ex3
+          type: predict
+          prompt: 'R1 = 4, puis ADD R1, R1, R1, puis ADD R1, R1, R1. Que vaut R1 ?'
+          code: "R1 = ?"
+          output: "16"
+          explanation: 4 → 8 → 16.
+        - id: hw-cpu-ex4
+          type: mcq
+          prompt: Que signifie 4 GHz ?
+          choices: [4 milliards de cycles d’horloge par seconde, 4 Go de cache, 4 cœurs, 4 milliards d’octets]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: hw-pipeline-coeurs
+    title: Pipeline, cœurs et parallélisme
+    summary: Comment un processeur exécute plusieurs instructions à la fois, et pourquoi il a plusieurs cœurs.
+    minutes: 20
+    concepts: [pipeline, multicoeur, parallelisme]
+    sections:
+      - title: Le pipeline
+        body: |
+          Plutôt que d’attendre qu’une instruction soit entièrement terminée, le processeur fonctionne comme une **chaîne de montage** : pendant qu’une instruction s’exécute, la suivante est décodée et une troisième est lue.
+
+          ```anim pipeline
+          ```
+
+          Avec 4 étages, jusqu’à 4 instructions avancent en parallèle. Les processeurs modernes ont des pipelines de 15 à 20 étages et en exécutent plusieurs **côte à côte** (superscalaire).
+
+          Un **saut mal prédit** oblige à vider le pipeline : c’est pourquoi les processeurs ont un **prédicteur de branchement** très sophistiqué.
+      - title: Plusieurs cœurs
+        body: |
+          Depuis les années 2000, augmenter la fréquence chauffe trop. On met donc **plusieurs cœurs** sur une même puce : chacun est un processeur complet qui exécute son propre flot d’instructions (*thread*).
+
+          | Processeur | Cœurs |
+          |---|---|
+          | Téléphone | 6 à 10 |
+          | PC de bureau | 6 à 24 |
+          | Serveur | 64 à 192 |
+
+          Pour en profiter, un programme doit découper son travail en **threads** : c’est la **programmation concurrente** (tu la verras en Rust, C++ et Java).
+    exercises:
+      - id: hw-pipe-q1
+        type: mcq
+        prompt: À quoi ressemble un pipeline ?
+        choices: [À une chaîne de montage, À un entrepôt, À une file d’attente de supermarché, À un tuyau d’eau]
+        answer: 0
+      - id: hw-pipe-q2
+        type: mcq
+        prompt: Pourquoi met-on plusieurs cœurs plutôt qu’augmenter la fréquence ?
+        choices: [Parce que monter la fréquence chauffe et consomme beaucoup trop, Parce que les cœurs sont gratuits, Parce que la fréquence est limitée par la loi, Pour économiser de la RAM]
+        answer: 0
+      - id: hw-pipe-q3
+        type: mcq
+        prompt: Que se passe-t-il quand un saut est mal prédit ?
+        choices: [Le pipeline est vidé et on perd des cycles, L’ordinateur redémarre, Le programme plante, Rien du tout]
+        answer: 0
+      - id: hw-pipe-p1
+        type: predict
+        prompt: 'Avec un pipeline à 4 étages et une instruction par cycle, combien de cycles pour terminer 10 instructions ? (4 pour la première, puis 1 par instruction)'
+        code: "4 + 9 = ?"
+        output: "13"
+        explanation: Sans pipeline, il en faudrait 10 × 4 = 40.
+    project:
+      id: hw-pipe-projet
+      type: fill
+      title: Gagner du temps avec le parallélisme
+      difficulty: 2
+      prompt: |
+        Un calcul prend 8 secondes sur 1 cœur et se découpe parfaitement en morceaux indépendants. Complète.
+      code: |
+        Sur 2 cœurs : {{?}} secondes
+        Sur 4 cœurs : {{?}} secondes
+        Sur 8 cœurs : {{?}} seconde(s)
+      blanks: [['4'], ['2'], ['1']]
+      explanation: Dans la réalité, une partie du travail reste séquentielle (loi d’Amdahl) et le gain est un peu moindre.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-pipe-ex1
+          type: mcq
+          prompt: Un thread, c’est…
+          choices: [Un flot d’instructions exécuté par un cœur, Un câble entre CPU et RAM, Un type de mémoire, Un format de fichier]
+          answer: 0
+        - id: hw-pipe-ex2
+          type: mcq
+          prompt: Le pipeline permet…
+          choices: [De traiter plusieurs instructions en même temps à des étapes différentes, D’augmenter la RAM, De refroidir le processeur, De supprimer les sauts]
+          answer: 0
+        - id: hw-pipe-ex3
+          type: predict
+          prompt: 'Combien de cycles pour 5 instructions avec un pipeline à 4 étages ?'
+          code: "4 + 4 = ?"
+          output: "8"
+        - id: hw-pipe-ex4
+          type: mcq
+          prompt: Qu’est-ce que la loi d’Amdahl ?
+          choices: [La partie séquentielle d’un programme limite le gain du parallélisme, Les transistors doublent tous les deux ans, La chaleur double avec la fréquence, La RAM double tous les ans]
+          answer: 0

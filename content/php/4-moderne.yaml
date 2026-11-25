@@ -1,0 +1,167 @@
+language: php
+level: 4
+chapters:
+  - slug: php-moderne
+    title: PHP moderne
+    summary: Enums, readonly, types union, null-safe, closures, générateurs et bonnes pratiques.
+    minutes: 35
+    concepts: [enums, readonly, closures, generateurs]
+    sections:
+      - title: Enums et readonly
+        body: |
+          ```php
+          <?php
+          enum Niveau: int
+          {
+              case Debutant = 1;
+              case Intermediaire = 3;
+              case Expert = 5;
+
+              public function libelle(): string
+              {
+                  return match ($this) {
+                      Niveau::Debutant => "Débutant",
+                      Niveau::Intermediaire => "Intermédiaire",
+                      Niveau::Expert => "Expert",
+                  };
+              }
+          }
+
+          final class Joueur
+          {
+              public function __construct(
+                  public readonly string $nom,      // modifiable une seule fois
+                  public readonly Niveau $niveau,
+              ) {}
+          }
+
+          echo (new Joueur("Kiri", Niveau::Expert))->niveau->libelle(), "\n";
+          echo Niveau::from(3)->name, "\n";   // Intermediaire
+          ```
+      - title: Types et opérateurs modernes
+        body: |
+          ```php
+          function trouver(array $t, string $cle): int|string|null { return $t[$cle] ?? null; }
+
+          $ville = $utilisateur?->adresse?->ville;  // null-safe : null si un maillon est null
+          $total = array_reduce($prix, fn($acc, $p) => $acc + $p, 0);
+          ```
+
+          - **Closures** : `function ($x) use ($facteur) { … }` capture une variable ; les **fonctions fléchées** `fn($x) => $x * $facteur` la capturent automatiquement.
+          - **Générateurs** : `yield` produit des valeurs à la demande, comme en Python.
+          - L’écosystème : **Composer** (gestionnaire de paquets), **PSR** (standards de code), **PHPUnit** (tests), **Laravel** et **Symfony** (frameworks).
+    exercises:
+      - id: php-mod-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          enum Couleur: string {
+              case Rouge = 'r';
+              case Vert = 'v';
+          }
+          echo Couleur::from('v')->name, " ", count(Couleur::cases()), "\n";
+        output: "Vert 2"
+      - id: php-mod-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          $facteur = 3;
+          $f = fn($x) => $x * $facteur;
+          echo implode(",", array_map($f, [1, 2, 3])), "\n";
+        output: "3,6,9"
+      - id: php-mod-q1
+        type: mcq
+        prompt: Que fait `public readonly string $nom` ?
+        choices: [La propriété ne peut être initialisée qu’une seule fois, Elle est privée, Elle est statique, Elle est obligatoire dans toutes les classes]
+        answer: 0
+      - id: php-mod-q2
+        type: mcq
+        prompt: Que renvoie `$a?->b` si `$a` vaut null ?
+        choices: ['null', Une erreur fatale, Une chaîne vide, 'false']
+        answer: 0
+      - id: php-mod-p3
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          function nombres(int $n) {
+              for ($i = 1; $i <= $n; $i++) {
+                  yield $i * $i;
+              }
+          }
+          foreach (nombres(4) as $v) echo $v, " ";
+          echo "\n";
+        output: "1 4 9 16"
+    project:
+      id: php-mod-projet
+      type: code
+      title: Panier d’achats
+      difficulty: 3
+      prompt: |
+        Un **enum** `Categorie` a trois cas : `Livre` (TVA 5,5 %), `Jeu` (20 %) et `Alimentation` (5,5 %), avec une méthode `tva(): float` qui renvoie le taux (0.055 ou 0.2).
+
+        Chaque ligne de l’entrée est un article `categorie prixHT` (catégorie en minuscules : `livre`, `jeu`, `alimentation`). Affiche le **total TTC** arrondi à 2 décimales, au format `Total TTC : 29.33`.
+      starter: |
+        <?php
+        declare(strict_types=1);
+
+        enum Categorie
+        {
+            // à toi
+        }
+
+        $total = 0.0;
+        while (($ligne = fgets(STDIN)) !== false) {
+            [$cat, $prix] = explode(' ', trim($ligne));
+        }
+        echo "Total TTC : ", round($total, 2), "\n";
+      solution: |
+        <?php
+        declare(strict_types=1);
+
+        enum Categorie: string
+        {
+            case Livre = 'livre';
+            case Jeu = 'jeu';
+            case Alimentation = 'alimentation';
+
+            public function tva(): float
+            {
+                return match ($this) {
+                    Categorie::Jeu => 0.2,
+                    Categorie::Livre, Categorie::Alimentation => 0.055,
+                };
+            }
+        }
+
+        $total = 0.0;
+        while (($ligne = fgets(STDIN)) !== false) {
+            [$cat, $prix] = explode(' ', trim($ligne));
+            $total += (float) $prix * (1 + Categorie::from($cat)->tva());
+        }
+        echo "Total TTC : ", round($total, 2), "\n";
+      tests:
+        - { input: "livre 10\njeu 15", output: "Total TTC : 28.55" }
+        - { input: "alimentation 2.5\nalimentation 4", output: "Total TTC : 6.86", hidden: true }
+      require:
+        - { pattern: '\benum\s+Categorie', message: Déclarer l’enum Categorie }
+    exam:
+      pass: 70
+      questions:
+        - id: php-mod-ex1
+          type: mcq
+          prompt: Quel est le gestionnaire de paquets de PHP ?
+          choices: [Composer, npm, pip, Cargo]
+          answer: 0
+        - id: php-mod-ex2
+          type: mcq
+          prompt: Que fait `Niveau::from(5)` sur un enum adossé à des entiers ?
+          choices: [Renvoie le cas dont la valeur vaut 5, Crée un nouveau cas, Renvoie 5, Provoque toujours une erreur]
+          answer: 0
+        - id: php-mod-ex3
+          type: mcq
+          prompt: Une fonction fléchée `fn($x) => $x * $k`…
+          choices: [Capture automatiquement $k par valeur, Ne peut pas utiliser $k, Doit utiliser use ($k), Modifie $k]
+          answer: 0

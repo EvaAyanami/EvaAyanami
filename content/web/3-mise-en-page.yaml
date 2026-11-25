@@ -1,0 +1,263 @@
+language: web
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: web-flexbox
+    title: Flexbox
+    summary: Aligner et répartir des éléments sur une ligne ou une colonne.
+    minutes: 30
+    concepts: [flexbox, alignement]
+    sections:
+      - title: Un conteneur flexible
+        body: |
+          ```css
+          .barre {
+            display: flex;              /* les enfants se placent en ligne */
+            justify-content: space-between; /* répartition sur l'axe principal */
+            align-items: center;        /* alignement sur l'axe secondaire */
+            gap: 1rem;                  /* espace entre les enfants */
+          }
+          ```
+
+          - `flex-direction: row` (par défaut) ou `column` ;
+          - `justify-content` : `flex-start`, `center`, `space-between`, `space-around`… ;
+          - `align-items` : `stretch` (défaut), `center`, `flex-start`… ;
+          - `flex-wrap: wrap` : passe à la ligne s’il n’y a plus de place.
+      - title: Les enfants flexibles
+        body: |
+          ```css
+          .menu { flex: 0 0 200px; }   /* ne grandit pas, ne rétrécit pas, 200px */
+          .contenu { flex: 1; }        /* prend toute la place restante */
+          ```
+
+          Pour centrer parfaitement un élément dans un autre : `display: flex; justify-content: center; align-items: center;` sur le parent.
+    exercises:
+      - id: web-flex-q1
+        type: mcq
+        prompt: Quelle propriété répartit les enfants sur l’axe principal ?
+        choices: [justify-content, align-items, flex-wrap, gap]
+        answer: 0
+      - id: web-flex-q2
+        type: mcq
+        prompt: 'Que fait `flex: 1` sur un enfant ?'
+        choices: [Il occupe la place restante, Il fait 1px de large, Il passe en première position, Il disparaît]
+        answer: 0
+      - id: web-flex-fill
+        type: fill
+        prompt: Centre parfaitement l’enfant dans `.ecran`.
+        code: |
+          <style>
+            .ecran { display: {{?}}; justify-content: {{?}}; align-items: center; height: 200px; }
+          </style>
+          <div class="ecran"><span>Au centre</span></div>
+        blanks: [[flex], [center]]
+        checks:
+          - { type: css, selector: .ecran, property: display, value: flex, message: Conteneur flex }
+          - { type: css, selector: .ecran, property: justify-content, value: center, message: Centré horizontalement }
+      - id: web-flex-code
+        type: code
+        title: La barre de navigation
+        prompt: Mets les liens du `nav` en ligne avec Flexbox et un espace entre eux (`gap`).
+        starter: |
+          <style>
+          </style>
+          <nav>
+            <a href="/">Accueil</a>
+            <a href="/cours">Cours</a>
+            <a href="/profil">Profil</a>
+          </nav>
+        solution: |
+          <style>
+            nav { display: flex; gap: 1rem; }
+          </style>
+          <nav>
+            <a href="/">Accueil</a>
+            <a href="/cours">Cours</a>
+            <a href="/profil">Profil</a>
+          </nav>
+        checks:
+          - { type: css, selector: nav, property: display, value: flex, message: Le nav est un conteneur flex }
+          - { type: css, selector: nav, property: gap, value: '*', message: Un espace entre les liens (gap) }
+    project:
+      id: web-flex-projet
+      type: code
+      title: L’en-tête de site
+      difficulty: 3
+      prompt: |
+        Crée un en-tête `<header>` en Flexbox : le logo (`.logo`) à gauche et le menu (`nav`) à droite (`justify-content: space-between`), verticalement centrés (`align-items: center`). Les liens du `nav` sont eux aussi en flex.
+      starter: |
+        <style>
+        </style>
+        <header>
+          <div class="logo">Codemori</div>
+          <nav>
+            <a href="/">Accueil</a>
+            <a href="/cours">Cours</a>
+          </nav>
+        </header>
+      solution: |
+        <style>
+          header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; }
+          nav { display: flex; gap: 1rem; }
+        </style>
+        <header>
+          <div class="logo">Codemori</div>
+          <nav>
+            <a href="/">Accueil</a>
+            <a href="/cours">Cours</a>
+          </nav>
+        </header>
+      checks:
+        - { type: css, selector: header, property: display, value: flex, message: L’en-tête est en flex }
+        - { type: css, selector: header, property: justify-content, value: space-between, message: Logo à gauche et menu à droite }
+        - { type: css, selector: header, property: align-items, value: center, message: Centrage vertical }
+        - { type: css, selector: nav, property: display, value: flex, message: Les liens sont en flex }
+    exam:
+      pass: 70
+      questions:
+        - id: web-flex-ex1
+          type: mcq
+          prompt: Comment passer les enfants en colonne ?
+          choices: ['flex-direction: column', 'flex-wrap: column', 'display: column', 'align-items: column']
+          answer: 0
+        - id: web-flex-ex2
+          type: mcq
+          prompt: 'Que fait `flex-wrap: wrap` ?'
+          choices: [Passe les enfants à la ligne s’il manque de place, Enveloppe le conteneur d’une bordure, Inverse l’ordre, Cache le débordement]
+          answer: 0
+        - id: web-flex-ex3
+          type: mcq
+          prompt: '`align-items` agit sur…'
+          choices: [L’axe secondaire (vertical en ligne), L’axe principal, Les marges, Le texte uniquement]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: web-grid
+    title: CSS Grid
+    summary: Des mises en page en deux dimensions avec lignes, colonnes et zones nommées.
+    minutes: 30
+    concepts: [grid, mise-en-page]
+    sections:
+      - title: Une grille
+        body: |
+          ```css
+          .galerie {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);  /* 3 colonnes égales */
+            gap: 1rem;
+          }
+          ```
+
+          L’unité **`fr`** partage l’espace disponible : `1fr 2fr` = la deuxième colonne est deux fois plus large.
+
+          `repeat(auto-fill, minmax(200px, 1fr))` crée **autant de colonnes que possible** d’au moins 200 px : une galerie responsive sans aucune media query !
+      - title: Placer et nommer
+        body: |
+          ```css
+          .page {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            grid-template-areas:
+              "entete entete"
+              "menu   contenu"
+              "pied   pied";
+          }
+          header { grid-area: entete; }
+          nav    { grid-area: menu; }
+          main   { grid-area: contenu; }
+          footer { grid-area: pied; }
+          ```
+
+          **Flexbox** pour une seule dimension (une barre, une liste), **Grid** pour deux dimensions (une page, une galerie).
+    exercises:
+      - id: web-grid-q1
+        type: mcq
+        prompt: 'Que signifie `grid-template-columns: 1fr 1fr 1fr` ?'
+        choices: [Trois colonnes de même largeur, Trois lignes, Une colonne de 3px, Trois grilles]
+        answer: 0
+      - id: web-grid-q2
+        type: mcq
+        prompt: Grid ou Flexbox pour la mise en page d’une page entière (en-tête, menu, contenu, pied) ?
+        choices: [Grid, Flexbox, Les tableaux, Les float]
+        answer: 0
+      - id: web-grid-code
+        type: code
+        title: Une galerie
+        prompt: Fais de `.galerie` une grille de 3 colonnes égales avec un `gap`.
+        starter: |
+          <style>
+          </style>
+          <div class="galerie">
+            <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
+          </div>
+        solution: |
+          <style>
+            .galerie { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+          </style>
+          <div class="galerie">
+            <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
+          </div>
+        checks:
+          - { type: css, selector: .galerie, property: display, value: grid, message: Conteneur grid }
+          - { type: css, selector: .galerie, property: grid-template-columns, value: '/repeat\(3,\s*1fr\)|^1fr 1fr 1fr$/', message: Trois colonnes égales }
+          - { type: css, selector: .galerie, property: gap, value: '*', message: Un espacement }
+    project:
+      id: web-grid-projet
+      type: code
+      title: La page avec zones nommées
+      difficulty: 3
+      prompt: |
+        Construis la mise en page avec `grid-template-areas` sur `.page`, et donne à `header`, `nav`, `main` et `footer` leur `grid-area`.
+      starter: |
+        <style>
+        </style>
+        <div class="page">
+          <header>En-tête</header>
+          <nav>Menu</nav>
+          <main>Contenu</main>
+          <footer>Pied de page</footer>
+        </div>
+      solution: |
+        <style>
+          .page {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            grid-template-areas: "entete entete" "menu contenu" "pied pied";
+            gap: 8px;
+          }
+          header { grid-area: entete; }
+          nav { grid-area: menu; }
+          main { grid-area: contenu; }
+          footer { grid-area: pied; }
+        </style>
+        <div class="page">
+          <header>En-tête</header>
+          <nav>Menu</nav>
+          <main>Contenu</main>
+          <footer>Pied de page</footer>
+        </div>
+      checks:
+        - { type: css, selector: .page, property: display, value: grid, message: .page est une grille }
+        - { type: css, selector: .page, property: grid-template-areas, value: '*', message: Des zones nommées }
+        - { type: css, selector: header, property: grid-area, value: '*', message: header placé dans une zone }
+        - { type: css, selector: nav, property: grid-area, value: '*', message: nav placé dans une zone }
+        - { type: css, selector: main, property: grid-area, value: '*', message: main placé dans une zone }
+        - { type: css, selector: footer, property: grid-area, value: '*', message: footer placé dans une zone }
+    exam:
+      pass: 70
+      questions:
+        - id: web-grid-ex1
+          type: mcq
+          prompt: Que fait `repeat(auto-fill, minmax(200px, 1fr))` ?
+          choices: [Autant de colonnes d’au moins 200px que possible, Exactement 200 colonnes, Une colonne de 200px, Rien sans media query]
+          answer: 0
+        - id: web-grid-ex2
+          type: mcq
+          prompt: L’unité fr représente…
+          choices: [Une fraction de l’espace disponible, Un pixel français, La taille de la police, Un pourcentage de l’écran]
+          answer: 0
+        - id: web-grid-ex3
+          type: mcq
+          prompt: Quelle propriété place un élément dans une zone nommée ?
+          choices: [grid-area, grid-zone, area, grid-name]
+          answer: 0

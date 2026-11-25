@@ -1,0 +1,176 @@
+language: php
+level: 3
+chapters:
+  - slug: php-poo
+    title: Programmation orientée objet
+    summary: Classes, constructeurs, visibilité, interfaces, héritage et exceptions.
+    minutes: 35
+    concepts: [classes, interfaces, exceptions, visibilite]
+    sections:
+      - title: Classes et objets
+        body: |
+          ```php
+          <?php
+          declare(strict_types=1);
+
+          class Compte
+          {
+              // promotion des propriétés du constructeur (PHP 8)
+              public function __construct(
+                  private string $titulaire,
+                  private int $solde = 0,
+              ) {}
+
+              public function deposer(int $montant): void
+              {
+                  $this->solde += $montant;
+              }
+
+              public function solde(): int
+              {
+                  return $this->solde;
+              }
+          }
+
+          $c = new Compte("Kiri");
+          $c->deposer(50);
+          echo $c->solde(), "\n";   // 50
+          ```
+
+          - `private` : accessible seulement depuis la classe ; `public` : partout ; `protected` : la classe et ses enfants.
+          - `$this->` désigne l’objet courant ; on appelle une méthode avec `->`.
+      - title: Interfaces et héritage
+        body: |
+          ```php
+          <?php
+          interface Forme
+          {
+              public function aire(): float;
+          }
+
+          class Carre implements Forme
+          {
+              public function __construct(private float $cote) {}
+              public function aire(): float { return $this->cote ** 2; }
+          }
+          ```
+
+          Une **interface** est un contrat : toute classe qui l’implémente doit fournir ses méthodes. `extends` permet d’hériter d’une autre classe.
+      - title: Les exceptions
+        body: |
+          ```php
+          <?php
+          try {
+              throw new InvalidArgumentException("montant négatif");
+          } catch (InvalidArgumentException $e) {
+              echo "Erreur : ", $e->getMessage(), "\n";
+          } finally {
+              echo "Fin\n";
+          }
+          ```
+    exercises:
+      - id: php-poo-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          class Compteur {
+              private int $n = 0;
+              public function incr(): static { $this->n++; return $this; }
+              public function valeur(): int { return $this->n; }
+          }
+          echo (new Compteur())->incr()->incr()->valeur(), "\n";
+        output: "2"
+      - id: php-poo-q1
+        type: mcq
+        prompt: Une propriété `private` est accessible…
+        choices: [Seulement depuis la classe elle-même, Partout, Depuis les classes enfants uniquement, Depuis les interfaces]
+        answer: 0
+      - id: php-poo-q2
+        type: mcq
+        prompt: Quel mot-clé utilise une classe pour respecter une interface ?
+        choices: [implements, extends, uses, inherits]
+        answer: 0
+      - id: php-poo-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          try {
+              echo intdiv(1, 0);
+          } catch (DivisionByZeroError $e) {
+              echo "division impossible\n";
+          }
+        output: "division impossible"
+    project:
+      id: php-poo-projet
+      type: code
+      title: Formes géométriques
+      difficulty: 3
+      prompt: |
+        Écris une interface `Forme` avec `aire(): float` et `nom(): string`, et deux classes `Rectangle` (largeur, hauteur) et `Cercle` (rayon, avec `M_PI`).
+
+        Chaque ligne de l’entrée décrit une forme : `rectangle 3 4` ou `cercle 1`. Affiche pour chacune `nom : aire` avec l’aire arrondie à 2 décimales.
+      starter: |
+        <?php
+        declare(strict_types=1);
+
+        // interface Forme, classes Rectangle et Cercle
+
+        while (($ligne = fgets(STDIN)) !== false) {
+            $p = explode(' ', trim($ligne));
+            // crée la forme et affiche-la
+        }
+      solution: |
+        <?php
+        declare(strict_types=1);
+
+        interface Forme
+        {
+            public function aire(): float;
+            public function nom(): string;
+        }
+
+        class Rectangle implements Forme
+        {
+            public function __construct(private float $l, private float $h) {}
+            public function aire(): float { return $this->l * $this->h; }
+            public function nom(): string { return "rectangle"; }
+        }
+
+        class Cercle implements Forme
+        {
+            public function __construct(private float $r) {}
+            public function aire(): float { return M_PI * $this->r ** 2; }
+            public function nom(): string { return "cercle"; }
+        }
+
+        while (($ligne = fgets(STDIN)) !== false) {
+            $p = explode(' ', trim($ligne));
+            $forme = $p[0] === 'rectangle' ? new Rectangle((float) $p[1], (float) $p[2]) : new Cercle((float) $p[1]);
+            echo $forme->nom(), " : ", round($forme->aire(), 2), "\n";
+        }
+      tests:
+        - { input: "rectangle 3 4\ncercle 1", output: "rectangle : 12\ncercle : 3.14" }
+        - { input: "cercle 2\nrectangle 1.5 2", output: "cercle : 12.57\nrectangle : 3", hidden: true }
+      require:
+        - { pattern: '\binterface\s+Forme', message: Déclarer l’interface Forme }
+        - { pattern: 'implements\s+Forme', message: Les classes implémentent Forme }
+    exam:
+      pass: 70
+      questions:
+        - id: php-poo-ex1
+          type: mcq
+          prompt: Comment crée-t-on un objet ?
+          choices: ['new Compte()', 'Compte::new()', 'create Compte', 'Compte()']
+          answer: 0
+        - id: php-poo-ex2
+          type: mcq
+          prompt: Que désigne `$this` ?
+          choices: [L’objet courant, La classe parente, Le fichier, La dernière variable]
+          answer: 0
+        - id: php-poo-ex3
+          type: mcq
+          prompt: Le bloc finally…
+          choices: ['S’exécute toujours, exception ou non', Ne s’exécute qu’en cas d’erreur, Remplace catch, Arrête le programme]
+          answer: 0

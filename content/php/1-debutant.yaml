@@ -1,0 +1,282 @@
+language: php
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: php-bases
+    title: Premiers pas en PHP
+    summary: Le rôle de PHP côté serveur, echo, variables, types et lecture de l’entrée.
+    minutes: 20
+    concepts: [php, variables, echo]
+    sections:
+      - title: PHP, le langage du serveur
+        body: |
+          **PHP** s’exécute sur le **serveur** : il fabrique la page HTML (ou la réponse JSON) avant de l’envoyer au navigateur. Il fait tourner WordPress, Wikipédia, Laravel, Symfony… soit une grande partie du web.
+
+          Ici, nous l’utilisons en **ligne de commande** pour apprendre le langage : ce que tu écris avec `echo` s’affiche dans la console.
+
+          ```php
+          <?php
+          echo "Bonjour, PHP !\n";   // \n = retour à la ligne
+          echo 2 + 3 * 4, "\n";      // 14
+          ```
+
+          Un fichier PHP commence par `<?php`, et chaque instruction se termine par `;`.
+      - title: Les variables
+        body: |
+          Les variables commencent par **`$`**. Leur type est déterminé par leur valeur :
+
+          ```php
+          <?php
+          $prenom = "Kiri";      // string
+          $age = 16;             // int
+          $taille = 1.58;        // float
+          $aimeCoder = true;     // bool
+
+          echo "$prenom a $age ans\n";          // interpolation entre guillemets doubles
+          echo 'Pas d\'interpolation : $age', "\n"; // guillemets simples : texte brut
+          echo $prenom . " !" . "\n";           // . concatène
+          ```
+      - title: Lire l’entrée
+        body: |
+          ```php
+          <?php
+          $n = (int) trim(fgets(STDIN));   // lit une ligne, enlève le \n, convertit
+          echo $n * 2, "\n";
+          ```
+
+          `intdiv(7, 2)` donne 3, `7 % 2` donne 1 et `7 / 2` donne 3.5.
+    exercises:
+      - id: php-b-q1
+        type: mcq
+        prompt: Par quel caractère commencent les variables PHP ?
+        choices: ['$', '@', '#', '&']
+        answer: 0
+      - id: php-b-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          $x = 5;
+          echo "x vaut $x\n";
+          echo 'x vaut $x', "\n";
+        output: "x vaut 5\nx vaut $x"
+      - id: php-b-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          echo intdiv(17, 5), " ", 17 % 5, " ", 2 ** 4, "\n";
+        output: "3 2 16"
+      - id: php-b-fill
+        type: fill
+        prompt: Complète pour concaténer et afficher `Bonjour Kiri`.
+        code: |
+          <?php
+          $nom = "Kiri";
+          echo "Bonjour " {{?}} $nom {{?}} "\n";
+        blanks: [['.'], ['.']]
+        tests:
+          - { input: '', output: 'Bonjour Kiri' }
+      - id: php-b-code
+        type: code
+        title: Le triple
+        prompt: Lis un entier et affiche son triple.
+        starter: |
+          <?php
+          $n = (int) trim(fgets(STDIN));
+        solution: |
+          <?php
+          $n = (int) trim(fgets(STDIN));
+          echo $n * 3, "\n";
+        tests:
+          - { input: '7', output: '21' }
+          - { input: '-2', output: '-6', hidden: true }
+    project:
+      id: php-b-projet
+      type: code
+      title: Le message de bienvenue
+      difficulty: 1
+      prompt: |
+        Lis un **prénom** puis une **année de naissance** (une valeur par ligne) et affiche :
+
+        ```
+        Bienvenue, <prénom> !
+        En 2030, tu auras <2030 - année> ans.
+        ```
+      starter: |
+        <?php
+        $prenom = trim(fgets(STDIN));
+        $annee = (int) trim(fgets(STDIN));
+      solution: |
+        <?php
+        $prenom = trim(fgets(STDIN));
+        $annee = (int) trim(fgets(STDIN));
+        $age = 2030 - $annee;
+        echo "Bienvenue, $prenom !\n";
+        echo "En 2030, tu auras $age ans.\n";
+      tests:
+        - { input: "Kiri\n2010", output: "Bienvenue, Kiri !\nEn 2030, tu auras 20 ans." }
+        - { input: "Ada\n1990", output: "Bienvenue, Ada !\nEn 2030, tu auras 40 ans.", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: php-b-ex1
+          type: mcq
+          prompt: Où s’exécute PHP dans un site web ?
+          choices: [Sur le serveur, Dans le navigateur, Dans la carte graphique, Dans le DNS]
+          answer: 0
+        - id: php-b-ex2
+          type: mcq
+          prompt: Quel opérateur concatène deux chaînes ?
+          choices: ['.', '+', '&', '++']
+          answer: 0
+        - id: php-b-ex3
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            <?php
+            $a = "4";
+            $b = 2;
+            echo $a * $b, "\n";
+          output: "8"
+          explanation: PHP convertit la chaîne numérique "4" en nombre pour la multiplication.
+
+  # ------------------------------------------------------------------
+  - slug: php-conditions-boucles
+    title: Conditions et boucles
+    summary: if / elseif, comparaisons strictes, match, for, while et foreach.
+    minutes: 25
+    concepts: [conditions, boucles, comparaison-stricte]
+    sections:
+      - title: Conditions et comparaisons
+        body: |
+          ```php
+          <?php
+          $note = 14;
+          if ($note >= 16) {
+              echo "Très bien\n";
+          } elseif ($note >= 10) {
+              echo "Admis\n";
+          } else {
+              echo "À retravailler\n";
+          }
+          ```
+
+          > ⚠️ Utilise **`===`** (égalité stricte : même valeur ET même type) plutôt que `==`, qui convertit les types : `"1" == 1` est vrai, `"1" === 1` est faux.
+
+          L’expression `match` (PHP 8) est une version moderne et stricte du `switch` :
+
+          ```php
+          $mention = match (true) {
+              $note >= 16 => "Très bien",
+              $note >= 10 => "Admis",
+              default => "Ajourné",
+          };
+          ```
+      - title: Les boucles
+        body: |
+          ```php
+          <?php
+          for ($i = 1; $i <= 3; $i++) {
+              echo $i, "\n";
+          }
+          $n = 1;
+          while ($n < 100) {
+              $n *= 2;
+          }
+          foreach (["Rust", "PHP"] as $langage) {
+              echo "J'apprends $langage\n";
+          }
+          ```
+    exercises:
+      - id: php-cb-q1
+        type: mcq
+        prompt: Que vaut `"1" === 1` ?
+        choices: [false, true, Une erreur, '"1"']
+        answer: 0
+      - id: php-cb-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          $s = 0;
+          for ($i = 1; $i <= 4; $i++) {
+              $s += $i;
+          }
+          echo $s, "\n";
+        output: "10"
+      - id: php-cb-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          <?php
+          $x = 3;
+          echo match ($x) {
+              1, 2 => "petit",
+              3, 4 => "moyen",
+              default => "grand",
+          }, "\n";
+        output: "moyen"
+      - id: php-cb-code
+        type: code
+        title: Signe d’un nombre
+        prompt: Lis un entier et affiche `positif`, `négatif` ou `nul`.
+        starter: |
+          <?php
+          $n = (int) trim(fgets(STDIN));
+        solution: |
+          <?php
+          $n = (int) trim(fgets(STDIN));
+          if ($n > 0) {
+              echo "positif\n";
+          } elseif ($n < 0) {
+              echo "négatif\n";
+          } else {
+              echo "nul\n";
+          }
+        tests:
+          - { input: '5', output: 'positif' }
+          - { input: '-3', output: 'négatif' }
+          - { input: '0', output: 'nul', hidden: true }
+    project:
+      id: php-cb-projet
+      type: code
+      title: Table de multiplication
+      difficulty: 2
+      prompt: Lis un entier `n` et affiche sa table de multiplication de 1 à 10, au format `3 x 4 = 12`.
+      starter: |
+        <?php
+        $n = (int) trim(fgets(STDIN));
+      solution: |
+        <?php
+        $n = (int) trim(fgets(STDIN));
+        for ($i = 1; $i <= 10; $i++) {
+            echo "$n x $i = " . ($n * $i) . "\n";
+        }
+      tests:
+        - { input: '3', output: "3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15\n3 x 6 = 18\n3 x 7 = 21\n3 x 8 = 24\n3 x 9 = 27\n3 x 10 = 30" }
+        - { input: '0', output: "0 x 1 = 0\n0 x 2 = 0\n0 x 3 = 0\n0 x 4 = 0\n0 x 5 = 0\n0 x 6 = 0\n0 x 7 = 0\n0 x 8 = 0\n0 x 9 = 0\n0 x 10 = 0", hidden: true }
+    exam:
+      pass: 70
+      questions:
+        - id: php-cb-ex1
+          type: mcq
+          prompt: Quelle boucle parcourt directement les éléments d’un tableau ?
+          choices: [foreach, for, while, do-while]
+          answer: 0
+        - id: php-cb-ex2
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            <?php
+            $n = 1;
+            while ($n < 50) {
+                $n *= 3;
+            }
+            echo $n, "\n";
+          output: "81"
+        - id: php-cb-ex3
+          type: mcq
+          prompt: Pourquoi préférer `===` à `==` ?
+          choices: [Il compare aussi le type et évite des conversions surprenantes, Il est plus court, Il est obligatoire en PHP 8, Il compare les adresses mémoire]
+          answer: 0

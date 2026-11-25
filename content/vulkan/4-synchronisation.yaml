@@ -1,0 +1,79 @@
+language: vulkan
+level: 4
+chapters:
+  - slug: vk-synchronisation
+    title: Synchronisation et image par image
+    summary: Sémaphores, fences et barrières — orchestrer le CPU et le GPU sans les faire s’attendre inutilement.
+    minutes: 35
+    concepts: [semaphore, fence, barriere, frames-in-flight]
+    sections:
+      - title: Une image avec Vulkan
+        body: |
+          ```anim vulkan-frame
+          ```
+
+          Le CPU et le GPU travaillent **en parallèle**. Sans synchronisation explicite, le CPU pourrait réécrire un command buffer que le GPU est encore en train d’exécuter, ou présenter une image pas encore dessinée.
+      - title: Les outils de synchronisation
+        body: |
+          | Outil | Qui attend ? | Exemple |
+          |---|---|---|
+          | **Sémaphore** | le GPU attend le GPU | « dessine seulement quand l’image de la swapchain est disponible » |
+          | **Fence** | le CPU attend le GPU | « attends que l’image n° 2 soit finie avant de réutiliser son command buffer » |
+          | **Barrière** | dans un command buffer | « attends la fin de l’écriture de cette texture avant de la lire dans un shader » |
+
+          Les barrières servent aussi aux **transitions de layout** d’images : une image passe par exemple de `COLOR_ATTACHMENT_OPTIMAL` (on dessine dedans) à `PRESENT_SRC_KHR` (on l’affiche).
+      - title: Plusieurs images « en vol »
+        body: |
+          Pour ne pas laisser le CPU attendre à chaque image, on prépare souvent **2 images en vol** (*frames in flight*) : pendant que le GPU dessine l’image N, le CPU enregistre l’image N + 1. Chaque image a son command buffer, ses sémaphores et sa fence.
+    exercises:
+      - id: vk-sync-q1
+        type: mcq
+        prompt: Quel outil permet au CPU d’attendre la fin d’un travail du GPU ?
+        choices: [Une fence, Un sémaphore, Une barrière, Un pipeline]
+        answer: 0
+      - id: vk-sync-q2
+        type: mcq
+        prompt: Quel outil synchronise deux soumissions sur le GPU (acquisition de l’image puis rendu) ?
+        choices: [Un sémaphore, Une fence, Un mutex, Un thread]
+        answer: 0
+      - id: vk-sync-q3
+        type: mcq
+        prompt: À quoi sert une transition de layout ?
+        choices: ['Préparer une image pour un nouvel usage (rendu, lecture, présentation)', Changer la résolution, Compresser l’image, Changer de GPU]
+        answer: 0
+      - id: vk-sync-order
+        type: order
+        prompt: Remets dans l’ordre le rendu d’une image.
+        lines: [Attendre la fence de cette image en vol, Acquérir une image de la swapchain, Enregistrer le command buffer, Soumettre en attendant le sémaphore « image disponible », Présenter en attendant le sémaphore « rendu terminé »]
+    project:
+      id: vk-sync-projet
+      type: mcq
+      title: Le bug de l’image corrompue
+      difficulty: 3
+      prompt: Ton application affiche parfois des images à moitié dessinées et les couches de validation signalent qu’un command buffer est réenregistré « while in use ». Quelle correction appliquer ?
+      choices: [Attendre la fence de l’image en vol avant de réenregistrer son command buffer, Supprimer les sémaphores, Passer en mode IMMEDIATE, Désactiver la validation]
+      answer: 0
+      explanation: Sans attendre la fence, le CPU modifie un command buffer que le GPU exécute encore.
+    exam:
+      pass: 70
+      questions:
+        - id: vk-sync-ex1
+          type: mcq
+          prompt: Une barrière s’enregistre…
+          choices: [Dans un command buffer, Dans l’instance, Dans la swapchain, Dans un fichier SPIR-V]
+          answer: 0
+        - id: vk-sync-ex2
+          type: mcq
+          prompt: Pourquoi plusieurs images « en vol » ?
+          choices: [Pour que CPU et GPU travaillent en même temps sans s’attendre, Pour doubler la résolution, Pour économiser la VRAM, Pour éviter les shaders]
+          answer: 0
+        - id: vk-sync-ex3
+          type: mcq
+          prompt: Avant de présenter une image, son layout doit être…
+          choices: [PRESENT_SRC_KHR, UNDEFINED, TRANSFER_SRC, GENERAL]
+          answer: 0
+        - id: vk-sync-ex4
+          type: mcq
+          prompt: Qui détecte les erreurs de synchronisation pendant le développement ?
+          choices: [Les couches de validation (synchronization validation), Le moniteur, Le compilateur C++, Personne]
+          answer: 0

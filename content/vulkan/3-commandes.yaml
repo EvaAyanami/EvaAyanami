@@ -1,0 +1,81 @@
+language: vulkan
+level: 3
+chapters:
+  - slug: vk-pipeline-commandes
+    title: Pipeline graphique et command buffers
+    summary: Un pipeline figé à l’avance, des commandes enregistrées puis soumises à une file.
+    minutes: 30
+    concepts: [pipeline, command-buffer, rendering]
+    sections:
+      - title: Un pipeline figé
+        body: |
+          En OpenGL, on change les états (blending, profondeur…) n’importe quand. En Vulkan, presque tout est **figé à la création** d’un `VkPipeline` : shaders SPIR-V, format des sommets, rastérisation, profondeur, mélange des couleurs.
+
+          Créer un pipeline est **coûteux** : on les prépare au chargement (et on les met en cache avec `VkPipelineCache`). En échange, changer de pipeline pendant le rendu est rapide et sans surprise.
+      - title: Enregistrer des commandes
+        body: |
+          On ne dessine pas directement : on **enregistre** des commandes dans un **command buffer**, puis on le **soumet** à une file.
+
+          ```cpp
+          vkBeginCommandBuffer(cmd, &beginInfo);
+          vkCmdBeginRendering(cmd, &renderingInfo);       // Vulkan 1.3 : rendu dynamique
+          vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+          vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+          vkCmdDraw(cmd, 3, 1, 0, 0);                     // 3 sommets, 1 instance
+          vkCmdEndRendering(cmd);
+          vkEndCommandBuffer(cmd);
+          ```
+
+          Les command buffers viennent d’un **command pool** (un par thread). Plusieurs threads peuvent enregistrer en parallèle : c’est un des grands atouts de Vulkan.
+    exercises:
+      - id: vk-cmd-q1
+        type: mcq
+        prompt: Pourquoi crée-t-on les pipelines au chargement ?
+        choices: [Leur création est coûteuse, Ils ne peuvent être créés qu’une fois par programme, Le pilote l’exige à minuit, Pour libérer de la RAM]
+        answer: 0
+      - id: vk-cmd-q2
+        type: mcq
+        prompt: Que fait vkCmdDraw ?
+        choices: [Il enregistre une commande de dessin dans le command buffer, Il dessine immédiatement à l’écran, Il crée la fenêtre, Il compile un shader]
+        answer: 0
+      - id: vk-cmd-order
+        type: order
+        prompt: Remets dans l’ordre l’enregistrement d’un dessin.
+        lines: [vkBeginCommandBuffer, vkCmdBeginRendering, vkCmdBindPipeline, vkCmdDraw, vkCmdEndRendering, vkEndCommandBuffer]
+      - id: vk-cmd-q3
+        type: mcq
+        prompt: D’où viennent les command buffers ?
+        choices: [D’un command pool, De la swapchain, Du périphérique physique, D’une texture]
+        answer: 0
+    project:
+      id: vk-cmd-projet
+      type: mcq
+      title: Saccades au premier affichage
+      difficulty: 3
+      prompt: Ton jeu saccade la première fois qu’un nouvel effet apparaît, puis tout est fluide. Quelle est la cause la plus probable ?
+      choices: [Des pipelines créés en plein jeu au lieu d’être préparés au chargement, Une texture trop petite, Le mode FIFO, Un manque de couches de validation]
+      answer: 0
+      explanation: Compiler un pipeline peut prendre plusieurs millisecondes. On les précompile au chargement et on utilise un cache de pipelines.
+    exam:
+      pass: 70
+      questions:
+        - id: vk-cmd-ex1
+          type: mcq
+          prompt: Que contient un VkPipeline ?
+          choices: [Shaders et états de rendu figés, Les images de la swapchain, La liste des GPU, Les sémaphores]
+          answer: 0
+        - id: vk-cmd-ex2
+          type: mcq
+          prompt: Combien de command pools faut-il pour enregistrer sur 4 threads ?
+          choices: [Un par thread (4), Un seul partagé, Aucun, Un par image]
+          answer: 0
+        - id: vk-cmd-ex3
+          type: mcq
+          prompt: Que fait-on d’un command buffer enregistré ?
+          choices: [On le soumet à une file avec vkQueueSubmit, On le sauvegarde sur le disque, On l’affiche, On le compile en SPIR-V]
+          answer: 0
+        - id: vk-cmd-ex4
+          type: mcq
+          prompt: Le « rendu dynamique » de Vulkan 1.3 évite de créer…
+          choices: [Des render passes et framebuffers à l’avance, Des shaders, Des files, Une instance]
+          answer: 0

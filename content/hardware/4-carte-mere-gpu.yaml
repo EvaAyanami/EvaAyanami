@@ -1,0 +1,184 @@
+language: hardware
+level: 4
+chapters:
+  # ------------------------------------------------------------------
+  - slug: hw-carte-mere
+    title: Carte mère, bus et périphériques
+    summary: Comment les composants communiquent — sockets, PCI Express, USB, SATA, chipset et pilotes.
+    minutes: 25
+    concepts: [carte-mere, pcie, usb, pilotes]
+    sections:
+      - title: Le système nerveux de l’ordinateur
+        body: |
+          ```anim motherboard
+          ```
+
+          La carte mère accueille le processeur (dans son **socket**), la RAM (dans des **slots DIMM**), les cartes d’extension (**PCI Express**) et le stockage (**M.2** et **SATA**). Ses pistes de cuivre transportent les données et l’énergie.
+
+          Le **chipset** relie le processeur aux ports plus lents : USB, SATA, réseau, audio.
+      - title: Les bus et leurs débits
+        body: |
+          | Liaison | Utilisation | Débit typique |
+          |---|---|---|
+          | PCIe 4.0 x16 | carte graphique | ~32 Go/s |
+          | PCIe 4.0 x4 (M.2) | SSD NVMe | ~8 Go/s |
+          | SATA III | SSD/HDD SATA | 0,6 Go/s |
+          | USB 3.2 | périphériques | 1,2 à 2,4 Go/s |
+          | DDR5 | RAM | 50 à 100 Go/s |
+
+          Le nombre après « x » (x1, x4, x16) indique le nombre de **voies** utilisées en parallèle.
+      - title: Les pilotes
+        body: |
+          Un **pilote** (*driver*) est un logiciel qui apprend au système d’exploitation à parler à un matériel précis : carte graphique, imprimante, carte Wi-Fi…
+
+          Quand un périphérique « ne marche pas » après son branchement, c’est très souvent un problème de pilote.
+    exercises:
+      - id: hw-cm-q1
+        type: mcq
+        prompt: Où se branche la carte graphique ?
+        choices: [Sur un port PCIe x16, Sur un port SATA, Sur un port USB, Dans le socket du processeur]
+        answer: 0
+      - id: hw-cm-q2
+        type: mcq
+        prompt: Quel est le rôle d’un pilote ?
+        choices: [Permettre au système de dialoguer avec un matériel, Refroidir la carte mère, Augmenter la fréquence, Stocker des fichiers]
+        answer: 0
+      - id: hw-cm-q3
+        type: mcq
+        prompt: Quelle liaison est la plus rapide ?
+        choices: [PCIe 4.0 x16, SATA III, USB 2.0, Wi-Fi]
+        answer: 0
+      - id: hw-cm-fill
+        type: fill
+        prompt: Complète.
+        code: |
+          Le processeur se place dans le {{?}} de la carte mère.
+          Les SSD NVMe se branchent sur un port {{?}}.
+        blanks: [[socket], [M.2, m2, M2]]
+    project:
+      id: hw-cm-projet
+      type: mcq
+      title: Le PC qui n’affiche rien
+      difficulty: 3
+      prompt: Tu viens de monter un PC. Les ventilateurs tournent mais l’écran reste noir. Le câble de l’écran est branché sur la carte mère alors qu’une carte graphique est installée. Que faire ?
+      choices:
+        - Brancher le câble de l’écran sur la carte graphique
+        - Changer le processeur
+        - Formater le SSD
+        - Ajouter de la RAM
+      answer: 0
+      explanation: Avec une carte graphique dédiée, la sortie vidéo de la carte mère est souvent désactivée. C’est l’erreur la plus fréquente au premier démarrage !
+    exam:
+      pass: 70
+      questions:
+        - id: hw-cm-ex1
+          type: mcq
+          prompt: Que signifie « x16 » dans PCIe x16 ?
+          choices: [16 voies de données en parallèle, 16 Go, 16 GHz, La version 16]
+          answer: 0
+        - id: hw-cm-ex2
+          type: mcq
+          prompt: Le chipset relie le processeur…
+          choices: ['Aux ports USB, SATA, réseau et audio', À l’alimentation uniquement, Au ventirad, À l’écran directement]
+          answer: 0
+        - id: hw-cm-ex3
+          type: mcq
+          prompt: Les barrettes de RAM se placent dans…
+          choices: [Les slots DIMM, Le socket, Les ports M.2, Les ports SATA]
+          answer: 0
+        - id: hw-cm-ex4
+          type: mcq
+          prompt: Après l’installation d’une imprimante, elle n’est pas reconnue. Première chose à vérifier ?
+          choices: [Le pilote, La pâte thermique, La RAM, La fréquence du processeur]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: hw-gpu
+    title: La carte graphique (GPU)
+    summary: Des milliers de petits cœurs pour la 3D et le calcul parallèle — et ce qu’est un shader.
+    minutes: 25
+    concepts: [gpu, parallelisme, shaders, vram]
+    sections:
+      - title: CPU ou GPU ?
+        body: |
+          | | CPU | GPU |
+          |---|---|---|
+          | Cœurs | quelques gros cœurs (8 à 24) | des milliers de petits cœurs |
+          | Point fort | tâches complexes et variées | la même opération sur des millions de données |
+          | Exemples | système, logique d’un jeu, compilation | images 3D, vidéo, IA |
+
+          Calculer la couleur de 8 millions de pixels 60 fois par seconde est une tâche **massivement parallèle** : parfait pour un GPU.
+      - title: Le pipeline graphique
+        body: |
+          Le GPU transforme des triangles en pixels, étape par étape :
+
+          ```anim gpu-pipeline
+          ```
+
+          Les étapes programmables s’appellent des **shaders** : de petits programmes exécutés par des milliers de cœurs en même temps. Tu les écriras dans les pistes **OpenGL** et **Vulkan**.
+      - title: La mémoire vidéo
+        body: |
+          Le GPU a sa propre mémoire, la **VRAM** (GDDR6, HBM…), très rapide (plusieurs centaines de Go/s) : elle contient les textures, les modèles 3D et l’image en cours de calcul (le *framebuffer*).
+
+          Aujourd’hui, les GPU servent aussi à entraîner les **IA** : multiplier d’immenses matrices est, là encore, une tâche parfaitement parallèle.
+    exercises:
+      - id: hw-gpu-q1
+        type: mcq
+        prompt: Pourquoi le GPU est-il idéal pour la 3D ?
+        choices: [Il applique le même calcul à des millions de pixels en parallèle, Il a une fréquence plus élevée que le CPU, Il a plus de cache L1, Il remplace la RAM]
+        answer: 0
+      - id: hw-gpu-q2
+        type: mcq
+        prompt: Qu’est-ce qu’un shader ?
+        choices: [Un petit programme exécuté par le GPU, Un type d’écran, Un ventilateur de carte graphique, Un format d’image]
+        answer: 0
+      - id: hw-gpu-q3
+        type: mcq
+        prompt: Que contient la VRAM ?
+        choices: ['Les textures, les modèles et l’image en cours', Le système d’exploitation, Les fichiers de l’utilisateur, Le BIOS]
+        answer: 0
+      - id: hw-gpu-order
+        type: order
+        prompt: Remets dans l’ordre le trajet d’un triangle dans le GPU.
+        lines: [Les sommets sont envoyés au GPU, Le vertex shader les transforme, La rastérisation découpe le triangle en fragments, Le fragment shader calcule leur couleur, Le pixel est écrit dans l’image]
+      - id: hw-gpu-p1
+        type: predict
+        prompt: 'Un écran 1920 × 1080 contient combien de pixels ? (sans espace)'
+        code: "1920 × 1080 = ?"
+        output: "2073600"
+    project:
+      id: hw-gpu-projet
+      type: mcq
+      title: CPU ou GPU ?
+      difficulty: 2
+      prompt: Laquelle de ces tâches profite le plus d’un GPU ?
+      choices:
+        - Appliquer un filtre de couleur à chaque pixel d’une vidéo 4K
+        - Lire un fichier texte ligne par ligne
+        - Faire tourner un traitement de texte
+        - Compiler un petit programme
+      answer: 0
+      explanation: Le même calcul est répété indépendamment pour des millions de pixels.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-gpu-ex1
+          type: mcq
+          prompt: Combien de cœurs a un GPU moderne ?
+          choices: [Des milliers, 1, 4, 16]
+          answer: 0
+        - id: hw-gpu-ex2
+          type: mcq
+          prompt: Quel shader calcule la couleur de chaque pixel ?
+          choices: [Le fragment shader, Le vertex shader, Le pilote, L’UEFI]
+          answer: 0
+        - id: hw-gpu-ex3
+          type: mcq
+          prompt: Pourquoi les GPU servent-ils à l’intelligence artificielle ?
+          choices: ['Les calculs de l’IA sont d’énormes multiplications de matrices, très parallèles', Les GPU ont plus de stockage, Les IA ont besoin d’un écran, Par habitude]
+          answer: 0
+        - id: hw-gpu-ex4
+          type: predict
+          prompt: 'À 60 images par seconde, combien de millisecondes environ pour calculer une image ? (arrondi à l’unité)'
+          code: "1000 / 60 ≈ ?"
+          output: "17"

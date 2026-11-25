@@ -1,0 +1,290 @@
+language: python
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: py-fonctions
+    title: Les fonctions
+    summary: Définir des fonctions, paramètres, valeurs par défaut, return et portée des variables.
+    minutes: 25
+    concepts: [fonctions, parametres, return]
+    sections:
+      - title: Définir une fonction
+        body: |
+          ```python
+          def carre(x):
+              return x * x
+
+          def saluer(nom, poli=True):     # paramètre avec valeur par défaut
+              if poli:
+                  return f"Bonjour, {nom} !"
+              return f"Salut {nom}"
+
+          print(carre(7))                 # 49
+          print(saluer("Kiri"))           # Bonjour, Kiri !
+          print(saluer("Kiri", poli=False))
+          ```
+
+          - `def` définit la fonction, `return` renvoie une valeur (sans `return`, elle renvoie `None`).
+          - On peut nommer les arguments à l’appel : `saluer("Kiri", poli=False)`.
+      - title: Portée des variables
+        body: |
+          Une variable créée **dans** une fonction est **locale** : elle disparaît à la fin de la fonction et n’est pas visible ailleurs. Une fonction qui calcule doit donc **renvoyer** son résultat plutôt que de l’afficher, pour qu’on puisse le réutiliser.
+
+          ```python
+          def moyenne(a, b):
+              m = (a + b) / 2   # m est locale
+              return m
+          ```
+      - title: Plusieurs valeurs de retour
+        body: |
+          ```python
+          def min_max(a, b):
+              return min(a, b), max(a, b)   # un tuple
+
+          petit, grand = min_max(8, 3)       # déballage
+          print(petit, grand)                # 3 8
+          ```
+    exercises:
+      - id: py-fn-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          def f(x, y=10):
+              return x + y
+          print(f(1), f(1, 2))
+        output: "11 3"
+      - id: py-fn-q1
+        type: mcq
+        prompt: Que renvoie une fonction sans `return` ?
+        choices: [None, '0', Une chaîne vide, Une erreur]
+        answer: 0
+      - id: py-fn-fill
+        type: fill
+        prompt: Complète la fonction qui renvoie le cube de `x`.
+        code: |
+          {{?}} cube(x):
+              {{?}} x ** 3
+          print(cube(3))
+        blanks: [[def], [return]]
+        tests:
+          - { input: '', output: '27' }
+      - id: py-fn-code
+        type: code
+        title: Valeur absolue
+        prompt: |
+          Écris la fonction `absolue(n)` qui renvoie la valeur absolue de `n` **sans utiliser** `abs`. Le programme lit un entier et affiche `absolue(n)`.
+        starter: |
+          def absolue(n):
+              pass
+
+          print(absolue(int(input())))
+        solution: |
+          def absolue(n):
+              if n < 0:
+                  return -n
+              return n
+
+          print(absolue(int(input())))
+        tests:
+          - { input: '-5', output: '5' }
+          - { input: '8', output: '8', hidden: true }
+          - { input: '0', output: '0', hidden: true }
+        forbid:
+          - { pattern: '\babs\s*\(', message: Ne pas utiliser abs() }
+    project:
+      id: py-fn-projet
+      type: code
+      title: Convertisseur de températures
+      difficulty: 2
+      prompt: |
+        Écris `celsius_vers_fahrenheit(c)` (formule : `c × 9/5 + 32`). Le programme lit un nombre de lignes `n`, puis `n` températures en °C (entiers), et affiche chaque conversion **arrondie à une décimale** sous la forme `20 °C = 68.0 °F`.
+      starter: |
+        def celsius_vers_fahrenheit(c):
+            pass
+
+        n = int(input())
+        for _ in range(n):
+            c = int(input())
+            # affiche la conversion
+      solution: |
+        def celsius_vers_fahrenheit(c):
+            return c * 9 / 5 + 32
+
+        n = int(input())
+        for _ in range(n):
+            c = int(input())
+            print(f"{c} °C = {round(celsius_vers_fahrenheit(c), 1)} °F")
+      tests:
+        - { input: "2\n20\n-40", output: "20 °C = 68.0 °F\n-40 °C = -40.0 °F" }
+        - { input: "1\n37", output: "37 °C = 98.6 °F", hidden: true }
+      hints: ['`round(x, 1)` arrondit à une décimale.']
+    exam:
+      pass: 70
+      questions:
+        - id: py-fn-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            def f(a, b):
+                return b, a
+            x, y = f(1, 2)
+            print(x, y)
+          output: "2 1"
+        - id: py-fn-ex2
+          type: mcq
+          prompt: Une variable créée dans une fonction est…
+          choices: [Locale à la fonction, Globale, Partagée avec toutes les fonctions, Constante]
+          answer: 0
+        - id: py-fn-ex3
+          type: code
+          title: Le maximum de trois
+          prompt: Écris `max3(a, b, c)` sans utiliser `max`. Le programme lit trois entiers (un par ligne) et affiche le plus grand.
+          starter: |
+            def max3(a, b, c):
+                pass
+
+            a, b, c = int(input()), int(input()), int(input())
+            print(max3(a, b, c))
+          solution: |
+            def max3(a, b, c):
+                m = a
+                if b > m:
+                    m = b
+                if c > m:
+                    m = c
+                return m
+
+            a, b, c = int(input()), int(input()), int(input())
+            print(max3(a, b, c))
+          tests:
+            - { input: "1\n9\n4", output: '9' }
+            - { input: "-1\n-9\n-4", output: '-1', hidden: true }
+          forbid:
+            - { pattern: '\bmax\s*\(', message: Ne pas utiliser max() }
+
+  # ------------------------------------------------------------------
+  - slug: py-listes-dicts
+    title: Listes et dictionnaires
+    summary: Les collections indispensables — listes, indices, tranches, dictionnaires et parcours.
+    minutes: 30
+    concepts: [listes, dictionnaires, tranches]
+    sections:
+      - title: Les listes
+        body: |
+          ```python
+          notes = [12, 15, 9]
+          notes.append(18)          # ajoute à la fin
+          print(notes[0], notes[-1])  # 12 18 (premier, dernier)
+          print(len(notes), sum(notes))  # 4 54
+          print(notes[1:3])          # [15, 9] (tranche : indices 1 et 2)
+          notes.sort()               # trie sur place
+          ```
+
+          Les indices commencent à **0**. Les indices négatifs partent de la fin.
+      - title: Les dictionnaires
+        body: |
+          Un dictionnaire associe des **clés** à des **valeurs** :
+
+          ```python
+          stock = {"pommes": 3, "poires": 5}
+          stock["kiwis"] = 2            # ajout
+          stock["pommes"] += 1          # modification
+          print(stock.get("bananes", 0))  # 0 si la clé n'existe pas
+
+          for fruit, qte in stock.items():
+              print(fruit, qte)
+          ```
+      - title: Lire plusieurs valeurs
+        body: |
+          ```python
+          nombres = list(map(int, input().split()))   # "3 8 1" → [3, 8, 1]
+          ```
+
+          `split()` découpe la ligne aux espaces, `map(int, …)` convertit chaque morceau.
+    exercises:
+      - id: py-ld-p1
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          l = [4, 7, 1, 9]
+          print(l[1], l[-1], l[1:3])
+        output: "7 9 [7, 1]"
+      - id: py-ld-p2
+        type: predict
+        prompt: Que va afficher ce programme ?
+        code: |
+          d = {"a": 1}
+          d["b"] = 2
+          d["a"] += 10
+          print(d, len(d))
+        output: "{'a': 11, 'b': 2} 2"
+      - id: py-ld-q1
+        type: mcq
+        prompt: Comment obtenir une valeur par défaut si une clé n’existe pas ?
+        choices: ['d.get(cle, defaut)', 'd[cle] or defaut', 'd.find(cle)', 'd.value(cle)']
+        answer: 0
+      - id: py-ld-code
+        type: code
+        title: Le plus grand écart
+        prompt: Lis une ligne de nombres entiers séparés par des espaces et affiche l’écart entre le plus grand et le plus petit.
+        starter: |
+          nombres = list(map(int, input().split()))
+        solution: |
+          nombres = list(map(int, input().split()))
+          print(max(nombres) - min(nombres))
+        tests:
+          - { input: '3 8 1 6', output: '7' }
+          - { input: '5', output: '0', hidden: true }
+          - { input: '-2 10 -8', output: '18', hidden: true }
+    project:
+      id: py-ld-projet
+      type: code
+      title: Compteur de mots
+      difficulty: 2
+      prompt: |
+        Lis une ligne de texte (mots séparés par des espaces, en minuscules) et affiche chaque mot avec son nombre d’occurrences, **dans l’ordre de première apparition**, au format `mot: n`.
+      starter: |
+        mots = input().split()
+        compte = {}
+        # compte les mots puis affiche
+      solution: |
+        mots = input().split()
+        compte = {}
+        for m in mots:
+            compte[m] = compte.get(m, 0) + 1
+        for m, n in compte.items():
+            print(f"{m}: {n}")
+      tests:
+        - { input: 'le chat et le chien et le lapin', output: "le: 3\nchat: 1\net: 2\nchien: 1\nlapin: 1" }
+        - { input: 'kiri', output: 'kiri: 1', hidden: true }
+      hints: [Les dictionnaires gardent l’ordre d’insertion.]
+    exam:
+      pass: 70
+      questions:
+        - id: py-ld-ex1
+          type: predict
+          prompt: Que va afficher ce programme ?
+          code: |
+            l = [3, 1, 2]
+            l.sort()
+            l.append(0)
+            print(l)
+          output: "[1, 2, 3, 0]"
+        - id: py-ld-ex2
+          type: mcq
+          prompt: Quel est l’indice du dernier élément d’une liste `l` ?
+          choices: ['-1 (ou len(l) - 1)', 'len(l)', '0', '1']
+          answer: 0
+        - id: py-ld-ex3
+          type: code
+          title: Moyenne des notes
+          prompt: Lis une ligne de notes entières séparées par des espaces et affiche la moyenne arrondie à 2 décimales.
+          starter: |
+            notes = list(map(int, input().split()))
+          solution: |
+            notes = list(map(int, input().split()))
+            print(round(sum(notes) / len(notes), 2))
+          tests:
+            - { input: '12 15 9', output: '12.0' }
+            - { input: '10 11', output: '10.5', hidden: true }
+            - { input: '1 2 2', output: '1.67', hidden: true }

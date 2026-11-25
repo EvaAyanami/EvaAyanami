@@ -1,0 +1,362 @@
+language: hardware
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: hw-ordinateur
+    title: Qu’est-ce qu’un ordinateur ?
+    summary: Les grandes pièces d’un ordinateur et le rôle de chacune, de l’alimentation à l’écran.
+    minutes: 15
+    concepts: [composants, architecture]
+    sections:
+      - title: Une machine qui traite de l’information
+        body: |
+          Un ordinateur fait quatre choses, encore et encore :
+
+          1. **Recevoir** des données (clavier, souris, réseau, capteurs) — les **entrées** ;
+          2. **Traiter** ces données (calculer, comparer, décider) — c’est le rôle du **processeur** ;
+          3. **Mémoriser** les données et les programmes — **mémoire vive** et **stockage** ;
+          4. **Restituer** un résultat (écran, haut-parleurs, réseau) — les **sorties**.
+
+          Ton téléphone, une console, une montre connectée ou un serveur fonctionnent exactement sur ce principe. Seules la taille et la puissance changent.
+      - title: Les composants principaux
+        body: |
+          ```anim motherboard
+          ```
+
+          | Composant | Rôle | Analogie |
+          |---|---|---|
+          | **Processeur (CPU)** | exécute les instructions | le cerveau |
+          | **Mémoire vive (RAM)** | garde les données en cours d’utilisation | le bureau de travail |
+          | **Stockage (SSD, disque dur)** | conserve fichiers et programmes, même éteint | l’armoire de rangement |
+          | **Carte graphique (GPU)** | calcule les images | l’artiste |
+          | **Carte mère** | relie tous les composants | le système nerveux |
+          | **Alimentation (PSU)** | fournit l’énergie électrique | le cœur |
+
+          > 💡 Survole les composants de la carte mère ci-dessus pour voir leur rôle.
+      - title: Matériel et logiciel
+        body: |
+          Le **matériel** (*hardware*) désigne tout ce qu’on peut toucher. Le **logiciel** (*software*) désigne les programmes : le système d’exploitation (Windows, Linux, macOS, Android…), les applications, les jeux.
+
+          Entre les deux, le **micrologiciel** (*firmware*, comme l’UEFI de la carte mère) est un petit logiciel gravé dans le matériel. C’est lui qui démarre la machine.
+    exercises:
+      - id: hw-ordi-q1
+        type: mcq
+        prompt: Quel composant **exécute** les instructions des programmes ?
+        choices: [La mémoire vive, Le processeur, Le disque dur, L’alimentation]
+        answer: 1
+        explanation: Le processeur (CPU) lit et exécute les instructions, une par une, des milliards de fois par seconde.
+      - id: hw-ordi-q2
+        type: mcq
+        prompt: Que perd-on à l’extinction de l’ordinateur ?
+        choices: [Le contenu du SSD, Le contenu de la mémoire vive, Le système d’exploitation, Les photos enregistrées]
+        answer: 1
+        explanation: 'La RAM est **volatile** : sans courant, elle s’efface. Le stockage (SSD, disque dur) conserve les données.'
+      - id: hw-ordi-q3
+        type: mcq
+        prompt: Lesquels sont des périphériques d’**entrée** ?
+        choices: [Clavier, Écran, Souris, Imprimante]
+        answer: [0, 2]
+        explanation: Le clavier et la souris envoient des données à l’ordinateur. L’écran et l’imprimante sont des sorties.
+      - id: hw-ordi-order
+        type: order
+        prompt: Remets dans l’ordre ce qui se passe quand tu tapes une lettre dans un éditeur de texte.
+        lines:
+          - La touche du clavier envoie un signal (entrée)
+          - Le processeur traite l’événement
+          - La lettre est rangée en mémoire vive
+          - La carte graphique dessine la lettre à l’écran (sortie)
+        explanation: Entrée → traitement → mémorisation → sortie, le cycle de base de toute machine.
+      - id: hw-ordi-fill
+        type: fill
+        prompt: Complète les analogies.
+        code: |
+          Le processeur est le {{?}} de l’ordinateur.
+          La carte mère est son système {{?}}.
+        blanks: [[cerveau], [nerveux]]
+        explanation: Le CPU « réfléchit », la carte mère transporte les signaux entre les organes.
+    project:
+      id: hw-ordi-projet
+      type: order
+      title: Monter un PC (dans l’ordre)
+      difficulty: 1
+      prompt: Tu montes ton premier ordinateur. Remets les étapes dans un ordre logique et sûr.
+      lines:
+        - Débrancher l’alimentation et se décharger de l’électricité statique
+        - Installer le processeur dans son socket de la carte mère
+        - Poser le ventirad avec un peu de pâte thermique
+        - Clipser les barrettes de RAM
+        - Visser la carte mère dans le boîtier
+        - Installer le SSD et la carte graphique
+        - Brancher les câbles d’alimentation puis allumer
+      explanation: On commence par la sécurité, puis on équipe la carte mère hors du boîtier (plus facile), on l’installe, on ajoute les cartes et on finit par l’alimentation.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-ordi-ex1
+          type: mcq
+          prompt: Quel composant conserve tes fichiers quand l’ordinateur est éteint ?
+          choices: [RAM, SSD, Cache du processeur, Carte graphique]
+          answer: 1
+          explanation: Le SSD (ou le disque dur) est une mémoire **non volatile**.
+        - id: hw-ordi-ex2
+          type: mcq
+          prompt: Le système d’exploitation (Windows, Linux…) est…
+          choices: [Du matériel, Du logiciel, Un composant de la carte mère, Un câble]
+          answer: 1
+          explanation: C’est un logiciel ; il est stocké sur le SSD et chargé en RAM au démarrage.
+        - id: hw-ordi-ex3
+          type: mcq
+          prompt: Quel est le rôle de l’alimentation (PSU) ?
+          choices: [Calculer les images, Convertir le courant du secteur pour les composants, Stocker les programmes, Refroidir le processeur]
+          answer: 1
+          explanation: Elle transforme le 230 V alternatif en tensions continues (12 V, 5 V, 3,3 V).
+        - id: hw-ordi-ex4
+          type: mcq
+          prompt: Le micrologiciel qui démarre l’ordinateur s’appelle…
+          choices: [Le BIOS / UEFI, Le pilote graphique, Le noyau Linux, Le navigateur]
+          answer: 0
+          explanation: L’UEFI (successeur du BIOS) initialise le matériel puis lance le système.
+
+  # ------------------------------------------------------------------
+  - slug: hw-binaire
+    title: Le binaire, la langue des machines
+    summary: Pourquoi tout est fait de 0 et de 1, et comment compter en binaire et en hexadécimal.
+    minutes: 25
+    concepts: [binaire, hexadecimal, octet]
+    sections:
+      - title: Pourquoi 0 et 1 ?
+        body: |
+          À l’intérieur d’un ordinateur, l’information circule sous forme de **tensions électriques**. Distinguer deux états est simple et fiable : courant **ou** pas de courant, tension haute **ou** basse. On les note **1** et **0**.
+
+          Un chiffre binaire s’appelle un **bit** (*binary digit*). Avec 8 bits on forme un **octet** (*byte*), qui peut prendre 2⁸ = **256** valeurs différentes (de 0 à 255).
+      - title: Compter en binaire
+        body: |
+          En décimal, chaque position vaut 10 fois la précédente (unités, dizaines, centaines…). En binaire, chaque position vaut **2 fois** la précédente : 1, 2, 4, 8, 16, 32, 64, 128…
+
+          ```anim binary
+          ```
+
+          Exemple : `1011` = 8 + 0 + 2 + 1 = **11**.
+
+          Pour convertir 13 en binaire, on décompose en puissances de 2 : 13 = 8 + 4 + 1 → `1101`.
+      - title: L’hexadécimal
+        body: |
+          Écrire de longues suites de 0 et de 1 est pénible. Les programmeurs utilisent souvent la **base 16** (hexadécimal) : les chiffres vont de 0 à 9 puis de A (10) à F (15).
+
+          Un chiffre hexadécimal correspond exactement à **4 bits** :
+
+          | Binaire | Hexa | Décimal |
+          |---|---|---|
+          | 0000 | 0 | 0 |
+          | 1010 | A | 10 |
+          | 1111 | F | 15 |
+          | 1111 1111 | FF | 255 |
+
+          On le préfixe souvent par `0x` : `0xFF`, et les couleurs du web s’écrivent ainsi : `#FF8800`.
+      - title: Les unités
+        body: |
+          | Unité | Valeur |
+          |---|---|
+          | 1 octet (o) | 8 bits |
+          | 1 Kio | 1 024 octets |
+          | 1 Mio | 1 024 Kio |
+          | 1 Gio | 1 024 Mio |
+
+          > ⚠️ Les fabricants de disques utilisent souvent des puissances de 1000 (1 Go = 1 000 000 000 octets) : c’est pour ça qu’un disque « de 1 To » affiche environ 931 Gio dans Windows !
+    exercises:
+      - id: hw-bin-p1
+        type: predict
+        prompt: Convertis ce nombre binaire en décimal.
+        code: "1010"
+        output: "10"
+        explanation: 8 + 0 + 2 + 0 = 10.
+      - id: hw-bin-p2
+        type: predict
+        prompt: Convertis ce nombre binaire en décimal.
+        code: "11111111"
+        output: "255"
+        explanation: 128 + 64 + 32 + 16 + 8 + 4 + 2 + 1 = 255, la valeur maximale d’un octet.
+      - id: hw-bin-p3
+        type: predict
+        prompt: Écris 13 en binaire (sur 4 bits).
+        code: "13 = ?"
+        output: "1101"
+        explanation: 13 = 8 + 4 + 1.
+      - id: hw-bin-q1
+        type: mcq
+        prompt: Combien de valeurs différentes peut-on représenter avec 3 bits ?
+        choices: ['3', '6', '8', '9']
+        answer: 2
+        explanation: 2³ = 8 (de 000 à 111).
+      - id: hw-bin-q2
+        type: mcq
+        prompt: Que vaut `0x1F` en décimal ?
+        choices: ['16', '25', '31', '115']
+        answer: 2
+        explanation: 1 × 16 + 15 = 31.
+      - id: hw-bin-fill
+        type: fill
+        prompt: Complète.
+        code: |
+          1 octet = {{?}} bits
+          Valeur maximale d'un octet : {{?}}
+        blanks: [['8', huit], ['255']]
+    project:
+      id: hw-bin-projet
+      type: fill
+      title: Décoder une couleur
+      difficulty: 2
+      prompt: |
+        La couleur `#2A80FF` est formée de trois octets : rouge `2A`, vert `80`, bleu `FF`. Convertis chaque composante en décimal.
+      code: |
+        Rouge 0x2A = {{?}}
+        Vert  0x80 = {{?}}
+        Bleu  0xFF = {{?}}
+      blanks: [['42'], ['128'], ['255']]
+      hints: ['2A = 2 × 16 + 10.', '80 = 8 × 16 + 0.']
+      explanation: Chaque composante va de 0 à 255. Cette couleur contient beaucoup de bleu, un peu de vert et peu de rouge.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-bin-ex1
+          type: predict
+          prompt: Convertis en décimal.
+          code: "100101"
+          output: "37"
+          explanation: 32 + 4 + 1 = 37.
+        - id: hw-bin-ex2
+          type: mcq
+          prompt: Combien de bits faut-il au minimum pour représenter 300 ?
+          choices: ['8', '9', '10', '16']
+          answer: 1
+          explanation: 2⁸ = 256 < 300 ≤ 2⁹ = 512.
+        - id: hw-bin-ex3
+          type: predict
+          prompt: Écris 255 en hexadécimal (sans 0x).
+          code: "255 = ?"
+          output: FF
+          explanation: 255 = 15 × 16 + 15 → FF.
+        - id: hw-bin-ex4
+          type: mcq
+          prompt: Pourquoi les ordinateurs utilisent-ils le binaire ?
+          choices: [Parce que c’est la base la plus rapide pour calculer de tête, Parce que deux états électriques sont simples et fiables à distinguer, Parce que le décimal n’existait pas en 1940, Pour économiser de l’électricité uniquement]
+          answer: 1
+          explanation: Distinguer « tension présente / absente » est robuste face au bruit électrique.
+
+  # ------------------------------------------------------------------
+  - slug: hw-logique
+    title: Transistors et portes logiques
+    summary: Du petit interrupteur électronique aux portes ET, OU, NON… jusqu’à l’addition de deux nombres.
+    minutes: 25
+    concepts: [transistor, portes-logiques, algebre-booleenne]
+    sections:
+      - title: Le transistor
+        body: |
+          Le **transistor** est un interrupteur commandé électriquement, sans pièce mobile. Une petite tension sur sa **grille** laisse passer le courant entre **source** et **drain**.
+
+          ```anim transistor
+          ```
+
+          En les combinant, on fabrique toute la logique d’un processeur. Une puce moderne en contient **des dizaines de milliards**, gravés à quelques nanomètres.
+      - title: Les portes logiques
+        body: |
+          Une **porte logique** combine des bits selon une règle simple :
+
+          | A | B | ET | OU | XOR | NON A |
+          |---|---|---|---|---|---|
+          | 0 | 0 | 0 | 0 | 0 | 1 |
+          | 0 | 1 | 0 | 1 | 1 | 1 |
+          | 1 | 0 | 0 | 1 | 1 | 0 |
+          | 1 | 1 | 1 | 1 | 0 | 0 |
+
+          ```anim gates
+          ```
+
+          - **ET** (*AND*) : 1 seulement si les deux entrées valent 1.
+          - **OU** (*OR*) : 1 si au moins une entrée vaut 1.
+          - **XOR** (ou exclusif) : 1 si les entrées sont **différentes**.
+          - **NON** (*NOT*) : inverse le bit.
+      - title: Additionner avec des portes
+        body: |
+          Pour additionner deux bits, il faut une **somme** et une **retenue** : 1 + 1 = `10` en binaire (somme 0, retenue 1).
+
+          ```anim adder
+          ```
+
+          Le **demi-additionneur** utilise un XOR (somme) et un ET (retenue). En chaînant des additionneurs complets, on additionne des nombres de 8, 32 ou 64 bits. C’est le cœur de l’**UAL**, l’unité de calcul du processeur.
+
+          > 💡 Ces mêmes opérations existent dans les langages : `&` (ET), `|` (OU), `^` (XOR), `!` ou `~` (NON).
+    exercises:
+      - id: hw-log-q1
+        type: mcq
+        prompt: Que vaut `1 ET 0` ?
+        choices: ['0', '1']
+        answer: 0
+        explanation: ET exige que les deux entrées valent 1.
+      - id: hw-log-q2
+        type: mcq
+        prompt: Que vaut `1 XOR 1` ?
+        choices: ['0', '1', '2']
+        answer: 0
+        explanation: XOR vaut 1 seulement quand les entrées sont différentes.
+      - id: hw-log-q3
+        type: mcq
+        prompt: Quelle porte produit la **retenue** d’un demi-additionneur ?
+        choices: [OU, ET, XOR, NON]
+        answer: 1
+        explanation: 'La retenue vaut 1 seulement si A et B valent 1 : c’est un ET.'
+      - id: hw-log-p1
+        type: predict
+        prompt: Que vaut `NON (0 OU 1)` ?
+        code: "NON (0 OU 1)"
+        output: "0"
+        explanation: 0 OU 1 = 1, puis NON 1 = 0.
+      - id: hw-log-fill
+        type: fill
+        prompt: Complète la table de la porte OU.
+        code: |
+          0 OU 0 = {{?}}
+          0 OU 1 = {{?}}
+          1 OU 1 = {{?}}
+        blanks: [['0'], ['1'], ['1']]
+    project:
+      id: hw-log-projet
+      type: fill
+      title: L’additionneur 1 bit
+      difficulty: 2
+      prompt: |
+        Pour chaque addition de deux bits, donne la **retenue** puis la **somme**.
+      code: |
+        0 + 0 → retenue {{?}}, somme {{?}}
+        0 + 1 → retenue {{?}}, somme {{?}}
+        1 + 1 → retenue {{?}}, somme {{?}}
+      blanks: [['0'], ['0'], ['0'], ['1'], ['1'], ['0']]
+      hints: [Retenue = A ET B, somme = A XOR B.]
+      explanation: 1 + 1 = 10 en binaire, soit retenue 1 et somme 0.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-log-ex1
+          type: mcq
+          prompt: Un transistor dans un processeur se comporte comme…
+          choices: [Une petite batterie, Un interrupteur commandé, Un ventilateur, Une résistance chauffante]
+          answer: 1
+          explanation: Il laisse passer ou bloque le courant selon la tension sur sa grille.
+        - id: hw-log-ex2
+          type: predict
+          prompt: Que vaut `(1 ET 1) XOR 1` ?
+          code: "(1 ET 1) XOR 1"
+          output: "0"
+          explanation: 1 ET 1 = 1, puis 1 XOR 1 = 0.
+        - id: hw-log-ex3
+          type: mcq
+          prompt: Quelle porte vaut 1 si ses entrées sont différentes ?
+          choices: [ET, OU, XOR, NAND]
+          answer: 2
+          explanation: XOR = « ou exclusif ».
+        - id: hw-log-ex4
+          type: mcq
+          prompt: Dans quelle partie du processeur se font les additions ?
+          choices: [L’UAL (unité arithmétique et logique), Le cache L3, Le contrôleur USB, Le ventirad]
+          answer: 0
+          explanation: L’UAL est faite d’additionneurs et de portes logiques.

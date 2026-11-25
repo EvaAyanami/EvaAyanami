@@ -1,0 +1,176 @@
+language: hardware
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: hw-hierarchie-memoire
+    title: La hiérarchie mémoire et les caches
+    summary: Registres, caches, RAM, SSD — pourquoi plusieurs étages de mémoire, et comment le cache rend tout plus rapide.
+    minutes: 25
+    concepts: [cache, ram, latence, localite]
+    sections:
+      - title: Rapide, petite et chère… ou l’inverse
+        body: |
+          Aucune mémoire n’est à la fois énorme, très rapide et bon marché. L’ordinateur empile donc plusieurs étages :
+
+          ```anim memory-hierarchy
+          ```
+
+          Le processeur cherche d’abord dans son cache L1. Si la donnée n’y est pas (*cache miss*), il descend en L2, L3, puis en RAM : chaque étage est environ **10 fois plus lent** que le précédent.
+      - title: Le principe de localité
+        body: |
+          Les caches marchent bien parce que les programmes ont des habitudes :
+
+          - **localité temporelle** : une donnée utilisée sera sans doute réutilisée bientôt (une variable de boucle) ;
+          - **localité spatiale** : les données voisines seront sans doute utilisées aussi (les cases d’un tableau).
+
+          Le cache charge donc des **lignes** de 64 octets d’un coup. Parcourir un tableau dans l’ordre est très rapide ; sauter au hasard en mémoire est lent.
+      - title: Le bus entre CPU et RAM
+        body: |
+          ```anim bus
+          ```
+
+          Le processeur envoie une **adresse** et reçoit la **donnée** par le bus mémoire. Une barrette DDR5 transfère des dizaines de Go par seconde, mais il faut quand même ~80 ns pour obtenir le premier octet : l’équivalent de **300 cycles** perdus sans cache !
+    exercises:
+      - id: hw-mem-q1
+        type: mcq
+        prompt: Classe du plus rapide au plus lent.
+        choices: [Registres > cache > RAM > SSD, RAM > cache > registres > SSD, SSD > RAM > cache > registres, Cache > SSD > RAM > registres]
+        answer: 0
+      - id: hw-mem-q2
+        type: mcq
+        prompt: Qu’est-ce qu’un « cache miss » ?
+        choices: [La donnée n’est pas dans le cache et il faut aller la chercher plus loin, Une erreur de la RAM, Un cache qui a disparu, Un virus]
+        answer: 0
+      - id: hw-mem-q3
+        type: mcq
+        prompt: Quel parcours d’un grand tableau est le plus rapide ?
+        choices: [Dans l’ordre des cases, Au hasard, De deux en deux en partant de la fin, C’est pareil]
+        answer: 0
+        explanation: Localité spatiale — le cache charge les cases voisines par lignes de 64 octets.
+      - id: hw-mem-order
+        type: order
+        prompt: Remets dans l’ordre le chemin d’une lecture qui rate tous les caches.
+        lines: [Le CPU cherche dans le cache L1, Puis dans les caches L2 et L3, Puis il demande la donnée à la RAM, La donnée remonte et est copiée dans les caches]
+    project:
+      id: hw-mem-projet
+      type: mcq
+      title: Diagnostiquer un programme lent
+      difficulty: 2
+      prompt: |
+        Un programme additionne les cases d’une matrice de 10 000 × 10 000 nombres rangée **ligne par ligne** en mémoire. Il parcourt la matrice **colonne par colonne** et il est très lent. Quelle est la meilleure correction ?
+      choices:
+        - Parcourir la matrice ligne par ligne pour profiter du cache
+        - Acheter un SSD plus rapide
+        - Augmenter la fréquence de l’écran
+        - Ajouter des pauses dans la boucle
+      answer: 0
+      explanation: En colonne, chaque accès saute 10 000 cases plus loin, ce qui fait un cache miss presque à chaque fois. Ligne par ligne, on lit des cases voisines.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-mem-ex1
+          type: mcq
+          prompt: La localité temporelle signifie…
+          choices: [Une donnée utilisée sera probablement réutilisée bientôt, Les données sont rangées par date, La RAM s’efface avec le temps, Le cache expire après une seconde]
+          answer: 0
+        - id: hw-mem-ex2
+          type: mcq
+          prompt: Quelle taille fait habituellement une ligne de cache ?
+          choices: [1 octet, 64 octets, 1 Mo, 1 Go]
+          answer: 1
+        - id: hw-mem-ex3
+          type: mcq
+          prompt: Pourquoi ne pas fabriquer toute la mémoire comme du cache L1 ?
+          choices: [Ce serait beaucoup trop cher et trop grand sur la puce, C’est interdit, Ce serait plus lent, Le cache ne garde pas les nombres]
+          answer: 0
+        - id: hw-mem-ex4
+          type: predict
+          prompt: 'Une lecture en RAM prend 80 ns et le processeur fait 4 cycles par nanoseconde. Combien de cycles attend-il ?'
+          code: "80 × 4 = ?"
+          output: "320"
+
+  # ------------------------------------------------------------------
+  - slug: hw-stockage
+    title: RAM, SSD et disques durs
+    summary: Mémoire volatile et non volatile, mémoire flash, plateaux magnétiques et ce que tout cela change au quotidien.
+    minutes: 20
+    concepts: [stockage, ssd, ram]
+    sections:
+      - title: Mémoire vive ou stockage ?
+        body: |
+          | | RAM | SSD / disque dur |
+          |---|---|---|
+          | Garde les données éteint ? | ❌ non (volatile) | ✅ oui |
+          | Vitesse | très rapide | plus lente |
+          | Taille typique | 8 à 64 Go | 0,5 à 20 To |
+          | Rôle | programmes en cours | fichiers, système, jeux |
+
+          Quand tu lances un jeu, il est **copié** du SSD vers la RAM, puis le processeur travaille dans la RAM.
+      - title: SSD et disques durs
+        body: |
+          ```anim storage
+          ```
+
+          Le **disque dur** (HDD) range des bits magnétiques sur des plateaux qui tournent (5 400 à 7 200 tours/minute). Une tête doit se déplacer au bon endroit : quelques **millisecondes** par accès.
+
+          Le **SSD** utilise de la mémoire **flash** : des cellules électroniques, sans pièce mobile. Un accès prend quelques **dizaines de microsecondes**, soit environ 100 fois moins. Les SSD **NVMe** branchés en PCIe dépassent 7 Go/s.
+
+          > 💡 Les cellules flash s’usent après un grand nombre d’écritures : le SSD répartit l’usure tout seul (*wear leveling*).
+    exercises:
+      - id: hw-sto-q1
+        type: mcq
+        prompt: Quand tu lances un programme, il est copié…
+        choices: [Du stockage vers la RAM, De la RAM vers le SSD, Du processeur vers le disque, De l’écran vers la RAM]
+        answer: 0
+      - id: hw-sto-q2
+        type: mcq
+        prompt: Pourquoi un SSD est-il plus rapide qu’un disque dur ?
+        choices: [Il n’a aucune pièce mobile à déplacer, Il tourne plus vite, Il est plus gros, Il utilise de la RAM]
+        answer: 0
+      - id: hw-sto-q3
+        type: mcq
+        prompt: Ton PC rame quand tu ouvres beaucoup d’onglets. Quel composant ajouter en priorité ?
+        choices: [De la RAM, Un plus gros disque dur, Un deuxième écran, Une souris plus rapide]
+        answer: 0
+        explanation: Quand la RAM est pleine, le système déplace des données sur le stockage (swap), beaucoup plus lent.
+      - id: hw-sto-p1
+        type: predict
+        prompt: 'Un disque « de 1 To » contient 1 000 000 000 000 octets. Combien de Gio environ (1 Gio = 1 073 741 824 octets) ? Arrondis à l’unité.'
+        code: "10¹² / 2³⁰ ≈ ?"
+        output: "931"
+    project:
+      id: hw-sto-projet
+      type: mcq
+      title: Choisir le bon stockage
+      difficulty: 2
+      prompt: Tu montes un PC pour jouer et programmer, avec un budget serré. Quelle configuration choisir ?
+      choices:
+        - Un SSD NVMe de 1 To pour le système et les jeux, et un disque dur de 4 To pour les archives
+        - Un disque dur de 8 To uniquement
+        - 64 Go de RAM et aucun stockage
+        - Un SSD de 128 Go uniquement
+      answer: 0
+      explanation: Le SSD rend le système et les jeux rapides ; le disque dur reste économique pour stocker beaucoup de fichiers peu utilisés.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-sto-ex1
+          type: mcq
+          prompt: Quelle mémoire est volatile ?
+          choices: [La RAM, Le SSD, Le disque dur, La clé USB]
+          answer: 0
+        - id: hw-sto-ex2
+          type: mcq
+          prompt: Qu’est-ce que le « swap » ?
+          choices: [Utiliser le stockage comme extension de la RAM quand elle est pleine, Échanger deux SSD, Un type de câble, Une mise à jour]
+          answer: 0
+        - id: hw-sto-ex3
+          type: mcq
+          prompt: Les SSD NVMe se branchent généralement…
+          choices: [En PCIe sur un port M.2, En USB uniquement, Sur le port HDMI, Sur la carte son]
+          answer: 0
+        - id: hw-sto-ex4
+          type: mcq
+          prompt: Le « wear leveling » sert à…
+          choices: [Répartir l’usure des cellules flash, Accélérer le ventilateur, Effacer la RAM, Chiffrer le disque]
+          answer: 0

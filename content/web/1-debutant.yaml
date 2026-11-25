@@ -1,0 +1,360 @@
+language: web
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: web-html-bases
+    title: Ta première page HTML
+    summary: Balises, structure d’un document, titres, paragraphes, liens et images.
+    minutes: 25
+    concepts: [html, balises, liens, images]
+    sections:
+      - title: Des balises pour décrire le contenu
+        body: |
+          **HTML** décrit la **structure** d’une page : ce qui est un titre, un paragraphe, un lien, une image… On l’écrit avec des **balises** :
+
+          ```html
+          <h1>Bienvenue</h1>
+          <p>Ceci est un <strong>paragraphe</strong> avec un mot important.</p>
+          ```
+
+          La plupart des balises vont par deux : ouvrante `<p>` et fermante `</p>`. Certaines sont **vides** et n’ont pas de fermeture : `<img>`, `<br>`, `<meta>`.
+      - title: Le squelette d’un document
+        body: |
+          ```html
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <title>Ma page</title>
+          </head>
+          <body>
+            <h1>Bonjour !</h1>
+          </body>
+          </html>
+          ```
+
+          - `<!DOCTYPE html>` : « ceci est du HTML5 » ;
+          - `<head>` : les informations sur la page (titre de l’onglet, encodage, feuilles de style) ;
+          - `<body>` : ce qui s’affiche ;
+          - `lang="fr"` : la langue, utile aux lecteurs d’écran et aux moteurs de recherche.
+      - title: Titres, liens et images
+        body: |
+          ```html
+          <h1>Titre principal</h1>
+          <h2>Sous-titre</h2>
+          <a href="https://fr.wikipedia.org">Un lien</a>
+          <img src="kiri.png" alt="Kiri qui sourit">
+          ```
+
+          - Il y a six niveaux de titres, de `<h1>` à `<h6>` : un seul `<h1>` par page.
+          - `href` indique la destination du lien.
+          - `alt` décrit l’image pour les personnes qui ne la voient pas : **toujours le renseigner**.
+    exercises:
+      - id: web-html-q1
+        type: mcq
+        prompt: Que décrit le HTML ?
+        choices: [La structure et le contenu d’une page, Les couleurs et la mise en page, La logique d’un jeu, La base de données]
+        answer: 0
+        explanation: Le HTML structure, le CSS met en forme, le JavaScript rend interactif.
+      - id: web-html-q2
+        type: mcq
+        prompt: Quelle balise crée un lien ?
+        choices: ['<a>', '<link>', '<href>', '<url>']
+        answer: 0
+      - id: web-html-q3
+        type: mcq
+        prompt: À quoi sert l’attribut `alt` d’une image ?
+        choices: [Décrire l’image pour ceux qui ne la voient pas, Changer sa taille, Ajouter un lien, Choisir son format]
+        answer: 0
+      - id: web-html-order
+        type: order
+        prompt: Remets le squelette HTML dans l’ordre.
+        lines: ['<!DOCTYPE html>', '<html lang="fr">', '<head><title>Page</title></head>', '<body><h1>Salut</h1></body>', '</html>']
+      - id: web-html-fill
+        type: fill
+        prompt: Complète pour créer un lien vers Wikipédia.
+        code: |
+          <{{?}} {{?}}="https://fr.wikipedia.org">Wikipédia</a>
+        blanks: [[a], [href]]
+        checks:
+          - { type: attr, selector: 'a', name: href, value: 'https://fr.wikipedia.org', message: Le lien pointe vers Wikipédia }
+      - id: web-html-code
+        type: code
+        title: Mon premier titre
+        prompt: |
+          Écris une page qui contient un titre principal `<h1>` avec le texte **Bonjour Kiri** et un paragraphe de ton choix.
+        starter: |
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <title>Ma page</title>
+          </head>
+          <body>
+
+          </body>
+          </html>
+        solution: |
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <title>Ma page</title>
+          </head>
+          <body>
+            <h1>Bonjour Kiri</h1>
+            <p>J’apprends le HTML.</p>
+          </body>
+          </html>
+        checks:
+          - { type: text, selector: h1, contains: Bonjour Kiri, message: Un titre h1 « Bonjour Kiri » }
+          - { type: count, selector: 'body p', min: 1, message: Au moins un paragraphe dans le body }
+    project:
+      id: web-html-projet
+      type: code
+      title: Ma carte de présentation
+      difficulty: 1
+      prompt: |
+        Crée une petite page de présentation qui contient :
+
+        - un titre `<h1>` avec ton prénom ;
+        - une image avec un attribut `alt` non vide ;
+        - un paragraphe ;
+        - un lien vers un site de ton choix.
+      starter: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <title>Présentation</title>
+        </head>
+        <body>
+
+        </body>
+        </html>
+      solution: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <title>Présentation</title>
+        </head>
+        <body>
+          <h1>Kiri</h1>
+          <img src="kiri.png" alt="Kiri, la mascotte de Codemori">
+          <p>J’aime le code et les mangas.</p>
+          <a href="https://codemori.fr">Mon site</a>
+        </body>
+        </html>
+      checks:
+        - { type: doctype, message: Le document commence par <!DOCTYPE html> }
+        - { type: count, selector: h1, min: 1, max: 1, message: Exactement un titre h1 }
+        - { type: attr, selector: img, name: alt, value: '*', message: L’image a un texte alternatif }
+        - { type: exists, selector: p, message: Un paragraphe }
+        - { type: attr, selector: a, name: href, value: '*', message: Un lien avec une destination }
+    exam:
+      pass: 70
+      questions:
+        - id: web-html-ex1
+          type: mcq
+          prompt: Où place-t-on le titre qui s’affiche dans l’onglet du navigateur ?
+          choices: ['<title> dans <head>', '<h1> dans <body>', '<header>', '<tab>']
+          answer: 0
+        - id: web-html-ex2
+          type: mcq
+          prompt: Laquelle est une balise vide (sans fermeture) ?
+          choices: ['<img>', '<p>', '<h1>', '<a>']
+          answer: 0
+        - id: web-html-ex3
+          type: mcq
+          prompt: Combien de `<h1>` recommande-t-on par page ?
+          choices: [Un seul, Deux, Autant qu’on veut, Aucun]
+          answer: 0
+        - id: web-html-ex4
+          type: code
+          title: Une image accessible
+          prompt: Ajoute dans le body une image `chat.png` avec un texte alternatif.
+          starter: |
+            <body>
+
+            </body>
+          solution: |
+            <body>
+              <img src="chat.png" alt="Un chat roux endormi">
+            </body>
+          checks:
+            - { type: attr, selector: img, name: src, value: chat.png, message: L’image chat.png }
+            - { type: attr, selector: img, name: alt, value: '*', message: Un texte alternatif non vide }
+
+  # ------------------------------------------------------------------
+  - slug: web-css-bases
+    title: Premiers pas en CSS
+    summary: Sélecteurs, couleurs, polices, classes et la cascade.
+    minutes: 25
+    concepts: [css, selecteurs, couleurs, classes]
+    sections:
+      - title: Donner du style
+        body: |
+          Le **CSS** décrit l’**apparence** : couleurs, tailles, espacements, mise en page. On l’écrit dans une balise `<style>` du `<head>` (ou dans un fichier `.css` séparé) :
+
+          ```html
+          <style>
+            h1 {
+              color: #3b6cf6;          /* propriété : valeur; */
+              font-size: 2rem;
+            }
+            p {
+              font-family: system-ui, sans-serif;
+              line-height: 1.6;
+            }
+          </style>
+          ```
+
+          Une **règle** = un **sélecteur** (`h1`) + des **déclarations** `propriété: valeur;` entre accolades.
+      - title: Classes et identifiants
+        body: |
+          ```html
+          <p class="note important">Attention !</p>
+          <div id="menu">…</div>
+          ```
+
+          ```css
+          .note { background: #fef3c7; }     /* tous les éléments de classe note */
+          .important { font-weight: bold; }
+          #menu { padding: 1rem; }           /* l'élément d'id menu (unique) */
+          ul li { color: gray; }             /* les li DANS un ul */
+          ```
+
+          Un élément peut avoir **plusieurs classes**. On préfère les classes aux identifiants pour le style.
+      - title: Les couleurs et la cascade
+        body: |
+          Couleurs : nom (`red`), hexadécimal (`#ff8800`), `rgb(255 136 0)`, `hsl(30 100% 50%)`.
+
+          Quand plusieurs règles ciblent le même élément, la plus **spécifique** gagne (id > classe > balise), puis la **dernière écrite**. C’est la **cascade** — le « C » de CSS.
+    exercises:
+      - id: web-css-q1
+        type: mcq
+        prompt: Comment cibler tous les éléments de classe `carte` ?
+        choices: ['.carte', '#carte', 'carte', '*carte']
+        answer: 0
+      - id: web-css-q2
+        type: mcq
+        prompt: Quelle règle l’emporte pour `<p id="intro" class="note">` ?
+        choices: ['#intro { color: red }', '.note { color: blue }', 'p { color: green }', 'La première écrite']
+        answer: 0
+        explanation: Un identifiant est plus spécifique qu’une classe, elle-même plus spécifique qu’une balise.
+      - id: web-css-fill
+        type: fill
+        prompt: Complète pour écrire les titres h1 en rouge.
+        code: |
+          <style>
+            h1 { {{?}}: red; }
+          </style>
+          <h1>Alerte</h1>
+        blanks: [[color]]
+        checks:
+          - { type: css, selector: h1, property: color, value: red, message: Le titre est rouge }
+      - id: web-css-code
+        type: code
+        title: Une note colorée
+        prompt: |
+          Donne à tous les éléments de classe `note` un fond `#fef3c7` (propriété `background-color` ou `background`) et un texte en gras (`font-weight: bold`).
+        starter: |
+          <style>
+
+          </style>
+          <p class="note">Pense à boire de l’eau.</p>
+          <p>Texte normal.</p>
+        solution: |
+          <style>
+            .note {
+              background-color: #fef3c7;
+              font-weight: bold;
+            }
+          </style>
+          <p class="note">Pense à boire de l’eau.</p>
+          <p>Texte normal.</p>
+        checks:
+          - { type: css, selector: p.note, property: background-color, value: '/#fef3c7/', message: La note a un fond jaune clair }
+          - { type: css, selector: p.note, property: font-weight, value: '/bold|700/', message: La note est en gras }
+    project:
+      id: web-css-projet
+      type: code
+      title: Habille ta carte
+      difficulty: 2
+      prompt: |
+        Mets en forme cette carte :
+
+        - le `body` utilise une police sans empattement (`font-family` contenant `sans-serif`) ;
+        - le titre `h1` est de couleur `#3b6cf6` ;
+        - les éléments de classe `tag` ont un fond (`background-color` ou `background`) et un arrondi (`border-radius`).
+      starter: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <title>Carte</title>
+          <style>
+
+          </style>
+        </head>
+        <body>
+          <h1>Kiri</h1>
+          <p>Passions : <span class="tag">Rust</span> <span class="tag">Python</span></p>
+        </body>
+        </html>
+      solution: |
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <title>Carte</title>
+          <style>
+            body { font-family: system-ui, sans-serif; }
+            h1 { color: #3b6cf6; }
+            .tag { background-color: #e0e7ff; border-radius: 999px; padding: 2px 8px; }
+          </style>
+        </head>
+        <body>
+          <h1>Kiri</h1>
+          <p>Passions : <span class="tag">Rust</span> <span class="tag">Python</span></p>
+        </body>
+        </html>
+      checks:
+        - { type: css, selector: body, property: font-family, value: '/sans-serif/', message: Police sans empattement sur le body }
+        - { type: css, selector: h1, property: color, value: '/#3b6cf6/', message: 'Titre bleu #3b6cf6' }
+        - { type: css, selector: .tag, property: background-color, value: '*', message: Les tags ont un fond }
+        - { type: css, selector: .tag, property: border-radius, value: '*', message: Les tags sont arrondis }
+    exam:
+      pass: 70
+      questions:
+        - id: web-css-ex1
+          type: mcq
+          prompt: Que signifie le « C » de CSS ?
+          choices: [Cascading (en cascade), Computer, Colorful, Code]
+          answer: 0
+        - id: web-css-ex2
+          type: mcq
+          prompt: Que cible `nav a` ?
+          choices: [Les liens situés dans un nav, Les nav et les liens, Le premier lien de la page, Les liens de classe nav]
+          answer: 0
+        - id: web-css-ex3
+          type: mcq
+          prompt: 'Comment écrire un commentaire en CSS ?'
+          choices: ['/* commentaire */', '// commentaire', '<!-- commentaire -->', '# commentaire']
+          answer: 0
+        - id: web-css-ex4
+          type: code
+          title: Texte centré
+          prompt: Centre le texte du paragraphe de classe `centre` (`text-align`).
+          starter: |
+            <style>
+            </style>
+            <p class="centre">Au milieu !</p>
+          solution: |
+            <style>
+              .centre { text-align: center; }
+            </style>
+            <p class="centre">Au milieu !</p>
+          checks:
+            - { type: css, selector: p.centre, property: text-align, value: center, message: Le paragraphe est centré }

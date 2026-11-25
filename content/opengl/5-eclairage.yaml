@@ -1,0 +1,98 @@
+language: opengl
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: gl-eclairage
+    title: Éclairage et rendu moderne
+    summary: Normales, modèle de Phong, plusieurs passes de rendu et les grandes techniques des moteurs actuels.
+    minutes: 35
+    concepts: [eclairage, normales, phong, framebuffer]
+    sections:
+      - title: Les normales et la lumière diffuse
+        body: |
+          Pour éclairer une surface, il faut savoir **où elle regarde** : c’est sa **normale**, un vecteur perpendiculaire de longueur 1. La lumière diffuse dépend de l’angle entre la normale `N` et la direction de la lumière `L` :
+
+          ```glsl
+          float diffuse = max(dot(normalize(N), normalize(L)), 0.0);
+          ```
+
+          Le **produit scalaire** (`dot`) vaut 1 quand la surface fait face à la lumière, 0 quand elle est rasante, et devient négatif dos à la lumière (d’où le `max`).
+      - title: Le modèle de Phong
+        body: |
+          Le modèle classique additionne trois termes :
+
+          | Terme | Effet |
+          |---|---|
+          | **Ambiant** | une petite lumière partout (évite le noir total) |
+          | **Diffus** | l’éclairage mat, selon l’angle de la lumière |
+          | **Spéculaire** | le reflet brillant, selon la position de l’observateur |
+
+          ```glsl
+          vec3 couleur = ambiant + diffuse * couleurLumiere + speculaire * couleurLumiere;
+          ```
+
+          Les moteurs modernes utilisent le **PBR** (*Physically Based Rendering*), plus réaliste, avec des paramètres de rugosité et de métal.
+      - title: Rendre dans une texture
+        body: |
+          Un **framebuffer object** (FBO) permet de dessiner dans une texture au lieu de l’écran. C’est la base de nombreux effets :
+
+          - **post-traitement** : flou, bloom, correction des couleurs ;
+          - **ombres** (*shadow mapping*) : on rend la scène depuis la lumière pour savoir ce qu’elle voit ;
+          - **rendu différé** : on calcule d’abord la géométrie puis l’éclairage de centaines de lumières.
+    exercises:
+      - id: gl-light-q1
+        type: mcq
+        prompt: Qu’est-ce qu’une normale ?
+        choices: [Un vecteur perpendiculaire à la surface, Une couleur moyenne, Un sommet ordinaire, Une texture standard]
+        answer: 0
+      - id: gl-light-p1
+        type: predict
+        prompt: 'Que vaut `max(dot(N, L), 0.0)` quand la surface fait exactement face à la lumière (N et L identiques, de longueur 1) ?'
+        code: "max(dot(N, L), 0.0)"
+        output: "1"
+      - id: gl-light-q2
+        type: mcq
+        prompt: Quel terme de Phong crée le reflet brillant ?
+        choices: [Spéculaire, Ambiant, Diffus, Normal]
+        answer: 0
+      - id: gl-light-q3
+        type: mcq
+        prompt: À quoi sert un framebuffer object ?
+        choices: [À dessiner dans une texture plutôt qu’à l’écran, À stocker les sommets, À compiler les shaders, À créer la fenêtre]
+        answer: 0
+    project:
+      id: gl-light-projet
+      type: order
+      title: Le shadow mapping
+      difficulty: 3
+      prompt: Remets dans l’ordre les étapes du rendu avec ombres portées.
+      lines:
+        - Rendre la scène depuis la lumière dans une texture de profondeur
+        - Rendre la scène depuis la caméra
+        - Pour chaque fragment, le projeter dans l’espace de la lumière
+        - Comparer sa profondeur à celle de la texture
+        - Assombrir le fragment s’il est plus loin que ce que voit la lumière
+      explanation: Si la lumière « voit » un objet plus proche à cet endroit, le fragment est dans l’ombre.
+    exam:
+      pass: 70
+      questions:
+        - id: gl-light-ex1
+          type: mcq
+          prompt: Pourquoi utiliser max(…, 0.0) pour la lumière diffuse ?
+          choices: [Pour éviter une lumière négative sur les faces dos à la lumière, Pour accélérer le calcul, Pour normaliser le vecteur, Pour activer les ombres]
+          answer: 0
+        - id: gl-light-ex2
+          type: mcq
+          prompt: Que signifie PBR ?
+          choices: [Physically Based Rendering, Pixel Buffer Rendering, Primary Blend Rate, Polygon Based Raster]
+          answer: 0
+        - id: gl-light-ex3
+          type: mcq
+          prompt: Le terme ambiant sert à…
+          choices: [Éviter que les zones non éclairées soient totalement noires, Créer les reflets, Projeter les ombres, Calculer la perspective]
+          answer: 0
+        - id: gl-light-ex4
+          type: mcq
+          prompt: Le bloom est un effet de…
+          choices: [Post-traitement, Vertex shader, Rastérisation, Chargement de texture]
+          answer: 0

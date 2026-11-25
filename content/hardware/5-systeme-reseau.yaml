@@ -1,0 +1,177 @@
+language: hardware
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: hw-demarrage-os
+    title: Du bouton marche au système d’exploitation
+    summary: UEFI, chargeur d’amorçage, noyau, pilotes et processus — ce qui se passe quand on allume l’ordinateur.
+    minutes: 25
+    concepts: [uefi, noyau, processus, memoire-virtuelle]
+    sections:
+      - title: La séquence de démarrage
+        body: |
+          1. L’**alimentation** stabilise ses tensions et envoie le signal « Power Good ».
+          2. Le processeur démarre et exécute l’**UEFI** stocké dans une puce flash de la carte mère.
+          3. L’UEFI teste et initialise le matériel (RAM, stockage, carte graphique).
+          4. Il lance le **chargeur d’amorçage** (*bootloader*) trouvé sur le SSD.
+          5. Le chargeur charge le **noyau** (Linux, Windows NT…) en RAM.
+          6. Le noyau charge les **pilotes**, monte les disques et lance les premiers **processus**.
+      - title: Le rôle du système d’exploitation
+        body: |
+          Le noyau partage la machine entre tous les programmes :
+
+          - **processus** : chaque programme en cours d’exécution, isolé des autres ;
+          - **ordonnanceur** : il donne le processeur à tour de rôle à chaque processus, des centaines de fois par seconde ;
+          - **mémoire virtuelle** : chaque processus croit avoir toute la mémoire pour lui ; le processeur (MMU) traduit ses adresses vers la vraie RAM ;
+          - **appels système** : un programme demande au noyau de lire un fichier, d’ouvrir une connexion réseau…
+
+          Quand un programme accède à une adresse interdite, la MMU le détecte : c’est la célèbre **erreur de segmentation**.
+    exercises:
+      - id: hw-boot-order
+        type: order
+        prompt: Remets dans l’ordre le démarrage d’un ordinateur.
+        lines: [L’alimentation stabilise ses tensions, L’UEFI initialise le matériel, Le chargeur d’amorçage est lancé, Le noyau est chargé en RAM, Les pilotes et les premiers processus démarrent]
+      - id: hw-boot-q1
+        type: mcq
+        prompt: Que fait l’ordonnanceur ?
+        choices: [Il partage le temps du processeur entre les processus, Il range les fichiers, Il refroidit le CPU, Il affiche le bureau]
+        answer: 0
+      - id: hw-boot-q2
+        type: mcq
+        prompt: Que provoque l’accès d’un programme à une adresse mémoire interdite ?
+        choices: [Une erreur de segmentation, Un redémarrage du PC, Une mise à jour, Rien]
+        answer: 0
+      - id: hw-boot-q3
+        type: mcq
+        prompt: Qu’est-ce qu’un appel système ?
+        choices: [Une demande d’un programme au noyau, Un appel téléphonique, Une instruction de l’UAL, Un câble]
+        answer: 0
+    project:
+      id: hw-boot-projet
+      type: mcq
+      title: Diagnostic de démarrage
+      difficulty: 3
+      prompt: Ton PC affiche le logo de la carte mère puis « No bootable device ». Quelle est la cause la plus probable ?
+      choices:
+        - Le SSD contenant le système n’est pas détecté ou n’est pas en première position de démarrage
+        - La carte graphique est en panne
+        - Le clavier est débranché
+        - La RAM est pleine
+      answer: 0
+      explanation: L’UEFI a fonctionné (logo affiché) mais ne trouve pas de chargeur d’amorçage. On vérifie le branchement du SSD et l’ordre de démarrage dans l’UEFI.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-boot-ex1
+          type: mcq
+          prompt: Où est stocké l’UEFI ?
+          choices: [Dans une puce flash de la carte mère, Sur le SSD, Dans la RAM, Dans le processeur]
+          answer: 0
+        - id: hw-boot-ex2
+          type: mcq
+          prompt: La mémoire virtuelle permet…
+          choices: [À chaque processus d’avoir son propre espace d’adresses isolé, D’agrandir l’écran, D’augmenter la fréquence, De supprimer la RAM]
+          answer: 0
+        - id: hw-boot-ex3
+          type: mcq
+          prompt: Quel composant traduit les adresses virtuelles en adresses physiques ?
+          choices: [La MMU du processeur, Le chipset audio, Le SSD, L’alimentation]
+          answer: 0
+        - id: hw-boot-ex4
+          type: mcq
+          prompt: Le noyau est…
+          choices: [Le cœur du système d’exploitation, Un composant de la carte graphique, Le fichier le plus gros du disque, Un pilote d’imprimante]
+          answer: 0
+
+  # ------------------------------------------------------------------
+  - slug: hw-reseau
+    title: Les réseaux et Internet
+    summary: Paquets, adresses IP, routeurs, TCP et DNS — comment une page web arrive jusqu’à ton écran.
+    minutes: 25
+    concepts: [reseau, ip, tcp, dns]
+    sections:
+      - title: Des paquets qui voyagent
+        body: |
+          Sur un réseau, les données sont découpées en **paquets**. Chaque paquet porte l’**adresse IP** de son destinataire et passe de **routeur** en routeur jusqu’à lui.
+
+          ```anim network
+          ```
+
+          - **IPv4** : `192.168.1.52` (4 nombres de 0 à 255, soit 32 bits) ;
+          - **IPv6** : `2001:db8::1` (128 bits, car il n’y avait plus assez d’adresses IPv4).
+      - title: Les couches réseau
+        body: |
+          | Couche | Rôle | Exemples |
+          |---|---|---|
+          | Physique / liaison | transmettre les bits | Ethernet, Wi-Fi, fibre |
+          | Réseau | acheminer d’une machine à l’autre | IP |
+          | Transport | fiabiliser ou accélérer | TCP (fiable), UDP (rapide) |
+          | Application | le service | HTTP, DNS, SSH |
+
+          **TCP** numérote les paquets, demande de renvoyer ceux qui sont perdus et les remet dans l’ordre : rien ne se perd. **UDP** envoie sans vérifier : idéal pour les jeux en ligne et la visio, où un paquet en retard ne sert plus à rien.
+      - title: Le DNS, l’annuaire d’Internet
+        body: |
+          Taper `codemori.fr` ne suffit pas : il faut l’adresse IP du serveur. Le **DNS** traduit les noms en adresses. Puis le navigateur ouvre une connexion **TCP** sur le port **443** et parle **HTTPS** (HTTP chiffré).
+
+          Les **ports** permettent à une même machine de proposer plusieurs services : 22 (SSH), 80 (HTTP), 443 (HTTPS)…
+    exercises:
+      - id: hw-net-q1
+        type: mcq
+        prompt: Que fait le DNS ?
+        choices: [Il traduit un nom de domaine en adresse IP, Il chiffre les pages, Il accélère le Wi-Fi, Il héberge les sites]
+        answer: 0
+      - id: hw-net-q2
+        type: mcq
+        prompt: Quel protocole garantit que tous les paquets arrivent, dans l’ordre ?
+        choices: [TCP, UDP, DNS, Wi-Fi]
+        answer: 0
+      - id: hw-net-q3
+        type: mcq
+        prompt: Quel est le port par défaut de HTTPS ?
+        choices: ['22', '80', '443', '8080']
+        answer: 2
+      - id: hw-net-p1
+        type: predict
+        prompt: 'Combien de bits contient une adresse IPv4 ?'
+        code: "4 nombres × 8 bits = ?"
+        output: "32"
+      - id: hw-net-order
+        type: order
+        prompt: Remets dans l’ordre ce qui se passe quand tu ouvres un site web.
+        lines: [Le navigateur demande l’adresse IP au DNS, Il ouvre une connexion TCP vers le serveur, Il envoie la requête HTTPS, Le serveur répond avec la page, Le navigateur affiche la page]
+    project:
+      id: hw-net-projet
+      type: mcq
+      title: Le jeu en ligne qui saccade
+      difficulty: 3
+      prompt: Un jeu en ligne envoie la position des joueurs 60 fois par seconde. Quel protocole de transport est le plus adapté ?
+      choices:
+        - UDP, car une position perdue est vite remplacée par la suivante
+        - TCP, car il faut absolument renvoyer chaque position perdue
+        - DNS, car il est plus rapide
+        - HTTP, car c’est un site web
+      answer: 0
+      explanation: Attendre la retransmission d’une vieille position (TCP) créerait des saccades. Les jeux utilisent UDP et gèrent eux-mêmes ce qui doit être fiable.
+    exam:
+      pass: 70
+      questions:
+        - id: hw-net-ex1
+          type: mcq
+          prompt: Un routeur…
+          choices: [Achemine les paquets vers leur destination, Stocke les sites web, Affiche les pages, Remplace le DNS]
+          answer: 0
+        - id: hw-net-ex2
+          type: mcq
+          prompt: Pourquoi IPv6 a-t-il été créé ?
+          choices: [Il n’y avait plus assez d’adresses IPv4, Pour accélérer le Wi-Fi, Pour remplacer le DNS, Pour chiffrer les données]
+          answer: 0
+        - id: hw-net-ex3
+          type: mcq
+          prompt: Sur quel port écoute un serveur SSH par défaut ?
+          choices: ['22', '25', '443', '3306']
+          answer: 0
+        - id: hw-net-ex4
+          type: mcq
+          prompt: Quelle couche s’occupe de fiabiliser la transmission ?
+          choices: [Transport (TCP), Physique, Application, Liaison]
+          answer: 0

@@ -1,0 +1,148 @@
+language: web
+level: 5
+chapters:
+  # ------------------------------------------------------------------
+  - slug: web-animations-variables
+    title: Variables CSS, transitions et animations
+    summary: Thèmes avec des propriétés personnalisées, transitions fluides, keyframes et performances.
+    minutes: 35
+    concepts: [variables-css, transitions, animations]
+    sections:
+      - title: Les propriétés personnalisées
+        body: |
+          ```css
+          :root {
+            --couleur-principale: #3b6cf6;
+            --rayon: 12px;
+          }
+          .bouton {
+            background: var(--couleur-principale);
+            border-radius: var(--rayon);
+          }
+          @media (prefers-color-scheme: dark) {
+            :root { --couleur-principale: #93b5ff; }   /* tout le thème change */
+          }
+          ```
+
+          Une seule variable modifiée met à jour **tous** les éléments qui l’utilisent : idéal pour les thèmes clair/sombre.
+      - title: Les transitions
+        body: |
+          ```css
+          .bouton {
+            transition: transform 0.2s ease, background-color 0.2s;
+          }
+          .bouton:hover {
+            transform: translateY(-2px) scale(1.03);
+          }
+          ```
+
+          `transition` anime le passage d’un état à l’autre (survol, focus, ajout d’une classe).
+      - title: Les animations
+        body: |
+          ```css
+          @keyframes flotter {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
+          .kiri { animation: flotter 3s ease-in-out infinite; }
+
+          @media (prefers-reduced-motion: reduce) {
+            .kiri { animation: none; }      /* respecter les préférences */
+          }
+          ```
+
+          Pour des animations fluides, on anime de préférence `transform` et `opacity` : le navigateur les calcule sur le GPU, sans recalculer la mise en page.
+    exercises:
+      - id: web-anim-q1
+        type: mcq
+        prompt: Comment utiliser la variable `--rayon` ?
+        choices: ['var(--rayon)', '$rayon', '@rayon', '--rayon()']
+        answer: 0
+      - id: web-anim-q2
+        type: mcq
+        prompt: Quelles propriétés animer en priorité pour la fluidité ?
+        choices: [transform et opacity, width et height, margin et padding, top et left]
+        answer: 0
+      - id: web-anim-q3
+        type: mcq
+        prompt: À quoi sert `prefers-reduced-motion` ?
+        choices: [Réduire les animations pour les personnes qui le demandent, Accélérer le site, Activer le mode sombre, Désactiver le JavaScript]
+        answer: 0
+      - id: web-anim-code
+        type: code
+        title: Bouton animé
+        prompt: Ajoute une `transition` sur `.bouton` et un effet au survol (`.bouton:hover`) qui modifie `transform`.
+        starter: |
+          <style>
+            .bouton { background: #3b6cf6; color: white; padding: 8px 16px; border: none; border-radius: 12px; }
+          </style>
+          <button class="bouton">Valider</button>
+        solution: |
+          <style>
+            .bouton { background: #3b6cf6; color: white; padding: 8px 16px; border: none; border-radius: 12px; transition: transform 0.2s ease; }
+            .bouton:hover { transform: scale(1.05); }
+          </style>
+          <button class="bouton">Valider</button>
+        checks:
+          - { type: css, selector: .bouton, property: transition, value: '*', message: Une transition sur le bouton }
+        require:
+          - { pattern: '\.bouton:hover\s*\{[^}]*transform', message: 'Un effet transform au survol (.bouton:hover)' }
+    project:
+      id: web-anim-projet
+      type: code
+      title: Un thème à variables
+      difficulty: 3
+      prompt: |
+        Crée un petit thème :
+
+        - dans `:root`, définis `--fond` et `--texte` ;
+        - le `body` utilise `var(--fond)` pour `background` (ou `background-color`) et `var(--texte)` pour `color` ;
+        - redéfinis ces variables dans `@media (prefers-color-scheme: dark)` ;
+        - ajoute une animation `@keyframes` utilisée par `.logo`.
+      starter: |
+        <style>
+        </style>
+        <body>
+          <div class="logo">⭐</div>
+          <p>Mon thème</p>
+        </body>
+      solution: |
+        <style>
+          :root { --fond: #ffffff; --texte: #1f2538; }
+          @media (prefers-color-scheme: dark) {
+            :root { --fond: #0b0e18; --texte: #e2e8f0; }
+          }
+          body { background-color: var(--fond); color: var(--texte); }
+          @keyframes tourner { to { transform: rotate(360deg); } }
+          .logo { animation: tourner 4s linear infinite; }
+        </style>
+        <body>
+          <div class="logo">⭐</div>
+          <p>Mon thème</p>
+        </body>
+      checks:
+        - { type: css, selector: body, property: background-color, value: '/var\(--fond\)/', message: Le fond utilise var(--fond) }
+        - { type: css, selector: body, property: color, value: '/var\(--texte\)/', message: Le texte utilise var(--texte) }
+        - { type: css, selector: .logo, property: animation, value: '*', message: Le logo est animé }
+      require:
+        - { pattern: ':root\s*\{[^}]*--fond', message: Variable --fond définie dans :root }
+        - { pattern: 'prefers-color-scheme:\s*dark', message: Un thème sombre }
+        - { pattern: '@keyframes', message: Une animation @keyframes }
+    exam:
+      pass: 70
+      questions:
+        - id: web-anim-ex1
+          type: mcq
+          prompt: Où définit-on généralement les variables globales d’un thème ?
+          choices: [':root', 'body', '*', 'html.vars']
+          answer: 0
+        - id: web-anim-ex2
+          type: mcq
+          prompt: Quelle différence entre transition et animation ?
+          choices: [La transition anime un changement d’état ; l’animation suit des keyframes, Aucune, La transition ne marche qu’au survol, L’animation est réservée au JavaScript]
+          answer: 0
+        - id: web-anim-ex3
+          type: mcq
+          prompt: 'Que fait `animation: flotter 3s infinite` ?'
+          choices: ['Joue l’animation « flotter » en boucle, toutes les 3 secondes', Attend 3 secondes, Joue 3 fois, Rien sans JavaScript]
+          answer: 0

@@ -285,7 +285,6 @@ export async function loadContent(dir: string): Promise<ContentBundle> {
           if (rt === 'web' && ex.type === 'code' && !ex.checks.length) errors.push(`${lvl.file}: ${ex.id} — vérifications (checks) manquantes`);
           if (rt === 'web' && ex.type === 'bugfix') errors.push(`${lvl.file}: ${ex.id} — « bugfix » non disponible pour le web`);
         }
-        if (ex.type === 'predict' && rt === 'web') errors.push(`${lvl.file}: ${ex.id} — « predict » non disponible pour le web`);
       }
   }
   for (const p of bundle.projects) for (const s of p.steps) check(s.id, p.file);

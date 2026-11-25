@@ -1,0 +1,134 @@
+language: opengl
+level: 2
+chapters:
+  # ------------------------------------------------------------------
+  - slug: gl-buffers-shaders
+    title: Sommets, buffers et premiers shaders
+    summary: VBO, VAO, attributs de sommets et le duo vertex shader / fragment shader en GLSL.
+    minutes: 30
+    concepts: [vbo, vao, glsl, shaders]
+    sections:
+      - title: Envoyer des sommets au GPU
+        body: |
+          Les sommets d’un triangle sont rangés dans un tableau, puis copiés dans la mémoire du GPU :
+
+          ```cpp
+          float sommets[] = {
+              -0.5f, -0.5f, 0.0f,   // sommet 1 (x, y, z)
+               0.5f, -0.5f, 0.0f,   // sommet 2
+               0.0f,  0.5f, 0.0f,   // sommet 3
+          };
+          GLuint vbo, vao;
+          glGenVertexArrays(1, &vao);
+          glGenBuffers(1, &vbo);
+          glBindVertexArray(vao);
+          glBindBuffer(GL_ARRAY_BUFFER, vbo);
+          glBufferData(GL_ARRAY_BUFFER, sizeof(sommets), sommets, GL_STATIC_DRAW);
+          glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+          glEnableVertexAttribArray(0);
+          ```
+
+          - **VBO** (*Vertex Buffer Object*) : le buffer qui contient les données ;
+          - **VAO** (*Vertex Array Object*) : la description de **comment lire** ces données (quels attributs, quel format) ;
+          - `glVertexAttribPointer(0, 3, GL_FLOAT, …)` : l’attribut n° 0 est fait de **3 flottants** par sommet.
+
+          Les coordonnées vont de **-1 à 1** sur chaque axe : c’est l’espace normalisé (NDC) de l’écran.
+      - title: Le vertex shader
+        body: |
+          ```glsl
+          #version 330 core
+          layout (location = 0) in vec3 aPos;   // attribut n° 0
+
+          void main() {
+              gl_Position = vec4(aPos, 1.0);     // position finale du sommet
+          }
+          ```
+
+          Il est exécuté **une fois par sommet**. Il doit écrire `gl_Position` (un `vec4`).
+      - title: Le fragment shader
+        body: |
+          ```glsl
+          #version 330 core
+          out vec4 couleur;
+
+          void main() {
+              couleur = vec4(1.0, 0.5, 0.2, 1.0); // orange opaque (R, G, B, A)
+          }
+          ```
+
+          Il est exécuté **une fois par fragment** (pixel couvert par le triangle). Les couleurs vont de **0.0 à 1.0**.
+
+          On compile les deux, on les relie dans un **programme**, puis on dessine :
+
+          ```cpp
+          glUseProgram(programme);
+          glBindVertexArray(vao);
+          glDrawArrays(GL_TRIANGLES, 0, 3);
+          ```
+    exercises:
+      - id: gl-buf-q1
+        type: mcq
+        prompt: Quel objet décrit **comment lire** les attributs des sommets ?
+        choices: [Le VAO, Le VBO, Le framebuffer, La texture]
+        answer: 0
+      - id: gl-buf-q2
+        type: mcq
+        prompt: Quelle variable le vertex shader doit-il obligatoirement écrire ?
+        choices: [gl_Position, gl_FragColor, couleur, aPos]
+        answer: 0
+      - id: gl-buf-fill
+        type: fill
+        prompt: Complète le fragment shader pour afficher du rouge opaque.
+        code: |
+          #version 330 core
+          out vec4 couleur;
+          void main() {
+              couleur = vec4({{?}}, 0.0, 0.0, {{?}});
+          }
+        blanks: [['1.0', '1'], ['1.0', '1']]
+      - id: gl-buf-p1
+        type: predict
+        prompt: 'Combien de fois le vertex shader est-il exécuté pour dessiner 2 triangles séparés (glDrawArrays avec 6 sommets) ?'
+        code: "glDrawArrays(GL_TRIANGLES, 0, 6);"
+        output: "6"
+      - id: gl-buf-order
+        type: order
+        prompt: Remets dans l’ordre les étapes pour dessiner un triangle.
+        lines: [Créer et remplir le VBO avec les sommets, Décrire les attributs dans le VAO, Compiler et lier les shaders dans un programme, glUseProgram puis glDrawArrays]
+    project:
+      id: gl-buf-projet
+      type: fill
+      title: Un triangle coloré
+      difficulty: 3
+      prompt: |
+        Chaque sommet a maintenant une **position** (3 flottants) **et une couleur** (3 flottants), rangées l’une après l’autre. Complète la déclaration de l’attribut couleur (n° 1).
+      code: |
+        // 6 flottants par sommet : x y z r g b
+        glVertexAttribPointer(1, {{?}}, GL_FLOAT, GL_FALSE, {{?}} * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray({{?}});
+      blanks: [['3'], ['6'], ['1']]
+      hints: [La couleur a 3 composantes ; l’écart entre deux sommets (stride) est de 6 flottants.]
+      explanation: Le dernier paramètre (offset) indique que la couleur commence après les 3 flottants de position.
+    exam:
+      pass: 70
+      questions:
+        - id: gl-buf-ex1
+          type: mcq
+          prompt: Dans quel intervalle vont les coordonnées normalisées de l’écran ?
+          choices: [De -1 à 1, De 0 à 1920, De 0 à 255, De -100 à 100]
+          answer: 0
+        - id: gl-buf-ex2
+          type: mcq
+          prompt: Le fragment shader est exécuté…
+          choices: [Une fois par fragment couvert, Une fois par image, Une fois par sommet, Une fois au démarrage]
+          answer: 0
+        - id: gl-buf-ex3
+          type: mcq
+          prompt: '`vec4(0.0, 0.0, 1.0, 1.0)` représente…'
+          choices: [Du bleu opaque, Du rouge transparent, Du noir, Du blanc]
+          answer: 0
+        - id: gl-buf-ex4
+          type: mcq
+          prompt: Le VBO contient…
+          choices: [Les données des sommets dans la mémoire du GPU, Le code des shaders, L’image finale, Les textures]
+          answer: 0

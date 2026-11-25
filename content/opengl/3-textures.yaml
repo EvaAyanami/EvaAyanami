@@ -1,0 +1,102 @@
+language: opengl
+level: 3
+chapters:
+  # ------------------------------------------------------------------
+  - slug: gl-textures-uniforms
+    title: Uniforms et textures
+    summary: Passer des paramètres aux shaders, plaquer une image sur un objet et filtrer les textures.
+    minutes: 30
+    concepts: [uniform, texture, uv]
+    sections:
+      - title: Les uniforms
+        body: |
+          Un **uniform** est une variable de shader dont la valeur est la même pour tous les sommets/fragments d’un dessin. Le programme C++ la fixe avant `glDrawArrays` :
+
+          ```glsl
+          uniform float temps;
+          out vec4 couleur;
+          void main() {
+              couleur = vec4(0.5 + 0.5 * sin(temps), 0.3, 0.8, 1.0); // couleur qui pulse
+          }
+          ```
+
+          ```cpp
+          GLint loc = glGetUniformLocation(programme, "temps");
+          glUseProgram(programme);
+          glUniform1f(loc, (float)glfwGetTime());
+          ```
+      - title: Les textures et les coordonnées UV
+        body: |
+          Une **texture** est une image chargée dans le GPU. Chaque sommet reçoit des **coordonnées de texture** (U, V) entre 0 et 1 : (0, 0) = coin bas gauche de l’image, (1, 1) = coin haut droit.
+
+          ```glsl
+          in vec2 vUV;
+          uniform sampler2D tex;
+          out vec4 couleur;
+          void main() {
+              couleur = texture(tex, vUV);   // lit la couleur de l'image
+          }
+          ```
+
+          - **Filtrage** : `GL_NEAREST` (pixelisé, style rétro) ou `GL_LINEAR` (lissé) ;
+          - **Mipmaps** : versions réduites de la texture, utilisées pour les objets lointains (moins de scintillement) ;
+          - **Répétition** : `GL_REPEAT` répète l’image si U ou V dépasse 1 (pratique pour un sol).
+    exercises:
+      - id: gl-tex-q1
+        type: mcq
+        prompt: Un uniform est…
+        choices: [Une valeur identique pour tout un appel de dessin, Une valeur différente pour chaque sommet, Une texture, Un type de buffer]
+        answer: 0
+      - id: gl-tex-q2
+        type: mcq
+        prompt: Les coordonnées UV d’une texture vont généralement…
+        choices: [De 0 à 1, De -1 à 1, De 0 à 255, De 0 à la taille en pixels]
+        answer: 0
+      - id: gl-tex-q3
+        type: mcq
+        prompt: Quel filtrage donne un rendu pixelisé façon rétro ?
+        choices: [GL_NEAREST, GL_LINEAR, GL_MIPMAP, GL_REPEAT]
+        answer: 0
+      - id: gl-tex-fill
+        type: fill
+        prompt: Complète pour lire la texture dans le fragment shader.
+        code: |
+          uniform sampler2D tex;
+          in vec2 vUV;
+          out vec4 couleur;
+          void main() {
+              couleur = {{?}}(tex, vUV);
+          }
+        blanks: [[texture]]
+    project:
+      id: gl-tex-projet
+      type: mcq
+      title: Le sol qui scintille
+      difficulty: 3
+      prompt: Un grand sol texturé scintille beaucoup au loin quand la caméra bouge. Quelle est la meilleure solution ?
+      choices: [Générer des mipmaps et utiliser un filtrage GL_LINEAR_MIPMAP_LINEAR, Passer en GL_NEAREST, Réduire la taille de la fenêtre, Supprimer la texture]
+      answer: 0
+      explanation: Au loin, des dizaines de texels tombent dans un seul pixel ; les mipmaps fournissent une version déjà réduite et lissée.
+    exam:
+      pass: 70
+      questions:
+        - id: gl-tex-ex1
+          type: mcq
+          prompt: Quelle fonction fixe un uniform float ?
+          choices: [glUniform1f, glBufferData, glDrawArrays, glBindTexture]
+          answer: 0
+        - id: gl-tex-ex2
+          type: mcq
+          prompt: GL_REPEAT sert à…
+          choices: [Répéter la texture quand les UV dépassent 1, Redessiner l’image, Répéter le vertex shader, Recompiler les shaders]
+          answer: 0
+        - id: gl-tex-ex3
+          type: mcq
+          prompt: Les mipmaps sont…
+          choices: [Des versions réduites d’une texture, Des cartes du niveau, Des shaders spéciaux, Des buffers de sommets]
+          answer: 0
+        - id: gl-tex-ex4
+          type: mcq
+          prompt: Le type GLSL d’une texture 2D est…
+          choices: [sampler2D, vec2, texture2D, image]
+          answer: 0

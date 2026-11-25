@@ -1,0 +1,86 @@
+language: opengl
+level: 1
+chapters:
+  # ------------------------------------------------------------------
+  - slug: gl-introduction
+    title: OpenGL et le pipeline graphique
+    summary: Ce qu’est OpenGL, ce que fait la carte graphique et le chemin d’un triangle jusqu’à l’écran.
+    minutes: 20
+    concepts: [opengl, pipeline-graphique]
+    sections:
+      - title: Qu’est-ce qu’OpenGL ?
+        body: |
+          **OpenGL** est une **API graphique** : un ensemble de fonctions qu’un programme (souvent en C ou C++) appelle pour demander au GPU de dessiner. Elle existe depuis 1992, fonctionne sous Windows, Linux et macOS (version figée en 4.1), et sa variante **OpenGL ES / WebGL** fait tourner la 3D sur téléphones et navigateurs.
+
+          OpenGL ne gère **ni les fenêtres ni le clavier** : on utilise une bibliothèque comme **GLFW** ou **SDL** pour cela, et **GLAD** pour charger les fonctions OpenGL.
+      - title: Du triangle au pixel
+        body: |
+          Tout objet 3D est fait de **triangles**, eux-mêmes définis par des **sommets** (*vertices*).
+
+          ```anim gpu-pipeline
+          ```
+
+          Les étapes **en violet** sont programmables avec des **shaders** écrits en **GLSL**. Les autres (assemblage, rastérisation, tests de profondeur) sont réalisées par le matériel.
+      - title: Une machine à états
+        body: |
+          OpenGL fonctionne comme une **machine à états** : on « lie » (*bind*) un objet (un buffer, une texture, un shader), puis les appels suivants s’appliquent à l’objet lié.
+
+          ```cpp
+          glBindBuffer(GL_ARRAY_BUFFER, vbo);   // « je travaille sur ce buffer »
+          glBufferData(GL_ARRAY_BUFFER, ...);   // s'applique à vbo
+          ```
+
+          C’est simple à démarrer, mais il faut garder en tête **ce qui est lié à chaque instant**.
+    exercises:
+      - id: gl-intro-q1
+        type: mcq
+        prompt: OpenGL est…
+        choices: [Une API pour demander au GPU de dessiner, Un langage de programmation généraliste, Un moteur de jeu complet, Une carte graphique]
+        answer: 0
+      - id: gl-intro-q2
+        type: mcq
+        prompt: Quelle bibliothèque peut créer la fenêtre et gérer le clavier ?
+        choices: [GLFW, GLSL, GLAD, OpenAL]
+        answer: 0
+        explanation: GLSL est le langage des shaders ; GLAD charge les fonctions OpenGL ; OpenAL sert au son.
+      - id: gl-intro-q3
+        type: mcq
+        prompt: De quelle forme de base sont faits les objets 3D ?
+        choices: [Triangles, Cercles, Cubes, Pixels]
+        answer: 0
+      - id: gl-intro-order
+        type: order
+        prompt: Remets dans l’ordre les étapes du pipeline graphique.
+        lines: [Envoi des sommets, Vertex shader, Assemblage des primitives, Rastérisation, Fragment shader, Écriture dans le framebuffer]
+    project:
+      id: gl-intro-projet
+      type: mcq
+      title: Programmable ou fixe ?
+      difficulty: 2
+      prompt: Laquelle de ces étapes est **programmable** par le développeur ?
+      choices: [Le fragment shader, La rastérisation, L’assemblage des primitives, Le test de profondeur]
+      answer: 0
+      explanation: Le vertex shader et le fragment shader sont écrits en GLSL ; la rastérisation et les tests sont configurables mais pas programmables.
+    exam:
+      pass: 70
+      questions:
+        - id: gl-intro-ex1
+          type: mcq
+          prompt: Dans quel langage écrit-on les shaders OpenGL ?
+          choices: [GLSL, HLSL, Python, SQL]
+          answer: 0
+        - id: gl-intro-ex2
+          type: mcq
+          prompt: Que signifie « lier » (bind) un objet en OpenGL ?
+          choices: [Le rendre actif pour les appels suivants, Le supprimer, Le copier sur le disque, L’afficher à l’écran]
+          answer: 0
+        - id: gl-intro-ex3
+          type: mcq
+          prompt: Quelle variante d’OpenGL fait tourner la 3D dans les navigateurs ?
+          choices: [WebGL, OpenCL, OpenAL, GLFW]
+          answer: 0
+        - id: gl-intro-ex4
+          type: mcq
+          prompt: La rastérisation…
+          choices: [Découpe les triangles en fragments (pixels candidats), Compile les shaders, Crée la fenêtre, Charge les textures]
+          answer: 0
