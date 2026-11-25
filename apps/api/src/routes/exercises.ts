@@ -1,3 +1,4 @@
+import { consumeRun, gainEnergy, planStatus, requireEnergy, spendEnergy } from '../lib/plan.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Exercise, Prisma } from '@prisma/client';
@@ -136,8 +137,20 @@ export default async function exerciseRoutes(app: FastifyInstance) {
     if (ex.kind === 'exam' && body.mode !== 'review') throw forbidden("Les questions d'examen se valident depuis l'examen du chapitre");
     if (ex.kind === 'placement') throw forbidden();
     const language = resolveLanguage(ex, body.language);
+    const settings0 = await getSettings();
+    // Offre gratuite : plus d'énergie = plus de réponses en pratique (les révisions restent ouvertes).
+    const costsEnergy = body.mode === 'practice' && (ex.type !== 'code' || settings0.codeCostsEnergy);
+    if (costsEnergy) await requireEnergy(user);
     const result = await grade(ex, body.answer as Answer, language);
     const settings = await getSettings();
+    let energyDelta = 0;
+    if (costsEnergy && !result.correct) {
+      await spendEnergy(user);
+      energyDelta = -1;
+    } else if (body.mode === 'review' && result.correct && settings.reviewRefillsEnergy) {
+      await gainEnergy(user, 1);
+      energyDelta = 1;
+    }
 
     const key = { userId_exerciseId_language: { userId: user.id, exerciseId: ex.id, language } };
     const before = await prisma.exerciseProgress.findUnique({ where: key });
@@ -236,7 +249,8 @@ export default async function exerciseRoutes(app: FastifyInstance) {
       if (a.correct) break;
       failStreak++;
     }
-    return { ...result, firstSolve, attempts, failStreak, rewards, chapterCompleted, projectCompleted };
+    const plan = await planStatus(await prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
+    return { ...result, firstSolve, attempts, failStreak, rewards, chapterCompleted, projectCompleted, plan, energyDelta: plan.unlimited ? 0 : energyDelta };
   });
 
   /* Exécution libre (sans notation) avec les entrées des tests visibles ou une entrée personnalisée */
@@ -254,6 +268,7 @@ export default async function exerciseRoutes(app: FastifyInstance) {
     if (ex.type === 'fill') source = fillTemplate(c.code, body.blanks ?? []);
     if (ex.type === 'predict') throw badRequest("Pour cet exercice, il faut prédire la sortie sans exécuter le programme 😉");
     if (!source.trim()) throw badRequest('Aucun code à exécuter');
+    await consumeRun(user);
     const visible: { input: string; output: string }[] = c.visibleTests ?? [];
     const inputs = body.stdin !== undefined ? [body.stdin] : visible.length ? visible.map((t) => t.input) : [''];
     const raw = await runCode(language, source, inputs);
@@ -270,6 +285,7 @@ export default async function exerciseRoutes(app: FastifyInstance) {
       runs: raw.tests.map((t) => ({ ...t, input: inputs[t.index], expected: body.stdin === undefined ? visible[t.index]?.output : undefined })),
       help: !raw.compile.ok ? explainError(language, raw.compile.stderr, raw.compile.exitCode) : failing ? explainError(language, failing.stderr, failing.exitCode) : [],
       error: raw.error,
+      plan: await planStatus(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })),
     };
   });
 

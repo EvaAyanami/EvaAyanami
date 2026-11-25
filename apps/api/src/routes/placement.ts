@@ -102,6 +102,12 @@ export default async function placementRoutes(app: FastifyInstance) {
   app.post('/placement/start', async (req) => {
     const user = requireUser(req);
     const body = parse(z.object({ languages: z.array(z.enum(['rust', 'cpp', 'java'])).min(1) }), req.body);
+    // Anti-triche : une nouvelle évaluation au plus tous les 7 jours (hors administrateurs).
+    if (user.role !== 'ADMIN' && user.onboardingDone) {
+      const last = await prisma.placementAnswer.findFirst({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } });
+      const wait = last ? last.createdAt.getTime() + 7 * 86400_000 - Date.now() : 0;
+      if (wait > 0) throw badRequest(`Tu pourras refaire l'évaluation dans ${Math.ceil(wait / 86400_000)} jour(s). En attendant, ton niveau évolue en validant les examens des chapitres !`);
+    }
     const runId = randomUUID();
     const starts = ((user.questionnaire as any)?.startLevels ?? {}) as Record<string, number>;
     const first = await pickQuestion(user.id, runId, body.languages[0], starts[body.languages[0]] ?? 1);
@@ -167,7 +173,9 @@ export default async function placementRoutes(app: FastifyInstance) {
   /** « Commencer de zéro » : tous les langages au niveau débutant absolu. */
   app.post('/placement/skip', async (req) => {
     const user = requireUser(req);
-    for (const l of LANGS) await applySkillLevel(user.id, l, 1, 'manual');
+    // Après l'accueil, « commencer de zéro » ne touche plus aux niveaux déjà établis.
+    const existing = user.onboardingDone ? (await prisma.skillProfile.findMany({ where: { userId: user.id } })).map((s) => s.languageId) : [];
+    for (const l of LANGS) if (!existing.includes(l)) await applySkillLevel(user.id, l, 1, 'manual');
     await prisma.user.update({ where: { id: user.id }, data: { onboardingDone: true } });
     const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
     const rewards = await reward(fresh, { xp: 0 });

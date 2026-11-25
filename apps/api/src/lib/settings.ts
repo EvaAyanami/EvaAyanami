@@ -16,6 +16,32 @@ export const DEFAULT_SETTINGS = {
   solutionMinAttempts: 2,
   leaderboardEnabled: true,
   aiEnabled: true,
+  // Abonnement Premium et limites de l'offre gratuite
+  premiumEnabled: true,
+  freeMaxEnergy: 5,
+  energyRegenMinutes: 30,
+  freeDailyRuns: 40,
+  adsEnabled: true,
+  adMaxPerDay: 6,
+  adMinSeconds: 15,
+  adRewardEnergy: 1,
+  adRewardRuns: 10,
+  bannerAds: true,
+  /** Essai Premium offert à l'inscription (0 = aucun). */
+  trialDays: 7,
+  /** Bonus d'XP du « meilleur codeur de la semaine ». */
+  bestCoderXp: 150,
+  /** Les exercices d'écriture de code ne coûtent jamais d'énergie (on apprend en itérant). */
+  codeCostsEnergy: false,
+  reviewRefillsEnergy: true,
+  aiPremiumOnly: true,
+  premiumPriceLabel: '4,99 € / mois',
+  /** Boutique : clés Premium (prix en centimes d'euro). */
+  shopOffers: [
+    { id: 'm1', months: 1, days: 30, priceCents: 499, label: '1 mois' },
+    { id: 'm2', months: 2, days: 60, priceCents: 998, label: '2 mois' },
+    { id: 'm3', months: 3, days: 90, priceCents: 1250, label: '3 mois', best: true },
+  ],
   weeklyChallenges: [
     { metric: 'xp', title: 'Gagner {n} XP cette semaine', target: 300, xpReward: 60 },
     { metric: 'exercises', title: 'Réussir {n} exercices', target: 25, xpReward: 50 },

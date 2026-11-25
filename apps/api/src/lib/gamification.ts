@@ -64,6 +64,12 @@ export async function logActivity(userId: string, type: string, message: string,
  * Point d'entrée unique pour récompenser une activité : XP, série, objectif
  * quotidien, défis hebdomadaires et succès.
  */
+/** Protection de série (Premium) : disponible une fois tous les 7 jours. */
+export function canSaveStreak(user: User) {
+  const premium = !!user.premiumUntil && user.premiumUntil > new Date();
+  return premium && (!user.streakSavedAt || Date.now() - user.streakSavedAt.getTime() > 7 * 86400_000);
+}
+
 export async function reward(
   user: User,
   opts: { xp: number; exercises?: number; correct?: number; reviews?: number; chapters?: number; code?: number; timeMs?: number },
@@ -73,8 +79,14 @@ export async function reward(
   let streak = user.streak;
   let streakIncreased = false;
   const active = opts.xp > 0 || (opts.correct ?? 0) > 0;
+  let streakSaved = false;
   if (active && user.lastStreakDate !== today) {
-    streak = user.lastStreakDate === previousDay(today) ? user.streak + 1 : 1;
+    if (user.lastStreakDate === previousDay(today)) streak = user.streak + 1;
+    else if (user.lastStreakDate === previousDay(previousDay(today)) && canSaveStreak(user)) {
+      // Avantage Premium : un jour manqué par semaine ne casse pas la série.
+      streak = user.streak + 1;
+      streakSaved = true;
+    } else streak = 1;
     streakIncreased = true;
   }
   const daily = await prisma.dailyActivity.upsert({
@@ -110,6 +122,7 @@ export async function reward(
       xp: { increment: opts.xp + bonus },
       streak,
       longestStreak: Math.max(user.longestStreak, streak),
+      ...(streakSaved ? { streakSavedAt: new Date() } : {}),
       lastStreakDate: active ? today : user.lastStreakDate,
       learningTimeMs: { increment: BigInt(opts.timeMs ?? 0) },
     },

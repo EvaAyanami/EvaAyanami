@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { aiAllowed } from '../lib/plan.js';
 import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { requireUser } from '../lib/auth.js';
@@ -31,7 +32,11 @@ function comparisonMarkdown(g: Awaited<ReturnType<typeof getGlossary>>[number]) 
 }
 
 export default async function assistantRoutes(app: FastifyInstance) {
-  app.get('/assistant/status', async () => ({ ai: await aiAvailable(), mascot: MASCOT, provider: config.ai.provider }));
+  app.get('/assistant/status', async (req) => {
+    const configured = await aiAvailable();
+    const allowed = req.user ? await aiAllowed(req.user) : false;
+    return { ai: configured && allowed, aiConfigured: configured, premiumOnly: configured && !allowed, mascot: MASCOT, provider: config.ai.provider };
+  });
 
   /** Explication pédagogique d'une erreur de compilation / d'exécution. */
   app.post('/assistant/explain', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
@@ -39,7 +44,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
     const body = parse(z.object({ language: z.enum(['rust', 'cpp', 'java']), stderr: z.string().max(20000), exitCode: z.number().int().optional(), code: z.string().max(50000).optional() }), req.body);
     const local = explainError(body.language, body.stderr, body.exitCode);
     let ai: string | null = null;
-    if (body.code && (await aiAvailable())) {
+    if (body.code && (await aiAvailable()) && (await aiAllowed(user))) {
       const ctx = await context(user.id, { language: body.language });
       ai = await aiChat([
         { role: 'system', content: tutorSystemPrompt({ appName: config.appName, mascot: MASCOT, language: LABEL[body.language], level: ctx.level }) },
@@ -64,7 +69,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
       req.body,
     );
     const ctx = await context(user.id, body.context);
-    if (await aiAvailable()) {
+    if ((await aiAvailable()) && (await aiAllowed(user))) {
       const exText = ctx.exercise ? `${ctx.exercise.title}\n${ctx.exercise.prompt}${body.context.code ? `\n\nCode actuel de l'apprenant :\n${body.context.code.slice(0, 6000)}` : ''}` : undefined;
       const answer = await aiChat([
         {
@@ -115,7 +120,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
     if (!ctx.chapter) throw notFound('Chapitre');
     const section = (ctx.chapter.sections as { title: string; body: string }[])[body.section];
     if (!section) throw notFound('Section');
-    if (await aiAvailable()) {
+    if ((await aiAvailable()) && (await aiAllowed(user))) {
       const answer = await aiChat(
         [
           { role: 'system', content: tutorSystemPrompt({ appName: config.appName, mascot: MASCOT, chapter: ctx.chapter.title, language: LABEL[ctx.language!], level: ctx.level }) },
@@ -140,7 +145,7 @@ export default async function assistantRoutes(app: FastifyInstance) {
     const body = parse(z.object({ chapterSlug: z.string() }), req.body);
     const ctx = await context(user.id, { chapterSlug: body.chapterSlug });
     if (!ctx.chapter) throw notFound('Chapitre');
-    if (await aiAvailable()) {
+    if ((await aiAvailable()) && (await aiAllowed(user))) {
       const raw = await aiChat(
         [
           { role: 'system', content: 'Tu génères des QCM de programmation en français. Réponds UNIQUEMENT avec du JSON valide.' },

@@ -1,3 +1,4 @@
+import { planStatus, requireEnergy, spendEnergy } from '../lib/plan.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
@@ -146,6 +147,7 @@ export default async function learnRoutes(app: FastifyInstance) {
     const body = parse(z.object({ answers: z.record(z.any()), timeMs: z.number().int().min(0).max(36e5).optional() }), req.body);
     const chapter = await prisma.chapter.findUnique({ where: { slug: req.params.slug } });
     if (!chapter) throw notFound('Chapitre');
+    await requireEnergy(user);
     const questions = await prisma.exercise.findMany({ where: { chapterId: chapter.id, kind: 'exam' }, orderBy: { order: 'asc' } });
     const results = [];
     let total = 0;
@@ -179,12 +181,13 @@ export default async function learnRoutes(app: FastifyInstance) {
         ...(passed && !p.completedAt && wasLocked ? { completedAt: new Date(), skipped: true } : {}),
       },
     });
+    if (!passed) await spendEnergy(user);
     const settings = await getSettings();
     let rewards = await reward(user, { xp: firstPass ? settings.xpExamPassed : 0, exercises: questions.length, correct: results.filter((r) => r.correct).length });
     if (firstPass) await logActivity(user.id, 'exam', `Examen réussi : ${chapter.title} (${score} %)`, { slug: chapter.slug });
     const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
     const done = await maybeCompleteChapter(fresh, chapter);
     if (done.rewards) rewards = mergeRewards(rewards, done.rewards);
-    return { score, passed, pass: chapter.examPass, results, chapterCompleted: done.completed, skipped: passed && wasLocked, rewards };
+    return { score, passed, pass: chapter.examPass, results, chapterCompleted: done.completed, skipped: passed && wasLocked, rewards, plan: await planStatus(fresh) };
   });
 }

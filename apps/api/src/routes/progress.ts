@@ -1,3 +1,4 @@
+import { canSaveStreak } from '../lib/gamification.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
@@ -71,7 +72,10 @@ export default async function progressRoutes(app: FastifyInstance) {
       languages.find((l) => l.next)?.next ??
       null;
     // La série est « en danger » si aucune activité aujourd'hui
-    const streakAlive = user.lastStreakDate === today || user.lastStreakDate === localDate(user.timezone, addDays(new Date(), -1));
+    const streakAlive =
+      user.lastStreakDate === today ||
+      user.lastStreakDate === localDate(user.timezone, addDays(new Date(), -1)) ||
+      (user.lastStreakDate === localDate(user.timezone, addDays(new Date(), -2)) && canSaveStreak(user));
     return {
       user: publicUser(user),
       level: levelFromXp(user.xp),

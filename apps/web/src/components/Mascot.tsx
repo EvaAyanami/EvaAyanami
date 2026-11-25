@@ -7,7 +7,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useId, useState } from 'react';
 
-export type Mood = 'neutral' | 'happy' | 'thinking' | 'coding' | 'sad' | 'celebrate' | 'explain' | 'sleep';
+export type Mood = 'neutral' | 'happy' | 'thinking' | 'coding' | 'sad' | 'celebrate' | 'explain' | 'sleep' | 'angry';
 
 export const MASCOT_NAME = 'Kiri';
 
@@ -16,12 +16,14 @@ interface Props {
   size?: number;
   className?: string;
   animate?: boolean;
+  /** Couronne dorée (abonnés Premium). */
+  crown?: boolean;
 }
 
-export default function Mascot({ mood = 'neutral', size = 160, className, animate = true }: Props) {
+export default function Mascot({ mood = 'neutral', size = 160, className, animate = true, crown = false }: Props) {
   const uid = useId().replace(/:/g, '');
   const [blink, setBlink] = useState(false);
-  const eyesOpen = ['neutral', 'thinking', 'coding', 'sad', 'explain'].includes(mood);
+  const eyesOpen = ['neutral', 'thinking', 'coding', 'sad', 'explain', 'angry'].includes(mood);
 
   useEffect(() => {
     if (!eyesOpen || !animate) return;
@@ -82,8 +84,8 @@ export default function Mascot({ mood = 'neutral', size = 160, className, animat
       <ellipse cx="100" cy="232" rx="46" ry="6" fill="#1e2a5a" opacity="0.15" />
 
       <motion.g
-        animate={animate && mood !== 'sleep' ? { y: [0, -4, 0] } : animate ? { y: [0, 2, 0] } : undefined}
-        transition={{ duration: mood === 'celebrate' ? 0.8 : 3.5, repeat: Infinity, ease: 'easeInOut' }}
+        animate={animate && mood === 'angry' ? { x: [0, -2, 2, -2, 0], y: [0, -3, 0] } : animate && mood !== 'sleep' ? { y: [0, -4, 0] } : animate ? { y: [0, 2, 0] } : undefined}
+        transition={{ duration: mood === 'celebrate' ? 0.8 : mood === 'angry' ? 0.9 : 3.5, repeat: Infinity, ease: 'easeInOut' }}
       >
         {/* ---------- Corps ---------- */}
         {/* Jambes */}
@@ -155,8 +157,8 @@ export default function Mascot({ mood = 'neutral', size = 160, className, animat
           <ellipse cx="151" cy="104" rx="6" ry="9" fill="#ffd9c7" />
 
           {/* Joues */}
-          <ellipse cx="68" cy="120" rx="9" ry="5" fill="#ff8fa8" opacity={mood === 'sad' ? 0.25 : 0.45} />
-          <ellipse cx="132" cy="120" rx="9" ry="5" fill="#ff8fa8" opacity={mood === 'sad' ? 0.25 : 0.45} />
+          <ellipse cx="68" cy="120" rx="9" ry="5" fill="#ff8fa8" opacity={mood === 'sad' ? 0.25 : mood === 'angry' ? 0.85 : 0.45} />
+          <ellipse cx="132" cy="120" rx="9" ry="5" fill="#ff8fa8" opacity={mood === 'sad' ? 0.25 : mood === 'angry' ? 0.85 : 0.45} />
 
           {/* Yeux */}
           <Eyes mood={mood} blink={blink} iris={`url(#${id('iris')})`} />
@@ -166,6 +168,11 @@ export default function Mascot({ mood = 'neutral', size = 160, className, animat
             <g stroke="#2c4fb8" strokeWidth="3" strokeLinecap="round">
               <path d="M66 78 Q74 74 84 76" transform="rotate(-10 75 76)" />
               <path d="M116 76 Q126 74 134 78" transform="rotate(10 125 76)" />
+            </g>
+          ) : mood === 'angry' ? (
+            <g stroke="#2c4fb8" strokeWidth="3.6" strokeLinecap="round">
+              <path d="M64 72 L86 82" />
+              <path d="M136 72 L114 82" />
             </g>
           ) : mood === 'thinking' ? (
             <g stroke="#2c4fb8" strokeWidth="3" strokeLinecap="round">
@@ -217,6 +224,20 @@ export default function Mascot({ mood = 'neutral', size = 160, className, animat
           </motion.g>
         )}
         {mood === 'sad' && <path d="M156 70 q6 10 0 14 q-6 -4 0 -14z" fill="#7dd3fc" />}
+        {mood === 'angry' && (
+          <motion.g animate={animate ? { scale: [1, 1.2, 1] } : undefined} transition={{ duration: 0.8, repeat: Infinity }} style={{ originX: '160px', originY: '52px' }}>
+            {/* Veine de colère façon manga */}
+            <path d="M152 44 q6 4 0 8 M168 44 q-6 4 0 8 M152 60 q6 -4 0 -8 M168 60 q-6 -4 0 -8" stroke="#ef4444" strokeWidth="3.2" fill="none" strokeLinecap="round" />
+          </motion.g>
+        )}
+        {crown && (
+          <motion.g animate={animate ? { y: [0, -2, 0], rotate: [-8, -5, -8] } : undefined} transition={{ duration: 2.4, repeat: Infinity }} style={{ originX: '80px', originY: '30px' }}>
+            <path d="M60 36 L64 14 L74 26 L82 8 L90 26 L100 14 L102 36 Z" fill="#fbbf24" stroke="#d97706" strokeWidth="2" strokeLinejoin="round" />
+            <circle cx="82" cy="28" r="3" fill="#ef4444" />
+            <circle cx="70" cy="30" r="2" fill="#22d3ee" />
+            <circle cx="94" cy="30" r="2" fill="#8b5cf6" />
+          </motion.g>
+        )}
         {mood === 'sleep' && (
           <motion.g animate={animate ? { y: [0, -6, 0], opacity: [0.5, 1, 0.5] } : undefined} transition={{ duration: 3, repeat: Infinity }}>
             <text x="150" y="40" fontSize="18" fontWeight="900" fill="#5f8cfb">Z</text>
@@ -295,6 +316,8 @@ function Mouth({ mood }: { mood: Mood }) {
       return <path d="M91 123 Q100 133 109 123 Z" fill="#c2304f" />;
     case 'thinking':
       return <path d="M96 127 Q101 124 106 127" stroke="#7a2a3d" strokeWidth="2.6" fill="none" strokeLinecap="round" />;
+    case 'angry':
+      return <path d="M92 128 Q100 121 108 128" stroke="#7a2a3d" strokeWidth="3" fill="none" strokeLinecap="round" />;
     case 'sad':
       return <path d="M92 128 Q96 124 100 127 Q104 130 108 126" stroke="#7a2a3d" strokeWidth="2.6" fill="none" strokeLinecap="round" />;
     case 'sleep':

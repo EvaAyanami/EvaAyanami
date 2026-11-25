@@ -26,5 +26,22 @@ export const config = {
     apiKey: env('AI_API_KEY', ''),
     model: env('AI_MODEL', ''),
   },
+  /** Clé de chiffrement des secrets de double authentification (à défaut : dérivée du jeton du runner). */
+  appSecret: env('APP_SECRET', env('RUNNER_TOKEN', 'codemori-dev-secret')),
+  stripe: {
+    secretKey: env('STRIPE_SECRET_KEY'),
+    priceId: env('STRIPE_PRICE_ID'),
+    webhookSecret: env('STRIPE_WEBHOOK_SECRET'),
+  },
+  /**
+   * Publicités rémunérées. ADS_PROVIDER : house (annonces maison, sans revenu) ou adsense.
+   * Avec AdSense, l'éditeur (toi) est payé par Google pour les affichages et clics.
+   */
+  ads: {
+    provider: env('ADS_PROVIDER', 'house') as 'house' | 'adsense',
+    adsenseClient: env('ADSENSE_CLIENT'), // ca-pub-XXXXXXXXXXXXXXXX
+    adsenseSlotReward: env('ADSENSE_SLOT_REWARD'), // bloc affiché pendant la pub récompensée
+    adsenseSlotBanner: env('ADSENSE_SLOT_BANNER'), // bannière discrète pour les comptes gratuits
+  },
   runLimitPerMinute: Number(env('RUN_LIMIT_PER_MINUTE', '20')),
 };

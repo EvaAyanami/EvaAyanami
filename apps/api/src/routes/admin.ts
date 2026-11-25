@@ -133,6 +133,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       users: users.map((u) => ({
         id: u.id, email: u.email, username: u.username, displayName: u.displayName, role: u.role, disabled: u.disabled,
         xp: u.xp, level: levelFromXp(u.xp).level, streak: u.streak, createdAt: u.createdAt, lastActiveAt: u.lastActiveAt, lockedUntil: u.lockedUntil,
+        tag: `${u.username}#${u.discriminator}`, twoFactor: u.totpEnabled, premiumUntil: u.premiumUntil, premiumSource: u.premiumSource,
       })),
     };
   });

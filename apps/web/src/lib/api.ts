@@ -19,7 +19,13 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Erreur ${res.status}`, data?.details);
+  if (!res.ok) {
+    // 402 : limite de l'offre gratuite atteinte → fenêtre « plus d'énergie / quota ».
+    if (res.status === 402) window.dispatchEvent(new CustomEvent('cm-limit', { detail: { code: data?.details?.code, message: data?.error } }));
+    throw new ApiError(res.status, data?.error ?? `Erreur ${res.status}`, data?.details);
+  }
+  // Les réponses qui modifient l'énergie ou les quotas renvoient l'état à jour de l'offre.
+  if (data && typeof data === 'object' && 'plan' in data && data.plan) window.dispatchEvent(new CustomEvent('cm-plan', { detail: data.plan }));
   return data as T;
 }
 

@@ -18,6 +18,8 @@ model User {
   id               String    @id @default(cuid())
   email            String    @unique
   username         String    @unique
+  /// Identifiant d'ami à 4 chiffres : « pseudo#0420 »
+  discriminator    String    @default(dbgenerated("lpad((floor(random() * 9999) + 1)::int::text, 4, '0')"))
   displayName      String
   passwordHash     String
   role             Role      @default(USER)
@@ -29,7 +31,7 @@ model User {
   timezone         String    @default("Europe/Paris")
   theme            String    @default("system")
   dailyGoalXp      Int       @default(50)
-  leaderboardOptIn Boolean   @default(false)
+  leaderboardOptIn Boolean   @default(true)
   onboardingDone   Boolean   @default(false)
   questionnaire    Json?
   xp               Int       @default(0)
@@ -38,6 +40,23 @@ model User {
   lastStreakDate   String?
   learningTimeMs   BigInt    @default(0)
   lastLocation     Json?
+
+  // Double authentification (TOTP)
+  totpSecret    String?
+  totpEnabled   Boolean  @default(false)
+  totpLastStep  Int?
+  recoveryCodes String[] @default([])
+
+  // Abonnement et limites de l'offre gratuite
+  premiumUntil     DateTime?
+  premiumSource    String?
+  stripeCustomerId String?   @unique
+  stripeSubId      String?
+  energy           Int       @default(5)
+  energyAt         DateTime  @default(now())
+  quotaDate        String?
+  runsUsed         Int       @default(0)
+  adsWatched       Int       @default(0)
 
   sessions         Session[]
   attempts         Attempt[]
@@ -52,6 +71,18 @@ model User {
   activities       ActivityLog[]
   snippets         Snippet[]
   placement        PlacementAnswer[]
+  challengesLogin  LoginChallenge[]
+  adViews          AdView[]
+  redemptions      PremiumRedemption[]
+  premiumPeriods   PremiumPeriod[]
+  boughtCodes      PremiumCode[]       @relation("CodeBuyer")
+  streakSavedAt    DateTime?
+  /// Avatar personnalisé (style de Kiri) : coiffure, couleurs, accessoires…
+  avatar           Json?
+  bio              String?
+  weeklyWins       WeeklyWinner[]
+  friendsSent      Friendship[]        @relation("FriendRequester")
+  friendsReceived  Friendship[]        @relation("FriendAddressee")
 }
 
 model Session {
@@ -81,70 +112,70 @@ model Language {
 }
 
 model Chapter {
-  id          String    @id @default(cuid())
-  slug        String    @unique
-  languageId  String
-  language    Language  @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  level       Int
-  order       Int
-  title       String
-  summary     String
-  concepts    String[]
-  sections    Json
-  minutes     Int       @default(20)
-  published   Boolean   @default(true)
-  customized  Boolean   @default(false)
-  examPass    Int       @default(70)
-  exercises   Exercise[]
-  progress    ChapterProgress[]
+  id         String            @id @default(cuid())
+  slug       String            @unique
+  languageId String
+  language   Language          @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  level      Int
+  order      Int
+  title      String
+  summary    String
+  concepts   String[]
+  sections   Json
+  minutes    Int               @default(20)
+  published  Boolean           @default(true)
+  customized Boolean           @default(false)
+  examPass   Int               @default(70)
+  exercises  Exercise[]
+  progress   ChapterProgress[]
 
   @@index([languageId, level, order])
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String            @id @default(cuid())
+  slug        String            @unique
   level       Int
-  order       Int      @default(0)
+  order       Int               @default(0)
   title       String
   summary     String
   description String
   objectives  String[]
   constraints String[]
   languages   String[]
-  published   Boolean  @default(true)
-  customized  Boolean  @default(false)
+  published   Boolean           @default(true)
+  customized  Boolean           @default(false)
   steps       Exercise[]
   progress    ProjectProgress[]
 }
 
 /// Exercice générique. `content` = partie publique, `solution` = partie privée (réponses, tests cachés).
 model Exercise {
-  id          String    @id
-  kind        String    // practice | exam | miniproject | placement | project
-  type        String    // mcq | fill | order | predict | bugfix | code
-  language    String?   // null = multi-langage (projets)
-  chapterId   String?
-  chapter     Chapter?  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  level       Int       @default(1)
-  difficulty  Int       @default(1)
-  order       Int       @default(0)
-  title       String
-  prompt      String
-  concepts    String[]
-  content     Json
-  solution    Json
-  hints       String[]
-  xp          Int       @default(10)
-  customized  Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id
+  kind       String // practice | exam | miniproject | placement | project
+  type       String // mcq | fill | order | predict | bugfix | code
+  language   String? // null = multi-langage (projets)
+  chapterId  String?
+  chapter    Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  level      Int      @default(1)
+  difficulty Int      @default(1)
+  order      Int      @default(0)
+  title      String
+  prompt     String
+  concepts   String[]
+  content    Json
+  solution   Json
+  hints      String[]
+  xp         Int      @default(10)
+  customized Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  attempts    Attempt[]
-  progress    ExerciseProgress[]
-  reviews     ReviewItem[]
+  attempts Attempt[]
+  progress ExerciseProgress[]
+  reviews  ReviewItem[]
 
   @@index([chapterId, kind])
   @@index([projectId])
@@ -152,38 +183,38 @@ model Exercise {
 }
 
 model Attempt {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exerciseId  String
-  exercise    Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  language    String
-  correct     Boolean
-  score       Int
-  mode        String   @default("practice")
-  answer      Json
-  timeMs      Int      @default(0)
-  xpAwarded   Int      @default(0)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  language   String
+  correct    Boolean
+  score      Int
+  mode       String   @default("practice")
+  answer     Json
+  timeMs     Int      @default(0)
+  xpAwarded  Int      @default(0)
+  createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([exerciseId])
 }
 
 model ExerciseProgress {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exerciseId   String
-  exercise     Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  language     String
-  solved       Boolean   @default(false)
-  attempts     Int       @default(0)
-  hintsUsed    Int       @default(0)
-  bestScore    Int       @default(0)
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId    String
+  exercise      Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  language      String
+  solved        Boolean   @default(false)
+  attempts      Int       @default(0)
+  hintsUsed     Int       @default(0)
+  bestScore     Int       @default(0)
   firstSolvedAt DateTime?
-  draft        String?
-  updatedAt    DateTime  @updatedAt
+  draft         String?
+  updatedAt     DateTime  @updatedAt
 
   @@unique([userId, exerciseId, language])
 }
@@ -250,33 +281,33 @@ model PlacementAnswer {
 }
 
 model ReviewItem {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseId   String
-  exercise     Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exercise     Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   language     String
-  ease         Float    @default(2.5)
-  interval     Int      @default(0)
-  repetitions  Int      @default(0)
-  lapses       Int      @default(0)
-  dueAt        DateTime @default(now())
+  ease         Float     @default(2.5)
+  interval     Int       @default(0)
+  repetitions  Int       @default(0)
+  lapses       Int       @default(0)
+  dueAt        DateTime  @default(now())
   lastReviewed DateTime?
-  reason       String   @default("error")
+  reason       String    @default("error")
 
   @@unique([userId, exerciseId])
   @@index([userId, dueAt])
 }
 
 model Achievement {
-  id          String   @id
+  id          String            @id
   title       String
   description String
   icon        String
-  xp          Int      @default(20)
+  xp          Int               @default(20)
   condition   Json
-  hidden      Boolean  @default(false)
-  order       Int      @default(0)
+  hidden      Boolean           @default(false)
+  order       Int               @default(0)
   users       UserAchievement[]
 }
 
@@ -292,13 +323,13 @@ model UserAchievement {
 }
 
 model WeeklyChallenge {
-  id        String   @id @default(cuid())
-  weekKey   String
-  title     String
-  metric    String
-  target    Int
-  xpReward  Int
-  users     UserChallenge[]
+  id       String          @id @default(cuid())
+  weekKey  String
+  title    String
+  metric   String
+  target   Int
+  xpReward Int
+  users    UserChallenge[]
 
   @@unique([weekKey, metric])
 }
@@ -367,4 +398,122 @@ model ErrorLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// Connexion en deux temps : mot de passe validé, code de double authentification attendu.
+model LoginChallenge {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+/// Code d'activation Premium (offert, vendu hors ligne, famille…).
+model PremiumCode {
+  id          String              @id @default(cuid())
+  code        String              @unique
+  days        Int
+  maxUses     Int                 @default(1)
+  uses        Int                 @default(0)
+  note        String?
+  expiresAt   DateTime?
+  createdAt   DateTime            @default(now())
+  /// Clé achetée dans la boutique : acheteur, offre et référence du paiement
+  buyerId     String?
+  buyer       User?               @relation("CodeBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  offer       String?
+  amountCents Int?
+  purchaseRef String?             @unique
+  redemptions PremiumRedemption[]
+
+  @@index([buyerId])
+}
+
+model PremiumRedemption {
+  id        String      @id @default(cuid())
+  codeId    String
+  code      PremiumCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@unique([codeId, userId])
+}
+
+/// Publicité « maison » affichée aux comptes gratuits contre une récompense.
+model Ad {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  imageUrl    String?
+  linkUrl     String?
+  linkLabel   String?
+  durationSec Int      @default(15)
+  weight      Int      @default(1)
+  enabled     Boolean  @default(true)
+  views       Int      @default(0)
+  clicks      Int      @default(0)
+  createdAt   DateTime @default(now())
+  adViews     AdView[]
+}
+
+model AdView {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adId        String?
+  ad          Ad?       @relation(fields: [adId], references: [id], onDelete: SetNull)
+  builtin     String?
+  durationSec Int
+  startedAt   DateTime  @default(now())
+  rewardedAt  DateTime?
+
+  @@index([userId, startedAt])
+}
+
+/// Historique des périodes Premium (abonnement, code, cadeau de l'administration).
+model PremiumPeriod {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source    String
+  days      Int
+  startsAt  DateTime
+  endsAt    DateTime
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+}
+
+model Friendship {
+  id          String       @id @default(cuid())
+  requesterId String
+  requester   User         @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId String
+  addressee   User         @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      FriendStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  acceptedAt  DateTime?
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
+}
+
+/// « Meilleur codeur de la semaine » (le plus d'XP gagnée du lundi au dimanche).
+model WeeklyWinner {
+  id        String   @id @default(cuid())
+  weekKey   String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xp        Int
+  createdAt DateTime @default(now())
 }

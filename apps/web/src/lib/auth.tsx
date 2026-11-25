@@ -5,6 +5,12 @@ export interface User {
   id: string;
   email: string;
   username: string;
+  discriminator: string;
+  tag: string;
+  twoFactorEnabled: boolean;
+  premium: boolean;
+  premiumUntil: string | null;
+  formerPremium: boolean;
   displayName: string;
   role: 'USER' | 'ADMIN';
   theme: 'light' | 'dark' | 'system';

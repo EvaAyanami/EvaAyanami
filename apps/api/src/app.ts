@@ -17,6 +17,16 @@ import progressRoutes from './routes/progress.js';
 import profileRoutes from './routes/profile.js';
 import assistantRoutes from './routes/assistant.js';
 import adminRoutes from './routes/admin.js';
+import billingRoutes from './routes/billing.js';
+import friendRoutes from './routes/friends.js';
+import communityRoutes from './routes/community.js';
+import adminBillingRoutes from './routes/admin-billing.js';
+
+// Domaines nécessaires à Google AdSense (uniquement si ADS_PROVIDER=adsense).
+const ADSENSE = config.ads.provider === 'adsense' && config.ads.adsenseClient;
+const AD_SCRIPT = ADSENSE ? ['https://pagead2.googlesyndication.com', 'https://*.googlesyndication.com', 'https://*.adtrafficquality.google', 'https://www.googletagservices.com', 'https://*.google.com'] : [];
+const AD_FRAME = ADSENSE ? ['https://googleads.g.doubleclick.net', 'https://tpc.googlesyndication.com', 'https://*.googlesyndication.com', 'https://www.google.com', 'https://*.adtrafficquality.google'] : [];
+const AD_CONNECT = ADSENSE ? ['https://pagead2.googlesyndication.com', 'https://*.google.com', 'https://*.adtrafficquality.google', 'https://*.doubleclick.net'] : [];
 
 export async function buildApp() {
   const app = Fastify({
@@ -29,12 +39,13 @@ export async function buildApp() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-eval'", 'blob:'], // Monaco utilise des web workers
+        scriptSrc: ["'self'", "'unsafe-eval'", 'blob:', ...AD_SCRIPT], // Monaco utilise des web workers
         workerSrc: ["'self'", 'blob:'],
         styleSrc: ["'self'", "'unsafe-inline'"],
         fontSrc: ["'self'", 'data:'], // polices embarquées (aucune requête vers un service tiers)
-        imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'], // https: images des annonces
+        connectSrc: ["'self'", ...AD_CONNECT],
+        frameSrc: ["'self'", ...AD_FRAME],
         // En accès HTTP (réseau local, NAS…), forcer HTTPS casserait le chargement des ressources.
         upgradeInsecureRequests: config.cookieSecure ? [] : null,
       },
@@ -51,6 +62,7 @@ export async function buildApp() {
   // (impossible à envoyer depuis un autre site sans pré-vol CORS).
   app.addHook('onRequest', async (req) => {
     if (!req.url.startsWith('/api/')) return;
+    if (req.url.startsWith('/api/billing/webhook')) return; // appel de Stripe, authentifié par signature
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.headers['x-codemori'] !== '1') {
       throw new HttpError(403, 'Requête refusée (en-tête de sécurité manquant)');
     }
@@ -73,6 +85,13 @@ export async function buildApp() {
     return reply.code(status).send({ error: status >= 500 && config.production ? 'Erreur interne du serveur' : err.message, details: (err as HttpError).details });
   });
 
+  // ads.txt : exigé par Google AdSense pour être rémunéré.
+  app.get('/ads.txt', async (_req, reply) => {
+    const pub = config.ads.adsenseClient.replace(/^ca-/, '');
+    if (!ADSENSE || !pub) return reply.code(404).type('text/plain').send('');
+    return reply.type('text/plain').send(`google.com, ${pub}, DIRECT, f08c47fec0942fa0\n`);
+  });
+
   app.get('/api/health', async () => {
     await prisma.$queryRaw`SELECT 1`;
     return { ok: true, name: config.appName };
@@ -88,6 +107,10 @@ export async function buildApp() {
       await api.register(profileRoutes);
       await api.register(assistantRoutes);
       await api.register(adminRoutes);
+      await api.register(adminBillingRoutes);
+      await api.register(billingRoutes);
+      await api.register(friendRoutes);
+      await api.register(communityRoutes);
     },
     { prefix: '/api' },
   );

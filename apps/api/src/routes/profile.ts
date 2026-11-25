@@ -1,9 +1,10 @@
+import { consumeRun, planStatus } from '../lib/plan.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { destroySession, publicUser, requireUser, verifyPassword } from '../lib/auth.js';
-import { badRequest } from '../lib/http.js';
+import { badRequest, forbidden } from '../lib/http.js';
 import { runCode } from '../lib/runner.js';
 import { explainError, parseDiagnostics } from '../lib/diagnostics.js';
 import { logActivity, checkAchievements } from '../lib/gamification.js';
@@ -97,9 +98,10 @@ export default async function profileRoutes(app: FastifyInstance) {
     });
   });
 
-  /** Modification manuelle du niveau d'un langage. */
+  /** Le niveau d'un langage ne se modifie plus à la main (anti-triche) : évaluation, examens, ou administrateur. */
   app.put<{ Params: { lang: string } }>('/me/skills/:lang', async (req) => {
     const user = requireUser(req);
+    if (user.role !== 'ADMIN') throw forbidden("Ton niveau évolue avec l'évaluation et les examens. Seul un administrateur peut le modifier.");
     if (!LANGS.includes(req.params.lang)) throw badRequest('Langage inconnu');
     const body = parse(z.object({ level: z.number().int().min(1).max(5) }), req.body);
     await applySkillLevel(user.id, req.params.lang, body.level, 'manual');
@@ -133,6 +135,7 @@ export default async function profileRoutes(app: FastifyInstance) {
   app.post('/ide/run', { config: { rateLimit: { max: config.runLimitPerMinute, timeWindow: '1 minute' } } }, async (req) => {
     const user = requireUser(req);
     const body = parse(z.object({ language: z.enum(['rust', 'cpp', 'java']), code: z.string().min(1).max(100_000), stdin: z.string().max(100_000).default(''), compileOnly: z.boolean().default(false) }), req.body);
+    await consumeRun(user);
     const raw = await runCode(body.language, body.code, body.compileOnly ? [] : [body.stdin]);
     const run = raw.tests[0];
     const ok = raw.compile.ok && (body.compileOnly || run?.exitCode === 0);
@@ -145,6 +148,7 @@ export default async function profileRoutes(app: FastifyInstance) {
       run: run ?? null,
       help: !raw.compile.ok ? explainError(body.language, raw.compile.stderr, raw.compile.exitCode) : run && run.exitCode !== 0 ? explainError(body.language, run.stderr, run.exitCode) : [],
       error: raw.error,
+      plan: await planStatus(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })),
     };
   });
 
