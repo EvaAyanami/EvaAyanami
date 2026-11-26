@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { useApi } from '../lib/hooks';
 import { PageTitle, Loading, ErrorBox, ProgressBar } from '../components/ui';
+import { t } from '../lib/i18n';
 
 interface A {
   id: string;
@@ -22,7 +23,7 @@ export default function Achievements() {
   const unlocked = data.filter((a) => a.unlockedAt).length;
   return (
     <div>
-      <PageTitle title="Succès" subtitle={`${unlocked}/${data.length} succès débloqués`} />
+      <PageTitle title={t("Succès")} subtitle={`${unlocked}/${data.length} succès débloqués`} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((a, i) => (
           <motion.div key={a.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.02 }} className={clsx('card flex items-center gap-3', !a.unlockedAt && 'opacity-70')}>
@@ -43,15 +44,15 @@ export default function Achievements() {
         ))}
       </div>
 
-      <h2 className="section-title mb-3 mt-10">Classement</h2>
-      {lb.data && !lb.data.enabled && <p className="muted">Le classement est désactivé sur ce serveur.</p>}
-      {lb.data?.enabled && !lb.data.optIn && <div className="card text-sm">Le classement est facultatif : active-le dans ton <a href="/profil" className="font-bold text-brand-500">profil</a> pour y apparaître.</div>}
+      <h2 className="section-title mb-3 mt-10">{t("Classement")}</h2>
+      {lb.data && !lb.data.enabled && <p className="muted">{t("Le classement est désactivé sur ce serveur.")}</p>}
+      {lb.data?.enabled && !lb.data.optIn && <div className="card text-sm">{t("Le classement est facultatif : active-le dans ton")} <a href="/profil" className="font-bold text-brand-500">profil</a> {t("pour y apparaître.")}</div>}
       {lb.data?.enabled && (
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           {[{ title: 'Cette semaine', rows: lb.data.weekly.map((w) => ({ ...w, sub: '' })) }, { title: 'Depuis toujours', rows: lb.data.allTime.map((a) => ({ ...a, sub: `niv. ${a.level}` })) }].map((b) => (
             <div key={b.title} className="card">
               <h3 className="mb-2 font-black">{b.title}</h3>
-              {b.rows.length === 0 && <p className="muted text-sm">Personne pour l’instant.</p>}
+              {b.rows.length === 0 && <p className="muted text-sm">{t("Personne pour l’instant.")}</p>}
               <ol className="space-y-1">
                 {b.rows.slice(0, 15).map((r, i) => (
                   <li key={r.id} className={clsx('flex items-center gap-3 rounded-xl px-2 py-1.5', r.me && 'bg-brand-50 dark:bg-brand-900/30')}>

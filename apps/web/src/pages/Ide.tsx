@@ -7,6 +7,7 @@ import { useFeedback } from '../lib/feedback';
 import { PageTitle } from '../components/ui';
 import Markdown from '../components/Markdown';
 import type { EditorDiagnostic } from '../components/CodeEditor';
+import { t } from '../lib/i18n';
 
 const CodeEditor = lazy(() => import('../components/CodeEditor'));
 
@@ -91,7 +92,7 @@ export default function Ide() {
       const s = await api<Snippet>('/ide/snippets', { body: { id: current?.id, language: lang, name, code } });
       setCurrent(s);
       setSnippets((list) => [s, ...list.filter((x) => x.id !== s.id)]);
-      toast('Fichier enregistré', 'success');
+      toast(t('Fichier enregistré'), 'success');
     } catch (e) {
       ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     }
@@ -106,7 +107,7 @@ export default function Ide() {
 
   return (
     <div className={clsx(full && 'fixed inset-0 z-50 overflow-auto bg-ink-50 p-3 dark:bg-ink-950')}>
-      {!full && <PageTitle title="IDE" subtitle="Un environnement libre pour expérimenter : ton code est compilé et exécuté dans un bac à sable isolé." />}
+      {!full && <PageTitle title={t("IDE")} subtitle="Un environnement libre pour expérimenter : ton code est compilé et exécuté dans un bac à sable isolé." />}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <aside className="card !p-3">
           <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-ink-100 p-1 dark:bg-ink-800">
@@ -125,9 +126,9 @@ export default function Ide() {
           >
             <FilePlus2 size={14} /> Nouveau ({langMeta(lang).file})
           </button>
-          <div className="muted mb-1 mt-3 text-xs font-extrabold uppercase">Mes fichiers</div>
+          <div className="muted mb-1 mt-3 text-xs font-extrabold uppercase">{t("Mes fichiers")}</div>
           <div className="scrollbar-thin max-h-72 space-y-1 overflow-y-auto">
-            {snippets.filter((s) => s.language === lang).length === 0 && <p className="muted text-xs">Aucun fichier enregistré.</p>}
+            {snippets.filter((s) => s.language === lang).length === 0 && <p className="muted text-xs">{t("Aucun fichier enregistré.")}</p>}
             {snippets
               .filter((s) => s.language === lang)
               .map((s) => (
@@ -141,7 +142,7 @@ export default function Ide() {
                   >
                     <FileCode2 size={14} /> {s.name}
                   </button>
-                  <button className="opacity-0 group-hover:opacity-100" onClick={() => remove(s)} aria-label="Supprimer">
+                  <button className="opacity-0 group-hover:opacity-100" onClick={() => remove(s)} aria-label={t("Supprimer")}>
                     <Trash2 size={14} className="text-rose-500" />
                   </button>
                 </div>
@@ -162,13 +163,13 @@ export default function Ide() {
                 </button>
               </>
             )}
-            <button className="btn-ghost btn-sm" onClick={save} title="Enregistrer">
+            <button className="btn-ghost btn-sm" onClick={save} title={t("Enregistrer")}>
               <Save size={16} />
             </button>
-            <button className="btn-ghost btn-sm" onClick={() => confirm('Réinitialiser avec le modèle ?') && setCode(templates[lang]?.code ?? '')} title="Réinitialiser">
+            <button className="btn-ghost btn-sm" onClick={() => confirm('Réinitialiser avec le modèle ?') && setCode(templates[lang]?.code ?? '')} title={t("Réinitialiser")}>
               <RotateCcw size={16} />
             </button>
-            <button className="btn-ghost btn-sm" onClick={() => setFull((f) => !f)} title="Agrandir">
+            <button className="btn-ghost btn-sm" onClick={() => setFull((f) => !f)} title={t("Agrandir")}>
               {full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
           </div>
@@ -176,19 +177,19 @@ export default function Ide() {
             <CodeEditor value={code} onChange={setCode} language={lang} height={full ? 'calc(100vh - 320px)' : 460} diagnostics={result?.compile.diagnostics} onRun={() => !isWeb && exec(false)} />
           </Suspense>
           {isWeb ? (
-            <div className="h-80 border-t border-ink-200 dark:border-ink-800"><WebPreview html={code} title="Aperçu en direct" /></div>
+            <div className="h-80 border-t border-ink-200 dark:border-ink-800"><WebPreview html={code} title={t("Aperçu en direct")} /></div>
           ) : (
           <div className="grid border-t border-ink-200 dark:border-ink-800 md:grid-cols-[1fr_2fr]">
             <div className="flex flex-col border-b border-ink-800 bg-ink-900 md:border-b-0 md:border-r">
-              <div className="px-3 py-1.5 text-xs font-bold text-ink-400">Entrée (stdin)</div>
-              <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} className="h-44 resize-none bg-ink-900 p-3 font-mono text-xs text-ink-100 outline-none" placeholder="Données envoyées au programme…" />
+              <div className="px-3 py-1.5 text-xs font-bold text-ink-400">{t("Entrée (stdin)")}</div>
+              <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} className="h-44 resize-none bg-ink-900 p-3 font-mono text-xs text-ink-100 outline-none" placeholder={t("Données envoyées au programme…")} />
             </div>
             <div className="scrollbar-thin h-52 overflow-auto bg-ink-950 p-3 font-mono text-xs leading-5 text-ink-100">
               <div className="mb-1 flex items-center gap-1 font-bold text-ink-400">
-                <Terminal size={14} /> Console
+                <Terminal size={14} /> {t("Console")}
               </div>
               {busy && <div className="text-cyan-400">⏳ {busy === 'compile' ? 'Compilation…' : 'Compilation et exécution…'}</div>}
-              {!busy && !result && <div className="text-ink-500">Ctrl+Entrée pour exécuter.</div>}
+              {!busy && !result && <div className="text-ink-500">{t("Ctrl+Entrée pour exécuter.")}</div>}
               {!busy && result && (
                 <>
                   {result.error && !result.compile.stderr && <div className="text-rose-400">{result.error}</div>}

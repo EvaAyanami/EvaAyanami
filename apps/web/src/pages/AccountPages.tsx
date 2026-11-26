@@ -138,7 +138,7 @@ export function ForgotPassword() {
           }}
         >
           <p className="muted text-sm">{t('Saisis l’adresse de ton compte : tu recevras un lien pour choisir un nouveau mot de passe.')}</p>
-          <input className="input" type="email" required autoComplete="email" placeholder="toi@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="input" type="email" required autoComplete="email" placeholder={t("toi@exemple.fr")} value={email} onChange={(e) => setEmail(e.target.value)} />
           <Err msg={msg} />
           <button className="btn-primary w-full"><Send size={16} /> {t('Envoyer le lien')}</button>
         </form>

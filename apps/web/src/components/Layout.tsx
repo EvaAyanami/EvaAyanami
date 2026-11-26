@@ -37,7 +37,7 @@ export function Logo({ className }: { className?: string }) {
   return (
     <div className={clsx('flex items-center gap-2', className)}>
       <img src="/favicon.svg" alt="" className="h-9 w-9" />
-      <span className="bg-gradient-to-r from-brand-500 via-violet-500 to-cyan-500 bg-clip-text text-2xl font-black tracking-tight text-transparent">Codemori</span>
+      <span className="bg-gradient-to-r from-brand-500 via-violet-500 to-cyan-500 bg-clip-text text-2xl font-black tracking-tight text-transparent">{t("Codemori")}</span>
     </div>
   );
 }
@@ -50,7 +50,7 @@ function ThemeToggle() {
     return () => window.removeEventListener('cm-theme', h);
   }, []);
   return (
-    <button className="btn-ghost btn-sm" onClick={() => applyTheme(dark ? 'light' : 'dark')} aria-label="Changer de thème" title="Mode clair / sombre">
+    <button className="btn-ghost btn-sm" onClick={() => applyTheme(dark ? 'light' : 'dark')} aria-label={t("Changer de thème")} title={t("Mode clair / sombre")}>
       {dark ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
@@ -103,8 +103,8 @@ function PremiumCard() {
     );
   return (
     <NavLink to="/premium" className="group mt-3 block overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-brand-500 to-cyan-500 p-3 text-white shadow-lg">
-      <div className="flex items-center gap-2 text-sm font-black"><Crown size={16} className="transition group-hover:rotate-12 group-hover:scale-125" /> Passer à Premium</div>
-      <div className="text-xs font-bold opacity-90">Tout illimité, zéro pub</div>
+      <div className="flex items-center gap-2 text-sm font-black"><Crown size={16} className="transition group-hover:rotate-12 group-hover:scale-125" /> {t("Passer à Premium")}</div>
+      <div className="text-xs font-bold opacity-90">{t("Tout illimité, zéro pub")}</div>
     </NavLink>
   );
 }
@@ -150,7 +150,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
         </div>
         <PremiumCard />
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-ink-50 p-2 dark:bg-ink-800/60">
-          <NavLink to="/avatar" title="Mon avatar">
+          <NavLink to="/avatar" title={t("Mon avatar")}>
             <Avatar avatar={user?.avatar} size={40} ring={user?.premium ? 'premium' : 'none'} />
           </NavLink>
           <div className="min-w-0 flex-1 text-sm">
@@ -160,7 +160,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
 
           <button
             className="btn-ghost btn-sm"
-            title="Se déconnecter"
+            title={t("Se déconnecter")}
             onClick={async () => {
               await logout();
               nav('/connexion');
@@ -173,15 +173,15 @@ export default function Layout({ children }: { children?: ReactNode }) {
 
       {/* Barre supérieure */}
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-200/70 bg-white/80 px-4 py-2 backdrop-blur dark:border-ink-800 dark:bg-ink-950/80">
-        <button className="btn-ghost btn-sm lg:hidden" onClick={() => setMenu(true)} aria-label="Menu">
+        <button className="btn-ghost btn-sm lg:hidden" onClick={() => setMenu(true)} aria-label={t("Menu")}>
           <Menu size={20} />
         </button>
         <Logo className="lg:hidden [&_span]:text-xl [&_img]:h-7 [&_img]:w-7" />
         <div className="flex-1" />
-        <div className="flex items-center gap-1 rounded-2xl px-2 py-1 font-extrabold text-orange-500" title="Série quotidienne">
+        <div className="flex items-center gap-1 rounded-2xl px-2 py-1 font-extrabold text-orange-500" title={t("Série quotidienne")}>
           <Flame size={20} className={clsx(user?.streak ? 'fill-orange-400' : 'opacity-50')} /> {user?.streak ?? 0}
         </div>
-        <div className="flex items-center gap-1 rounded-2xl px-2 py-1 font-extrabold text-amber-500" title="Expérience">
+        <div className="flex items-center gap-1 rounded-2xl px-2 py-1 font-extrabold text-amber-500" title={t("Expérience")}>
           ⭐ {user?.xp ?? 0}
         </div>
         <EnergyPill />
@@ -189,7 +189,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
           <MessageCircleHeart size={20} className="text-violet-500" />
         </button>
         <ThemeToggle />
-        <NavLink to="/profil" className="ml-1 hidden sm:block" title="Mon profil">
+        <NavLink to="/profil" className="ml-1 hidden sm:block" title={t("Mon profil")}>
           <motion.div whileHover={{ scale: 1.08, rotate: -4 }}>
             <Avatar avatar={user?.avatar} size={34} ring={user?.premium ? 'premium' : 'none'} />
           </motion.div>
@@ -226,7 +226,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
                   nav('/connexion');
                 }}
               >
-                <LogOut size={16} /> Se déconnecter
+                <LogOut size={16} /> {t("Se déconnecter")}
               </button>
             </motion.aside>
           </motion.div>

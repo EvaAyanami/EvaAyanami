@@ -7,6 +7,7 @@ import { useApi } from '../lib/hooks';
 import { LANG_META } from '../lib/api';
 import { PageTitle, Loading, ErrorBox } from '../components/ui';
 import Mascot from '../components/Mascot';
+import { t } from '../lib/i18n';
 
 interface MapData {
   language: { id: string; name: string; description: string };
@@ -62,7 +63,7 @@ export default function Path() {
                     {done}/{lv.chapters.length} chapitres validés
                   </div>
                 </div>
-                {data.skillLevel === lv.level && <span className="rounded-full bg-white/25 px-3 py-1 text-xs font-black">Ton niveau</span>}
+                {data.skillLevel === lv.level && <span className="rounded-full bg-white/25 px-3 py-1 text-xs font-black">{t("Ton niveau")}</span>}
               </div>
               <div className="relative mx-auto max-w-2xl">
                 {lv.chapters.map((c, i) => {
@@ -94,7 +95,7 @@ export default function Path() {
                         <div className={clsx('card flex-1 !p-3 transition group-hover:shadow-lg', c.status === 'locked' && 'opacity-70')}>
                           <div className="flex items-center gap-2">
                             <span className="font-black">{c.title}</span>
-                            {c.status === 'skipped' && <span className="chip">passé</span>}
+                            {c.status === 'skipped' && <span className="chip">{t("passé")}</span>}
                           </div>
                           <div className="muted line-clamp-2 text-xs">{c.summary}</div>
                           <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-bold text-ink-500">

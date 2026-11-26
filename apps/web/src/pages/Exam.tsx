@@ -10,6 +10,7 @@ import { Loading, ErrorBox, MascotSays, ProgressBar, PageTitle } from '../compon
 import Exercise, { type Answer, type PublicExercise } from '../components/Exercise';
 import Markdown from '../components/Markdown';
 import Mascot from '../components/Mascot';
+import { t } from '../lib/i18n';
 
 interface ExamData {
   chapter: { slug: string; title: string; language: string; examPass: number };
@@ -66,11 +67,11 @@ export default function Exam() {
           <h1 className="text-3xl">{result.passed ? 'Examen réussi !' : 'Pas encore…'}</h1>
           <div className={clsx('mt-2 text-5xl font-black', result.passed ? 'text-emerald-500' : 'text-rose-500')}>{result.score} %</div>
           <p className="muted mt-1">Seuil de réussite : {result.pass} %</p>
-          {!result.passed && <p className="mt-3 font-semibold">Les questions manquées ont été ajoutées à tes révisions. Relis le cours, entraîne-toi, puis retente ta chance : tu vas y arriver !</p>}
-          {result.passed && !result.chapterCompleted && !result.skipped && <p className="mt-3 font-semibold">Il ne te reste plus qu’à réussir le mini-projet pour terminer le chapitre.</p>}
+          {!result.passed && <p className="mt-3 font-semibold">{t("Les questions manquées ont été ajoutées à tes révisions. Relis le cours, entraîne-toi, puis retente ta chance : tu vas y arriver !")}</p>}
+          {result.passed && !result.chapterCompleted && !result.skipped && <p className="mt-3 font-semibold">{t("Il ne te reste plus qu’à réussir le mini-projet pour terminer le chapitre.")}</p>}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link to={`/chapitre/${slug}`} className="btn-outline">
-              Retour au chapitre
+              {t("Retour au chapitre")}
             </Link>
             {!result.passed && (
               <button
@@ -82,7 +83,7 @@ export default function Exam() {
                   answers.current = {};
                 }}
               >
-                Recommencer l’examen
+                {t("Recommencer l’examen")}
               </button>
             )}
           </div>
@@ -114,10 +115,10 @@ export default function Exam() {
           <p className="mt-3 text-lg font-bold">
             {data.questions.length} questions · réussite à partir de {data.chapter.examPass} %
           </p>
-          <p className="muted mt-1">Les réponses sont corrigées à la fin. Pas d’indice pendant l’examen, mais aucune pénalité : tu peux le repasser autant de fois que nécessaire.</p>
+          <p className="muted mt-1">{t("Les réponses sont corrigées à la fin. Pas d’indice pendant l’examen, mais aucune pénalité : tu peux le repasser autant de fois que nécessaire.")}</p>
           {data.best > 0 && <p className="mt-2 font-bold">Meilleur score : {data.best} %{data.passed && ' ✔'}</p>}
           <MascotSays mood="explain" className="mt-4 justify-center text-left">
-            Concentre-toi, relis bien chaque question. Je crois en toi !
+            {t("Concentre-toi, relis bien chaque question. Je crois en toi !")}
           </MascotSays>
           <button
             className="btn-primary mt-4 px-8 py-3 text-lg"
@@ -126,7 +127,7 @@ export default function Exam() {
               t0.current = Date.now();
             }}
           >
-            Commencer l’examen
+            {t("Commencer l’examen")}
           </button>
         </div>
       </div>
@@ -151,11 +152,11 @@ export default function Exam() {
       ))}
       <div className="mt-4 flex justify-between">
         <button className="btn-outline" disabled={i === 0} onClick={() => setI(i - 1)}>
-          <ChevronLeft size={18} /> Précédente
+          <ChevronLeft size={18} /> {t("Précédente")}
         </button>
         {i < data.questions.length - 1 ? (
           <button className="btn-primary" onClick={() => setI(i + 1)}>
-            Suivante <ChevronRight size={18} />
+            {t("Suivante")} <ChevronRight size={18} />
           </button>
         ) : (
           <button className="btn-success" onClick={submit} disabled={busy}>

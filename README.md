@@ -1,17 +1,21 @@
 # Codemori
 
-**Apprendre Rust, C++ et Java, de zéro à expert — en français, avec Kiri.**
+**Apprendre la programmation et l’informatique, de zéro à expert — avec Kiri.**
 
 Codemori est une plateforme web d’apprentissage de la programmation, complète et **auto-hébergeable**. Les apprenants suivent des parcours progressifs, écrivent du vrai code dans un éditeur intégré, et ce code est **réellement compilé et exécuté** côté serveur, dans des bacs à sable Docker isolés. Kiri, la mascotte, les accompagne : elle réagit, encourage, explique les erreurs de compilation.
 
 ## En chiffres
 
-| | Rust | C++ | Java | Total |
-|---|---|---|---|---|
-| Chapitres (5 niveaux) | 54 | 54 | 55 | **163** |
-| Exercices, mini-projets et examens | | | | **≈ 1 400** |
-| Projets guidés multi-langages | | | | **22** (44 étapes, solutions dans les 3 langages) |
-| Questions du test de positionnement | 20 | 20 | 20 | **60** |
+| Piste | Type | Chapitres |
+|---|---|---|
+| Rust, C++, Java | code compilé et exécuté | 54 + 54 + 55 |
+| Python, PHP | code exécuté | 9 + 5 |
+| HTML & CSS | aperçu en direct, correction par analyse du document | 9 |
+| OpenGL, Vulkan | notions, schémas animés | 5 + 4 |
+| Hardware | notions, animations interactives | 11 |
+| **Total** | | **206 chapitres, ≈ 1 700 exercices** |
+
+Plus 22 projets guidés multi-langages, 60 questions de positionnement et 100 questions de blind test.
 
 Chaque solution de référence, chaque test caché et chaque sortie attendue est **vérifié automatiquement** par compilation et exécution réelles (`scripts/verify-content.sh`).
 
@@ -30,7 +34,11 @@ Chaque solution de référence, chaque test caché et chaque sortie attendue est
 - **Avatars** façon « Mii » dans le style de Kiri (coiffures, couleurs, tenues, accessoires) et petites scènes animées entre Kiri et ton avatar : coucou, tape-m'en cinq, fête, réconfort, trophée.
 - **Communauté** : amis avec identifiant `pseudo#1234`, profils publics, classement entre amis, **meilleur codeur de la semaine** et temple de la renommée.
 - **Premium** : offre gratuite généreuse (énergie façon Duolingo, quotas d'exécution, pubs récompensées facultatives), essai offert, **boutique de clés** (1, 2 ou 3 mois), clés à vendre aussi sur Discord, paiement Stripe (carte, Apple Pay, Google Pay), publicités AdSense rémunérées, anti-bloqueur avec une Kiri triste… puis fâchée. Badge Premium et historique sur le profil.
-- **Sécurité** : double authentification (TOTP + codes de secours), niveaux verrouillés (anti-triche).
+- **Sécurité** : double authentification (TOTP + codes de secours), vérification de l’e-mail, mot de passe oublié, connexion Google et Facebook, niveaux verrouillés (anti-triche).
+- **Flammes d’amitié** : une série partagée qui grandit chaque jour où les deux amis apprennent, avec paliers de récompenses.
+- **Blind test entre amis** : duels de culture code et hardware, et « Devine le langage » à partir d’extraits de code.
+- **FAQ** et **avis** : les apprenants signalent bugs et idées, votent, et l’équipe répond.
+- **Interface en français, anglais, allemand et espagnol.**
 - Thème clair/sombre, interface responsive, aucune ressource externe (polices embarquées).
 
 ## Démarrage rapide (production)
@@ -68,6 +76,7 @@ Des images prêtes à l’emploi sont publiées sur `ghcr.io` par la CI : colle 
 | [docs/contenu.md](docs/contenu.md) | Format des cours, exercices, projets et tests ; vérification |
 | [docs/administration.md](docs/administration.md) | Panneau d’administration et paramètres pédagogiques |
 | [docs/assistant-ia.md](docs/assistant-ia.md) | Assistant sans IA, API compatible OpenAI, Ollama |
+| [docs/comptes-et-langues.md](docs/comptes-et-langues.md) | E-mails, connexion Google/Facebook, traductions |
 | [docs/monetisation.md](docs/monetisation.md) | Premium, boutique de clés, Stripe, vente sur Discord, AdSense, 2FA |
 | [docs/developpement.md](docs/developpement.md) | Lancer le projet en local, tests, structure du code |
 

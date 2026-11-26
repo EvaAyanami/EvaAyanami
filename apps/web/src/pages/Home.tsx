@@ -8,6 +8,7 @@ import Duo from '../components/Duo';
 import { Podium, type BestCoderData } from './BestCoder';
 import { PageTitle, ProgressBar, Ring, Loading, ErrorBox, Bars, LangBadge } from '../components/ui';
 import type { Mood } from '../components/Mascot';
+import { t } from '../lib/i18n';
 
 interface Dashboard {
   user: { displayName: string; dailyGoalXp: number; xp: number };
@@ -61,9 +62,9 @@ function TrialWelcome() {
       <Crown size={32} />
       <div className="flex-1">
         <div className="font-black">Cadeau de bienvenue : {days} jours de Premium offerts !</div>
-        <div className="text-sm font-bold opacity-80">Énergie illimitée, zéro pub, IA de Kiri, avatars exclusifs… profites-en pour tout découvrir.</div>
+        <div className="text-sm font-bold opacity-80">{t("Énergie illimitée, zéro pub, IA de Kiri, avatars exclusifs… profites-en pour tout découvrir.")}</div>
       </div>
-      <button className="btn-ghost btn-sm" onClick={() => { sessionStorage.removeItem('cm-trial'); setDays(0); }}>OK</button>
+      <button className="btn-ghost btn-sm" onClick={() => { sessionStorage.removeItem('cm-trial'); setDays(0); }}>{t("OK")}</button>
     </motion.div>
   );
 }
@@ -75,10 +76,10 @@ function BestCoderWidget() {
   return (
     <Link to="/meilleur-codeur" className="card group block transition hover:shadow-lg">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="section-title flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> Meilleur codeur de la semaine</h2>
+        <h2 className="section-title flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> {t("Meilleur codeur de la semaine")}</h2>
         <span className="muted text-xs font-bold">{me ? `Tu es ${me.rank}ᵉ` : 'Gagne de l’XP pour entrer dans la course'}</span>
       </div>
-      {data.leaders.length ? <Podium leaders={data.leaders} /> : <p className="muted text-sm">La course vient de commencer !</p>}
+      {data.leaders.length ? <Podium leaders={data.leaders} /> : <p className="muted text-sm">{t("La course vient de commencer !")}</p>}
       {data.lastWinner && (
         <p className="muted mt-3 text-center text-xs font-bold">Semaine dernière : 🏆 {data.lastWinner.displayName} ({data.lastWinner.xp} XP)</p>
       )}
@@ -159,7 +160,7 @@ export default function Home() {
 
           {/* Progression par langage */}
           <div className="card">
-            <h2 className="section-title mb-3">Progression par langage</h2>
+            <h2 className="section-title mb-3">{t("Progression par langage")}</h2>
             <div className="grid gap-3 md:grid-cols-3">
               {data.languages.map((l) => (
                 <Link key={l.id} to={`/parcours/${l.id}`} className="rounded-3xl border-2 border-ink-100 p-4 transition hover:border-brand-200 dark:border-ink-800 dark:hover:border-brand-800">
@@ -190,18 +191,18 @@ export default function Home() {
 
           <div className="card">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="section-title">Activité des 30 derniers jours</h2>
+              <h2 className="section-title">{t("Activité des 30 derniers jours")}</h2>
               <Link to="/statistiques" className="text-sm font-bold text-brand-500">
-                Statistiques →
+                {t("Statistiques →")}
               </Link>
             </div>
             <Bars data={days} label={(v) => `${v} XP`} />
           </div>
 
           <div className="card">
-            <h2 className="section-title mb-3">Dernières activités</h2>
+            <h2 className="section-title mb-3">{t("Dernières activités")}</h2>
             {data.recent.length === 0 ? (
-              <p className="muted text-sm">Aucune activité pour l’instant. Lance-toi dans ton premier chapitre !</p>
+              <p className="muted text-sm">{t("Aucune activité pour l’instant. Lance-toi dans ton premier chapitre !")}</p>
             ) : (
               <ul className="space-y-2">
                 {data.recent.map((r, i) => (
@@ -221,7 +222,7 @@ export default function Home() {
           <div className="card">
             <div className="flex items-center gap-2">
               <Target className="text-brand-500" />
-              <h2 className="section-title">Objectif du jour</h2>
+              <h2 className="section-title">{t("Objectif du jour")}</h2>
             </div>
             <div className="mt-3 flex items-center gap-4">
               <Ring value={data.daily.xp / data.daily.goal} size={84} stroke={10} color={goalDone ? '#10b981' : '#3b6cf6'}>
@@ -247,7 +248,7 @@ export default function Home() {
               <RotateCcw />
             </div>
             <div className="flex-1">
-              <div className="font-black">Révisions</div>
+              <div className="font-black">{t("Révisions")}</div>
               <div className="muted text-sm">{data.reviewsDue ? `${data.reviewsDue} à faire maintenant` : 'Rien à réviser pour le moment'}</div>
             </div>
             <ArrowRight className="text-ink-400" />
@@ -256,7 +257,7 @@ export default function Home() {
           <div className="card">
             <div className="mb-3 flex items-center gap-2">
               <Swords className="text-violet-500" />
-              <h2 className="section-title">Défis de la semaine</h2>
+              <h2 className="section-title">{t("Défis de la semaine")}</h2>
             </div>
             <div className="space-y-3">
               {data.challenges.map((c) => (
@@ -280,10 +281,10 @@ export default function Home() {
           <div className="card">
             <div className="mb-3 flex items-center gap-2">
               <AlertTriangle className="text-amber-500" />
-              <h2 className="section-title">Points faibles</h2>
+              <h2 className="section-title">{t("Points faibles")}</h2>
             </div>
             {data.weakPoints.length === 0 ? (
-              <p className="muted text-sm">Pas encore assez de données. Continue à t’entraîner !</p>
+              <p className="muted text-sm">{t("Pas encore assez de données. Continue à t’entraîner !")}</p>
             ) : (
               <ul className="space-y-2">
                 {data.weakPoints.map((w) => (
@@ -297,7 +298,7 @@ export default function Home() {
             )}
             {data.weakPoints.length > 0 && (
               <Link to="/revisions" className="btn-outline btn-sm mt-3 w-full">
-                Réviser mes points faibles
+                {t("Réviser mes points faibles")}
               </Link>
             )}
           </div>

@@ -9,6 +9,7 @@ import { useFeedback } from '../lib/feedback';
 import { PremiumBadge } from '../lib/plan';
 import { PageTitle, Loading, Empty } from '../components/ui';
 import Avatar, { type AvatarData } from '../components/Avatar';
+import { t } from '../lib/i18n';
 
 interface Card {
   id: string; friendshipId: string; tag: string; displayName: string; xp: number; level: number; streak: number; online: boolean;
@@ -30,7 +31,7 @@ export function FlameBadge({ flame }: { flame: NonNullable<Card['flame']> }) {
   const out = flame.status === 'out';
   const size = Math.min(1.5, 1 + flame.flame / 60);
   return (
-    <div className="flex flex-col items-center" title={FLAME_TEXT[flame.status]}>
+    <div className="flex flex-col items-center" title={t(FLAME_TEXT[flame.status])}>
       <motion.div
         animate={out ? { opacity: 0.35, scale: 0.9 } : lit ? { scale: [size, size * 1.12, size], rotate: [0, -4, 4, 0] } : { scale: [size * 0.95, size, size * 0.95] }}
         transition={{ duration: lit ? 1.4 : 2.2, repeat: out ? 0 : Infinity }}
@@ -118,26 +119,26 @@ export default function Friends() {
   if (!data) return <Loading />;
   return (
     <div>
-      <PageTitle title="Amis" subtitle="Apprenez ensemble, comparez vos séries et motivez-vous chaque semaine." />
+      <PageTitle title={t("Amis")} subtitle="Apprenez ensemble, comparez vos séries et motivez-vous chaque semaine." />
       <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
         <div className="space-y-5">
           <form onSubmit={add} className="card">
-            <h2 className="section-title mb-1 flex items-center gap-2"><UserPlus size={20} /> Ajouter un ami</h2>
+            <h2 className="section-title mb-1 flex items-center gap-2"><UserPlus size={20} /> {t("Ajouter un ami")}</h2>
             <p className="muted mb-3 text-sm">
               Ton identifiant :{' '}
-              <button type="button" className="font-mono font-black text-brand-500" onClick={() => navigator.clipboard?.writeText(data.me.tag).then(() => toast('Identifiant copié', 'success'))}>
+              <button type="button" className="font-mono font-black text-brand-500" onClick={() => navigator.clipboard?.writeText(data.me.tag).then(() => toast(t('Identifiant copié'), 'success'))}>
                 {data.me.tag} <Copy size={12} className="inline" />
               </button>
             </p>
             <div className="flex gap-2">
-              <input className="input font-mono" placeholder="pseudo#1234" value={tag} onChange={(e) => setTag(e.target.value)} />
-              <button className="btn-primary shrink-0" disabled={busy || !/#\d{4}$/.test(tag.trim())}>Envoyer</button>
+              <input className="input font-mono" placeholder={t("pseudo#1234")} value={tag} onChange={(e) => setTag(e.target.value)} />
+              <button className="btn-primary shrink-0" disabled={busy || !/#\d{4}$/.test(tag.trim())}>{t("Envoyer")}</button>
             </div>
           </form>
 
           {data.incoming.length > 0 && (
             <div className="card">
-              <h2 className="section-title mb-3">Demandes reçues <span className="chip bg-rose-500 text-white">{data.incoming.length}</span></h2>
+              <h2 className="section-title mb-3">{t("Demandes reçues")} <span className="chip bg-rose-500 text-white">{data.incoming.length}</span></h2>
               <div className="space-y-2">
                 <AnimatePresence>
                   {data.incoming.map((u) => (
@@ -154,7 +155,7 @@ export default function Friends() {
           <div className="card">
             <h2 className="section-title mb-3 flex items-center gap-2"><Users size={20} /> Mes amis ({data.friends.length})</h2>
             {!data.friends.length ? (
-              <Empty title="Pas encore d’amis" text="Partage ton identifiant pseudo#1234 pour que tes amis t’ajoutent." />
+              <Empty title={t("Pas encore d’amis")} text="Partage ton identifiant pseudo#1234 pour que tes amis t’ajoutent." />
             ) : (
               <div className="space-y-2">
                 <AnimatePresence>
@@ -162,12 +163,12 @@ export default function Friends() {
                     <UserLine key={u.friendshipId} u={u}>
                       {u.flame && (
                         <div className="hidden text-right text-[11px] font-bold leading-tight text-ink-500 md:block md:w-40">
-                          {FLAME_TEXT[u.flame.status]}
+                          {t(FLAME_TEXT[u.flame.status])}
                           {u.flame.next && <div className="text-ink-400">prochain palier : {u.flame.next.days} j « {u.flame.next.title} »</div>}
                         </div>
                       )}
                       {u.flame && <FlameBadge flame={u.flame} />}
-                      <button className="btn-ghost btn-sm" title="Retirer" onClick={() => confirm(`Retirer ${u.displayName} de tes amis ?`) && act(`/friends/${u.friendshipId}`, 'DELETE', 'Ami retiré')}>
+                      <button className="btn-ghost btn-sm" title={t("Retirer")} onClick={() => confirm(`Retirer ${u.displayName} de tes amis ?`) && act(`/friends/${u.friendshipId}`, 'DELETE', 'Ami retiré')}>
                         <X size={16} />
                       </button>
                     </UserLine>
@@ -179,11 +180,11 @@ export default function Friends() {
 
           {data.outgoing.length > 0 && (
             <div className="card">
-              <h2 className="section-title mb-3">Demandes envoyées</h2>
+              <h2 className="section-title mb-3">{t("Demandes envoyées")}</h2>
               <div className="space-y-2">
                 {data.outgoing.map((u) => (
                   <UserLine key={u.friendshipId} u={u}>
-                    <button className="btn-ghost btn-sm" onClick={() => act(`/friends/${u.friendshipId}`, 'DELETE', 'Demande annulée')}>Annuler</button>
+                    <button className="btn-ghost btn-sm" onClick={() => act(`/friends/${u.friendshipId}`, 'DELETE', 'Demande annulée')}>{t("Annuler")}</button>
                   </UserLine>
                 ))}
               </div>
@@ -193,8 +194,8 @@ export default function Friends() {
 
         <div className="space-y-5 self-start">
         <div className="card">
-          <h2 className="section-title mb-1">🔥 Flammes d’amitié</h2>
-          <p className="muted mb-2 text-sm">Chaque jour où ton ami et toi réussissez au moins un exercice, votre flamme grandit. Des paliers vous rapportent de l’XP à tous les deux.</p>
+          <h2 className="section-title mb-1">{t("🔥 Flammes d’amitié")}</h2>
+          <p className="muted mb-2 text-sm">{t("Chaque jour où ton ami et toi réussissez au moins un exercice, votre flamme grandit. Des paliers vous rapportent de l’XP à tous les deux.")}</p>
           <div className="grid grid-cols-4 gap-1 text-center text-[11px] font-bold">
             {(data.milestones ?? []).map((m) => (
               <div key={m.days} className="rounded-xl bg-orange-50 p-1.5 dark:bg-orange-950/20">
@@ -206,7 +207,7 @@ export default function Friends() {
           </div>
         </div>
         <div className="card">
-          <h2 className="section-title mb-3 flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> Entre amis, cette semaine</h2>
+          <h2 className="section-title mb-3 flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> {t("Entre amis, cette semaine")}</h2>
           <div className="space-y-1">
             {data.ranking.map((r, i) => (
               <motion.div key={r.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className={clsx('flex items-center gap-2 rounded-2xl px-3 py-2', r.me && 'bg-brand-50 ring-2 ring-brand-200 dark:bg-brand-900/30 dark:ring-brand-800')}>
@@ -216,7 +217,7 @@ export default function Friends() {
               </motion.div>
             ))}
           </div>
-          <Link to="/meilleur-codeur" className="btn-outline btn-sm mt-3 w-full">Classement général de la semaine</Link>
+          <Link to="/meilleur-codeur" className="btn-outline btn-sm mt-3 w-full">{t("Classement général de la semaine")}</Link>
         </div>
         </div>
       </div>

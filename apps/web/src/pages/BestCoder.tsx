@@ -7,6 +7,7 @@ import { useNow, countdown } from '../lib/plan';
 import { PageTitle, Loading, Empty } from '../components/ui';
 import Avatar, { type AvatarData } from '../components/Avatar';
 import Duo from '../components/Duo';
+import { t } from '../lib/i18n';
 
 interface Entry { id: string; tag: string; displayName: string; level: number; avatar: AvatarData; premium: boolean; xp: number; rank?: number; me?: boolean; weekKey?: string }
 export interface BestCoderData { week: string; endsAt: string; bonusXp: number; optIn: boolean; leaders: Entry[]; lastWinner: Entry | null; hallOfFame: Entry[] }
@@ -47,19 +48,19 @@ export default function BestCoder() {
   if (!data) return <Loading />;
   return (
     <div>
-      <PageTitle title="Meilleur codeur de la semaine" subtitle={`Celui ou celle qui gagne le plus d’XP du lundi au dimanche remporte le titre et +${data.bonusXp} XP.`}>
+      <PageTitle title={t("Meilleur codeur de la semaine")} subtitle={`Celui ou celle qui gagne le plus d’XP du lundi au dimanche remporte le titre et +${data.bonusXp} XP.`}>
         <span className="chip"><Clock size={14} /> Fin dans {countdown(data.endsAt, now)}</span>
       </PageTitle>
 
       {!data.optIn && (
         <div className="mb-4 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-          Tu n’apparais pas dans le classement. Active « Apparaître dans le classement » dans ton <Link to="/profil" className="underline">profil</Link> pour participer.
+          {t("Tu n’apparais pas dans le classement. Active « Apparaître dans le classement » dans ton")} <Link to="/profil" className="underline">profil</Link> {t("pour participer.")}
         </div>
       )}
 
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         <div className="card">
-          <h2 className="section-title mb-4 flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> Semaine en cours</h2>
+          <h2 className="section-title mb-4 flex items-center gap-2"><Trophy size={20} className="text-amber-500" /> {t("Semaine en cours")}</h2>
           {data.leaders.length ? (
             <>
               <Podium leaders={data.leaders} />
@@ -77,21 +78,21 @@ export default function BestCoder() {
               </div>
             </>
           ) : (
-            <Empty title="La course commence !" text="Personne n’a encore gagné d’XP cette semaine : c’est le moment de prendre la tête." />
+            <Empty title={t("La course commence !")} text="Personne n’a encore gagné d’XP cette semaine : c’est le moment de prendre la tête." />
           )}
         </div>
 
         <div className="space-y-5">
           {data.lastWinner && (
             <div className="card premium-shine bg-gradient-to-br from-amber-50 to-white text-center dark:from-amber-950/30 dark:to-ink-900">
-              <div className="muted text-xs font-black uppercase tracking-wider">Vainqueur de la semaine dernière</div>
+              <div className="muted text-xs font-black uppercase tracking-wider">{t("Vainqueur de la semaine dernière")}</div>
               <Duo scene="trophy" size={90} avatar={data.lastWinner.avatar} />
               <Link to={`/u/${encodeURIComponent(data.lastWinner.tag)}`} className="text-xl font-black">{data.lastWinner.displayName}</Link>
               <div className="font-black text-amber-500">{data.lastWinner.xp} XP</div>
             </div>
           )}
           <div className="card">
-            <h2 className="section-title mb-3 flex items-center gap-2"><Crown size={18} className="text-amber-500" /> Temple de la renommée</h2>
+            <h2 className="section-title mb-3 flex items-center gap-2"><Crown size={18} className="text-amber-500" /> {t("Temple de la renommée")}</h2>
             {data.hallOfFame.length ? (
               data.hallOfFame.map((w) => (
                 <Link key={w.weekKey} to={`/u/${encodeURIComponent(w.tag)}`} className="flex items-center gap-2 rounded-2xl px-2 py-1.5 hover:bg-ink-50 dark:hover:bg-ink-800">
@@ -101,7 +102,7 @@ export default function BestCoder() {
                 </Link>
               ))
             ) : (
-              <p className="muted text-sm">Le premier titre sera décerné à la fin de la semaine.</p>
+              <p className="muted text-sm">{t("Le premier titre sera décerné à la fin de la semaine.")}</p>
             )}
           </div>
         </div>

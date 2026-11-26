@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/api';
 import { useFeedback } from '../lib/feedback';
 import Mascot from './Mascot';
 import Markdown from './Markdown';
+import { t } from '../lib/i18n';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -71,7 +72,7 @@ export default function Assistant() {
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((o) => !o)}
         className="fixed bottom-20 right-4 z-40 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-gradient-to-br from-brand-400 to-violet-500 shadow-xl dark:border-ink-800 lg:bottom-6"
-        aria-label="Ouvrir l’assistante Kiri"
+        aria-label={t("Ouvrir l’assistante Kiri")}
       >
         <div className="mt-10">
           <Mascot mood="happy" size={72} animate={false} />
@@ -90,21 +91,21 @@ export default function Assistant() {
                 <Mascot mood={busy ? 'thinking' : 'explain'} size={52} animate={false} />
               </div>
               <div className="flex-1">
-                <div className="font-black">Kiri</div>
+                <div className="font-black">{t("Kiri")}</div>
                 <div className="text-xs opacity-90">
                   {ai ? (
                     <span className="flex items-center gap-1">
-                      <Sparkles size={12} /> Assistante IA
+                      <Sparkles size={12} /> {t("Assistante IA")}
                     </span>
                   ) : premiumOnly ? (
-                    <Link to="/premium" className="underline">Assistante pédagogique · IA avec Premium 👑</Link>
+                    <Link to="/premium" className="underline">{t("Assistante pédagogique · IA avec Premium 👑")}</Link>
                   ) : (
                     'Assistante pédagogique'
                   )}
                   {assistant.label ? ` · ${assistant.label}` : ''}
                 </div>
               </div>
-              <button className="rounded-xl p-1.5 hover:bg-white/20" onClick={() => setOpen(false)} aria-label="Fermer">
+              <button className="rounded-xl p-1.5 hover:bg-white/20" onClick={() => setOpen(false)} aria-label={t("Fermer")}>
                 <X size={18} />
               </button>
             </div>
@@ -118,7 +119,7 @@ export default function Assistant() {
               ))}
               {busy && (
                 <div className="flex items-center gap-2 text-sm text-ink-400">
-                  <Loader2 size={14} className="animate-spin" /> Kiri réfléchit…
+                  <Loader2 size={14} className="animate-spin" /> {t("Kiri réfléchit…")}
                 </div>
               )}
               <div ref={bottom} />
@@ -149,10 +150,10 @@ export default function Assistant() {
                   }
                 }}
                 rows={1}
-                placeholder="Écris ta question…"
+                placeholder={t("Écris ta question…")}
                 className="input max-h-32 min-h-[44px] resize-none py-2 text-sm"
               />
-              <button className="btn-primary px-3" disabled={busy || !input.trim()} aria-label="Envoyer">
+              <button className="btn-primary px-3" disabled={busy || !input.trim()} aria-label={t("Envoyer")}>
                 <Send size={18} />
               </button>
             </form>

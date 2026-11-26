@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import clsx from 'clsx';
 import { Check, ChevronRight, Loader2 } from 'lucide-react';
-import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES, levelName } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useFeedback, type Rewards } from '../lib/feedback';
 import Mascot from '../components/Mascot';
 import { MascotSays, ProgressBar } from '../components/ui';
 import Exercise, { type Answer, type PublicExercise } from '../components/Exercise';
 import { Logo } from '../components/Layout';
+import { t } from '../lib/i18n';
 
 interface Q {
   id: string;
@@ -106,14 +107,14 @@ export default function Onboarding() {
               <Mascot mood="happy" size={200} />
               <h1 className="mt-4 text-3xl">Bienvenue{user ? `, ${user.displayName}` : ''} !</h1>
               <p className="muted mt-2 max-w-lg text-lg">
-                Je suis <b className="text-brand-500">Kiri</b>, ton accompagnatrice. Avant de commencer, faisons connaissance : quelques questions sur ton expérience, puis un petit test qui s’adapte à tes réponses. Ainsi, tu ne perdras pas de temps sur ce que tu sais déjà !
+                {t("Je suis")} <b className="text-brand-500">{t("Kiri")}</b>, ton accompagnatrice. Avant de commencer, faisons connaissance : quelques questions sur ton expérience, puis un petit test qui s’adapte à tes réponses. Ainsi, tu ne perdras pas de temps sur ce que tu sais déjà !
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <button className="btn-primary px-6 py-3 text-lg" onClick={() => setStep('questionnaire')}>
-                  C’est parti ! <ChevronRight />
+                  {t("C’est parti !")} <ChevronRight />
                 </button>
                 <button className="btn-outline px-6 py-3" onClick={startFromZero}>
-                  Je débute complètement
+                  {t("Je débute complètement")}
                 </button>
               </div>
             </motion.div>
@@ -147,10 +148,10 @@ export default function Onboarding() {
                   );
                 })}
               </div>
-              {q.type === 'multi' && <p className="muted mt-2 text-sm">Plusieurs choix possibles. Aucun ? Choisis « Autre » ou passe.</p>}
+              {q.type === 'multi' && <p className="muted mt-2 text-sm">{t("Plusieurs choix possibles. Aucun ? Choisis « Autre » ou passe.")}</p>}
               <div className="mt-6 flex justify-between">
                 <button className="btn-ghost" onClick={() => (qi ? setQi(qi - 1) : setStep('welcome'))}>
-                  Retour
+                  {t("Retour")}
                 </button>
                 <button
                   className="btn-primary px-6"
@@ -166,7 +167,7 @@ export default function Onboarding() {
           {step === 'choose' && (
             <motion.div key="c" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
               <MascotSays mood="happy" size={110}>
-                Merci ! Maintenant, un petit test adaptatif : les questions deviennent plus difficiles quand tu réussis, plus simples sinon. Choisis les langages à évaluer.
+                {t("Merci ! Maintenant, un petit test adaptatif : les questions deviennent plus difficiles quand tu réussis, plus simples sinon. Choisis les langages à évaluer.")}
               </MascotSays>
               <div className="grid gap-3 sm:grid-cols-3">
                 {Object.entries(LANG_META).map(([id, m]) => {
@@ -175,7 +176,7 @@ export default function Onboarding() {
                     <button key={id} onClick={() => setLangs((l) => (on ? l.filter((x) => x !== id) : [...l, id]))} className={clsx('card text-left transition', on ? 'ring-4 ring-brand-300' : 'opacity-60')}>
                       <div className={`mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl ${m.gradient}`}>{m.icon}</div>
                       <div className="text-lg font-black">{m.name}</div>
-                      <div className="muted text-sm">Départ estimé : {LEVEL_NAMES[startLevels[id] ?? 1]}</div>
+                      <div className="muted text-sm">Départ estimé : {levelName(startLevels[id] ?? 1)}</div>
                     </button>
                   );
                 })}
@@ -185,7 +186,7 @@ export default function Onboarding() {
                   {busy ? <Loader2 className="animate-spin" /> : null} Lancer le test
                 </button>
                 <button className="btn-outline" onClick={startFromZero}>
-                  Passer et commencer de zéro
+                  {t("Passer et commencer de zéro")}
                 </button>
               </div>
             </motion.div>
@@ -214,7 +215,7 @@ export default function Onboarding() {
               </AnimatePresence>
               <div className="flex justify-between">
                 <button className="btn-ghost" disabled={busy || !!feedback} onClick={() => submitAnswer({})}>
-                  Je ne sais pas
+                  {t("Je ne sais pas")}
                 </button>
                 <button className="btn-primary px-6" disabled={busy || !!feedback} onClick={() => submitAnswer()}>
                   {busy ? <Loader2 className="animate-spin" size={18} /> : null} Valider
@@ -226,8 +227,8 @@ export default function Onboarding() {
           {step === 'result' && result && (
             <motion.div key="r" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card p-8 text-center">
               <Mascot mood="celebrate" size={170} />
-              <h1 className="mt-2 text-3xl">Ton profil de compétences</h1>
-              <p className="muted">Un niveau distinct pour chaque langage. Tu pourras le modifier à tout moment dans ton profil.</p>
+              <h1 className="mt-2 text-3xl">{t("Ton profil de compétences")}</h1>
+              <p className="muted">{t("Un niveau distinct pour chaque langage, qui progresse avec les examens réussis.")}</p>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {Object.entries(result).map(([l, r]) => (
                   <div key={l} className="rounded-3xl bg-ink-50 p-4 dark:bg-ink-800">
@@ -240,7 +241,7 @@ export default function Onboarding() {
                   </div>
                 ))}
               </div>
-              <p className="muted mt-4 text-sm">Les chapitres des niveaux inférieurs sont marqués comme « passés » : tu peux toujours les ouvrir pour réviser.</p>
+              <p className="muted mt-4 text-sm">{t("Les chapitres des niveaux inférieurs sont marqués comme « passés » : tu peux toujours les ouvrir pour réviser.")}</p>
               <button
                 className="btn-primary mt-6 px-8 py-3 text-lg"
                 onClick={async () => {
@@ -248,7 +249,7 @@ export default function Onboarding() {
                   nav('/apprendre');
                 }}
               >
-                Découvrir mes parcours <ChevronRight />
+                {t("Découvrir mes parcours")} <ChevronRight />
               </button>
             </motion.div>
           )}

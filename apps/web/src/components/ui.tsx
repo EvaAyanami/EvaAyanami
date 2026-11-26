@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 import Mascot, { type Mood } from './Mascot';
+import { t } from '../lib/i18n';
 
 export function PageTitle({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
   useEffect(() => {
@@ -69,7 +70,7 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
       <p className="mt-3 font-bold">{message}</p>
       {onRetry && (
         <button className="btn-outline mt-4" onClick={onRetry}>
-          Réessayer
+          {t("Réessayer")}
         </button>
       )}
     </div>
@@ -108,7 +109,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
           >
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xl">{title}</h2>
-              <button className="btn-ghost btn-sm" onClick={onClose} aria-label="Fermer">
+              <button className="btn-ghost btn-sm" onClick={onClose} aria-label={t("Fermer")}>
                 <X size={18} />
               </button>
             </div>

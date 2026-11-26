@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useApi } from '../lib/hooks';
-import { CATEGORY_LABEL, langMeta, LEVEL_NAMES } from '../lib/api';
+import { CATEGORY_LABEL, langMeta, LEVEL_NAMES, levelName } from '../lib/api';
 import { PageTitle, ProgressBar, Loading, ErrorBox, MascotSays } from '../components/ui';
+import { t } from '../lib/i18n';
 
 interface Lang {
   id: string;
@@ -69,17 +70,17 @@ export default function Learn() {
   if (error || !data) return <ErrorBox message={error ?? 'Erreur'} onRetry={reload} />;
   return (
     <div>
-      <PageTitle title="Apprendre" subtitle="Des parcours indépendants, de débutant absolu à expert. Ton niveau est suivi séparément pour chaque piste." />
+      <PageTitle title={t("Apprendre")} subtitle={t("Des parcours indépendants, de débutant absolu à expert. Ton niveau est suivi séparément pour chaque piste.")} />
       <MascotSays mood="explain" className="mb-6">
-        Choisis un parcours ! Chaque chapitre contient un cours, des exercices interactifs, un mini-projet et un examen de validation.
+        {t("Choisis un parcours ! Chaque chapitre contient un cours, des exercices interactifs, un mini-projet et un examen de validation.")}
       </MascotSays>
       {(['code', 'web', 'graphics', 'hardware'] as const).map((cat) => {
         const list = data.filter((l) => (l.category ?? 'code') === cat);
         if (!list.length) return null;
         return (
           <section key={cat} className="mb-8">
-            <h2 className="text-xl font-black text-ink-900 dark:text-white">{CATEGORY_LABEL[cat].title}</h2>
-            <p className="muted mb-3 text-sm">{CATEGORY_LABEL[cat].subtitle}</p>
+            <h2 className="text-xl font-black text-ink-900 dark:text-white">{t(CATEGORY_LABEL[cat].title)}</h2>
+            <p className="muted mb-3 text-sm">{t(CATEGORY_LABEL[cat].subtitle)}</p>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {list.map((l, i) => {
           const m = langMeta(l.id);
@@ -88,7 +89,7 @@ export default function Learn() {
               <div className={`bg-gradient-to-br ${m.gradient} px-5 pb-2 pt-5 text-white`}>
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black">{l.name}</h2>
-                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">{l.runtime === 'none' ? 'Notions' : l.version}</span>
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">{l.runtime === 'none' ? t('Notions') : l.version}</span>
                 </div>
                 <LangArt id={l.id} />
               </div>
@@ -96,7 +97,7 @@ export default function Learn() {
                 <p className="font-extrabold">{l.tagline}</p>
                 <p className="muted mt-1 flex-1 text-sm">{l.description}</p>
                 <div className="mt-4 text-sm font-bold">
-                  Ton niveau : <span className="text-brand-500">{LEVEL_NAMES[l.skillLevel]}</span>
+                  {t("Ton niveau :")} <span className="text-brand-500">{levelName(l.skillLevel)}</span>
                 </div>
                 <ProgressBar value={l.progress} className="mt-2" />
                 <div className="muted mt-1 text-xs font-bold">
@@ -105,11 +106,11 @@ export default function Learn() {
                 <div className="mt-4 flex gap-2">
                   {l.next && (
                     <Link to={`/chapitre/${l.next.slug}`} className="btn-primary flex-1">
-                      Continuer
+                      {t("Continuer")}
                     </Link>
                   )}
                   <Link to={`/parcours/${l.id}`} className="btn-outline flex-1">
-                    Parcours <ArrowRight size={16} />
+                    {t("Parcours")} <ArrowRight size={16} />
                   </Link>
                 </div>
               </div>

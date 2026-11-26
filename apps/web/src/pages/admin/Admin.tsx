@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { Users, BookOpen, Trophy, Settings, AlertOctagon, Database, LayoutDashboard, FolderKanban, Plus, Save, Trash2, PlayCircle, ChevronLeft, Download, Upload, Crown, MessageSquareHeart } from 'lucide-react';
-import { api, ApiError, LANG_META, LEVEL_NAMES, TYPE_LABEL } from '../../lib/api';
+import { api, ApiError, LANG_META, LEVEL_NAMES, levelName, TYPE_LABEL } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { useFeedback } from '../../lib/feedback';
 import { PageTitle, Loading, ErrorBox, Bars, Modal } from '../../components/ui';
@@ -185,7 +185,7 @@ function Chapters() {
       </div>
       {[1, 2, 3, 4, 5].map((lv) => (
         <div key={lv} className="mb-4">
-          <h3 className="mb-1 text-sm font-black text-ink-500">{lv}. {LEVEL_NAMES[lv]}</h3>
+          <h3 className="mb-1 text-sm font-black text-ink-500">{lv}. {levelName(lv)}</h3>
           {data?.filter((c) => c.level === lv).map((c) => (
             <button key={c.id} onClick={() => nav(`/admin/cours/${c.id}`)} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-ink-50 dark:hover:bg-ink-800">
               <span className="w-6 text-ink-400">{c.order + 1}</span>
@@ -280,7 +280,7 @@ function ChapterEditor() {
         </div>
         <div><label className="label">Résumé</label><textarea className="input" rows={2} value={ch.summary} onChange={(e) => setCh({ ...ch, summary: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <div><label className="label">Niveau</label><select className="input" value={ch.level} onChange={(e) => setCh({ ...ch, level: e.target.value })}>{[1, 2, 3, 4, 5].map((l) => <option key={l} value={l}>{l} — {LEVEL_NAMES[l]}</option>)}</select></div>
+          <div><label className="label">Niveau</label><select className="input" value={ch.level} onChange={(e) => setCh({ ...ch, level: e.target.value })}>{[1, 2, 3, 4, 5].map((l) => <option key={l} value={l}>{l} — {levelName(l)}</option>)}</select></div>
           <div><label className="label">Ordre</label><input type="number" className="input" value={ch.order} onChange={(e) => setCh({ ...ch, order: e.target.value })} /></div>
           <div><label className="label">Durée (min)</label><input type="number" className="input" value={ch.minutes} onChange={(e) => setCh({ ...ch, minutes: e.target.value })} /></div>
           <div><label className="label">Seuil examen (%)</label><input type="number" className="input" value={ch.examPass} onChange={(e) => setCh({ ...ch, examPass: e.target.value })} /></div>
@@ -362,7 +362,7 @@ function ProjectsTab() {
       {data?.map((p) => (
         <div key={p.id} className="card">
           <div className="flex items-center gap-2">
-            <span className="chip">{LEVEL_NAMES[p.level]}</span>
+            <span className="chip">{levelName(p.level)}</span>
             <h3 className="flex-1 font-black">{p.title}</h3>
             {!p.published && <span className="chip">masqué</span>}
             <button className="btn-outline btn-sm" onClick={() => setEdit({ id: p.id, kind: 'project', json: JSON.stringify({ title: p.title, summary: p.summary, description: p.description, objectives: p.objectives, constraints: p.constraints, published: p.published, level: p.level }, null, 2) })}>Modifier</button>

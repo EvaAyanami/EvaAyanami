@@ -10,6 +10,7 @@ import { api, ApiError } from './api';
 import { useAuth } from './auth';
 import { Modal } from '../components/ui';
 import Mascot, { type Mood } from '../components/Mascot';
+import { t } from './i18n';
 
 export interface Plan {
   enabled: boolean;
@@ -233,7 +234,7 @@ export function EnergyPill() {
   if (!plan || !plan.enabled) return null;
   if (plan.unlimited)
     return (
-      <Link to="/premium" className="flex items-center gap-1 rounded-2xl px-2 py-1 font-extrabold text-violet-500" title="Énergie illimitée">
+      <Link to="/premium" className="flex items-center gap-1 rounded-2xl px-2 py-1 font-extrabold text-violet-500" title={t("Énergie illimitée")}>
         <Zap size={18} className="fill-violet-400" /> <InfinityIcon size={18} />
       </Link>
     );
@@ -257,12 +258,12 @@ export function PremiumBadge({ kind, size = 'sm' }: { kind: 'premium' | 'former'
   if (!kind) return null;
   const big = size === 'md';
   return kind === 'premium' ? (
-    <span className={`premium-shine inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 font-black text-amber-900 shadow-sm ${big ? 'px-3 py-1 text-sm' : 'px-2 py-0.5 text-[11px]'}`} title="Membre Premium">
-      <Crown size={big ? 15 : 12} /> Premium
+    <span className={`premium-shine inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 font-black text-amber-900 shadow-sm ${big ? 'px-3 py-1 text-sm' : 'px-2 py-0.5 text-[11px]'}`} title={t("Membre Premium")}>
+      <Crown size={big ? 15 : 12} /> {t("Premium")}
     </span>
   ) : (
-    <span className={`inline-flex items-center gap-1 rounded-full bg-ink-100 font-black text-ink-500 dark:bg-ink-800 dark:text-ink-300 ${big ? 'px-3 py-1 text-sm' : 'px-2 py-0.5 text-[11px]'}`} title="A déjà été Premium">
-      <Crown size={big ? 15 : 12} /> Ancien Premium
+    <span className={`inline-flex items-center gap-1 rounded-full bg-ink-100 font-black text-ink-500 dark:bg-ink-800 dark:text-ink-300 ${big ? 'px-3 py-1 text-sm' : 'px-2 py-0.5 text-[11px]'}`} title={t("A déjà été Premium")}>
+      <Crown size={big ? 15 : 12} /> {t("Ancien Premium")}
     </span>
   );
 }
@@ -274,7 +275,7 @@ export function FreeBanner() {
   if (plan.ads.slotBanner && plan.ads.client && !adBlocked)
     return (
       <div className="card mt-8 !p-2">
-        <div className="muted mb-1 text-center text-[10px] font-bold uppercase tracking-wider">Publicité · finance Codemori</div>
+        <div className="muted mb-1 text-center text-[10px] font-bold uppercase tracking-wider">{t("Publicité · finance Codemori")}</div>
         <AdSenseUnit client={plan.ads.client} slot={plan.ads.slotBanner} format="horizontal" />
       </div>
     );
@@ -282,10 +283,10 @@ export function FreeBanner() {
     <Link to="/premium" className="group mt-8 flex items-center gap-3 overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 via-brand-500 to-cyan-500 p-4 text-white shadow-lg transition hover:shadow-xl lg:mr-20">
       <Mascot mood="happy" size={56} crown />
       <div className="flex-1">
-        <div className="font-black">Envie d’aller plus loin ?</div>
+        <div className="font-black">{t("Envie d’aller plus loin ?")}</div>
         <div className="text-sm opacity-90">Énergie illimitée, zéro pub, IA de Kiri, protection de série… dès {plan.priceLabel}.</div>
       </div>
-      <span className="rounded-2xl bg-white/20 px-3 py-2 font-black transition group-hover:bg-white/30">Découvrir</span>
+      <span className="rounded-2xl bg-white/20 px-3 py-2 font-black transition group-hover:bg-white/30">{t("Découvrir")}</span>
     </Link>
   );
 }
@@ -298,7 +299,7 @@ function LimitModal({ limit, plan, onClose, onAd }: { limit: { code: LimitCode; 
   const nav = useNavigate();
   const now = useNow();
   const code = limit?.code;
-  const title = code === 'RUN_QUOTA' ? 'Exécutions du jour épuisées' : code === 'PREMIUM_ONLY' ? 'Réservé aux membres Premium' : plan && plan.energy > 0 ? 'Ton énergie' : "Plus d'énergie !";
+  const title = t(code === 'RUN_QUOTA' ? 'Exécutions du jour épuisées' : code === 'PREMIUM_ONLY' ? 'Réservé aux membres Premium' : plan && plan.energy > 0 ? 'Ton énergie' : "Plus d'énergie !");
   const go = (to: string) => {
     onClose();
     nav(to);
@@ -320,14 +321,14 @@ function LimitModal({ limit, plan, onClose, onAd }: { limit: { code: LimitCode; 
                     ))}
                   </div>
                   <p className="text-sm font-semibold">
-                    {plan.energy > 0 ? 'Une mauvaise réponse coûte 1 énergie. ' : 'Pas de panique, ta progression est intacte ! '}
+                    {t(plan.energy > 0 ? 'Une mauvaise réponse coûte 1 énergie. ' : 'Pas de panique, ta progression est intacte ! ')}
                     {plan.nextEnergyAt ? (
-                      <>Prochaine recharge dans <b>{countdown(plan.nextEnergyAt, now)}</b> (pleine dans {countdown(plan.fullEnergyAt, now)}).</>
+                      <>{t("Prochaine recharge dans")} <b>{countdown(plan.nextEnergyAt, now)}</b> ({t('pleine dans')} {countdown(plan.fullEnergyAt, now)}).</>
                     ) : (
-                      'Ta réserve est pleine.'
+                      t('Ta réserve est pleine.')
                     )}
                   </p>
-                  {!plan.codeCostsEnergy && <p className="muted mt-1 text-xs">Les exercices d’écriture de code, les cours et l’IDE ne consomment jamais d’énergie.</p>}
+                  {!plan.codeCostsEnergy && <p className="muted mt-1 text-xs">{t("Les exercices d’écriture de code, les cours et l’IDE ne consomment jamais d’énergie.")}</p>}
                 </>
               )}
               {code !== 'NO_ENERGY' && <p className="text-sm font-semibold">{limit?.message}</p>}
@@ -337,7 +338,7 @@ function LimitModal({ limit, plan, onClose, onAd }: { limit: { code: LimitCode; 
           <div className="grid gap-2">
             {plan.adsEnabled && code !== 'PREMIUM_ONLY' && (
               <button className="btn-primary justify-start" disabled={plan.adsLeft <= 0} onClick={onAd}>
-                <Play size={18} /> Regarder une courte pub
+                <Play size={18} /> {t("Regarder une courte pub")}
                 <span className="ml-auto text-xs opacity-90">
                   {plan.adsLeft > 0 ? `+${plan.adRewardEnergy} énergie, +${plan.adRewardRuns} exécutions · ${plan.adsLeft} restante(s)` : 'limite du jour atteinte'}
                 </span>
@@ -345,12 +346,12 @@ function LimitModal({ limit, plan, onClose, onAd }: { limit: { code: LimitCode; 
             )}
             {code === 'NO_ENERGY' && plan.reviewRefillsEnergy && (
               <button className="btn-outline justify-start" onClick={() => go('/revisions')}>
-                <RotateCcw size={18} /> Faire une révision <span className="muted ml-auto text-xs">+1 énergie par bonne réponse</span>
+                <RotateCcw size={18} /> {t("Faire une révision")} <span className="muted ml-auto text-xs">{t("+1 énergie par bonne réponse")}</span>
               </button>
             )}
             {code === 'NO_ENERGY' && plan.nextEnergyAt && (
               <button className="btn-ghost justify-start" onClick={onClose}>
-                <Clock size={18} /> Attendre la recharge <span className="muted ml-auto text-xs">{countdown(plan.nextEnergyAt, now)}</span>
+                <Clock size={18} /> {t("Attendre la recharge")} <span className="muted ml-auto text-xs">{countdown(plan.nextEnergyAt, now)}</span>
               </button>
             )}
           </div>
@@ -363,7 +364,7 @@ function LimitModal({ limit, plan, onClose, onAd }: { limit: { code: LimitCode; 
           >
             <Crown size={28} />
             <div className="flex-1">
-              <div className="font-black">Passer à Premium</div>
+              <div className="font-black">{t("Passer à Premium")}</div>
               <div className="text-xs font-bold opacity-80">Tout illimité, sans publicité · dès {plan.priceLabel}</div>
             </div>
             <Sparkles size={20} />
@@ -436,20 +437,20 @@ function AdModal({ open, onClose, onBlocked }: { open: boolean; onClose: () => v
   return (
     <Modal open={open} onClose={onClose} title={done ? 'Merci !' : 'Publicité'}>
       {error && <p className="font-bold text-rose-500">{error}</p>}
-      {!error && !ad && !done && <p className="muted">Chargement de la publicité…</p>}
+      {!error && !ad && !done && <p className="muted">{t("Chargement de la publicité…")}</p>}
       {done && (
         <div className="flex flex-col items-center text-center">
           <Mascot mood="celebrate" size={130} />
           <motion.p initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-2 text-lg font-black">
             +{done.energy} <Zap size={18} className="inline fill-sky-400 text-sky-500" /> et +{done.runs} exécutions
           </motion.p>
-          <p className="muted text-sm">Merci de soutenir Codemori 💜</p>
-          <button className="btn-primary mt-4" onClick={onClose}>Continuer</button>
+          <p className="muted text-sm">{t("Merci de soutenir Codemori 💜")}</p>
+          <button className="btn-primary mt-4" onClick={onClose}>{t("Continuer")}</button>
         </div>
       )}
       {ad && !done && (
         <div className="space-y-3">
-          <div className="muted text-[10px] font-bold uppercase tracking-wider">Annonce</div>
+          <div className="muted text-[10px] font-bold uppercase tracking-wider">{t("Annonce")}</div>
           {ad.kind === 'adsense' && ad.adsense ? (
             <div className="min-h-[250px] rounded-2xl bg-ink-50 p-2 dark:bg-ink-800/60">
               <AdSenseUnit client={ad.adsense.client} slot={ad.adsense.slot} format="rectangle" />
@@ -521,12 +522,11 @@ function AdBlockModal({ open, onClose }: { open: boolean; onClose: () => void })
             </motion.div>
             <p className="mt-2 font-semibold">{nag.text}</p>
             <div className="muted mt-3 rounded-2xl bg-ink-50 p-3 text-left text-xs dark:bg-ink-800/60">
-              <b>Comment faire :</b> clique sur l’icône de ton bloqueur (uBlock, AdBlock, Brave…) puis « désactiver sur ce site », et recharge la page.
-              Les pubs récompensées (énergie, exécutions) ne fonctionnent pas tant que le bloqueur est actif.
+              <b>{t("Comment faire :")}</b> {t("clique sur l’icône de ton bloqueur (uBlock, AdBlock, Brave…) puis « désactiver sur ce site », et recharge la page. Les pubs récompensées (énergie, exécutions) ne fonctionnent pas tant que le bloqueur est actif.")}
             </div>
             <div className="mt-4 grid w-full gap-2">
               <button className="btn-primary" onClick={() => location.reload()}>
-                <ShieldOff size={18} /> J’ai désactivé mon bloqueur
+                <ShieldOff size={18} /> {t("J’ai désactivé mon bloqueur")}
               </button>
               <button
                 className="premium-shine flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-300 px-4 py-2.5 font-black text-amber-950"
@@ -535,9 +535,9 @@ function AdBlockModal({ open, onClose }: { open: boolean; onClose: () => void })
                   nav('/premium');
                 }}
               >
-                <Crown size={18} /> Passer à Premium (zéro pub)
+                <Crown size={18} /> {t("Passer à Premium (zéro pub)")}
               </button>
-              <button className="btn-ghost btn-sm" onClick={onClose}>Continuer quand même</button>
+              <button className="btn-ghost btn-sm" onClick={onClose}>{t("Continuer quand même")}</button>
             </div>
           </div>
         </Modal>

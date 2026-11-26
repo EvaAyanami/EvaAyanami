@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApi } from '../lib/hooks';
-import { LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
+import { LANG_META, langMeta, LEVEL_NAMES, levelName } from '../lib/api';
 import { PageTitle, Loading, ErrorBox, ProgressBar, MascotSays } from '../components/ui';
+import { t } from '../lib/i18n';
 
 interface P {
   slug: string;
@@ -21,16 +22,16 @@ export default function Projects() {
   if (error || !data) return <ErrorBox message={error ?? 'Erreur'} onRetry={reload} />;
   return (
     <div>
-      <PageTitle title="Projets" subtitle="Des projets progressifs pour mettre en pratique : cahier des charges, étapes, contraintes et tests automatisés." />
+      <PageTitle title={t("Projets")} subtitle="Des projets progressifs pour mettre en pratique : cahier des charges, étapes, contraintes et tests automatisés." />
       <MascotSays mood="coding" className="mb-6">
-        Chaque projet peut être réalisé en Rust, en C++ ou en Java. Choisis ton langage et avance étape par étape !
+        {t("Chaque projet peut être réalisé en Rust, en C++ ou en Java. Choisis ton langage et avance étape par étape !")}
       </MascotSays>
       {[1, 2, 3, 4, 5].map((lv) => {
         const list = data.filter((p) => p.level === lv);
         if (!list.length) return null;
         return (
           <section key={lv} className="mb-8">
-            <h2 className="section-title mb-3">{LEVEL_NAMES[lv]}</h2>
+            <h2 className="section-title mb-3">{levelName(lv)}</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {list.map((p, i) => {
                 const best = Math.max(0, ...p.progress.map((x) => x.stepsDone));

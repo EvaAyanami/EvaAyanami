@@ -148,13 +148,23 @@ export default function Avatar({ avatar, size = 48, variant = 'portrait', mood =
               <path d="M76 216h22v8a4 4 0 0 1-4 4H80a4 4 0 0 1-4-4z" fill="#f1f5ff" stroke="#c7d2f0" />
               <path d="M102 216h22v8a4 4 0 0 1-4 4h-14a4 4 0 0 1-4-4z" fill="#f1f5ff" stroke="#c7d2f0" />
               {a.gender === 'codeuse' ? (
-                <path d="M70 186 L130 186 L138 206 L62 206 Z" fill={o2} />
+                <g>
+                  {/* jupe plissée */}
+                  <path d="M68 186 L132 186 L142 210 L58 210 Z" fill={o2} />
+                  <path d="M84 189 l-5 20 M100 189 v20 M116 189 l5 20" stroke="#000" strokeOpacity="0.15" strokeWidth="1.5" />
+                </g>
               ) : a.gender === 'codeur' ? (
-                <g fill={o2}>
-                  <path d="M72 186 H128 V206 H104 L100 194 L96 206 H72 Z" />
+                <g fill="#334155">
+                  {/* pantalon */}
+                  <path d="M72 186 H128 V200 H72 Z" />
+                  <rect x="78" y="196" width="18" height="24" rx="4" />
+                  <rect x="104" y="196" width="18" height="24" rx="4" />
                 </g>
               ) : (
-                <path d="M71 186 H129 L132 202 H68 Z" fill={o2} />
+                <g fill="#475569">
+                  {/* short */}
+                  <path d="M71 186 H129 L131 204 H104 L100 196 L96 204 H69 Z" />
+                </g>
               )}
             </>
           )}

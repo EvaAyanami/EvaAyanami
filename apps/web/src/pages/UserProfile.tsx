@@ -1,13 +1,14 @@
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Flame, Trophy, Crown, UserPlus, Check, Clock, Pencil, BookOpen, FolderKanban, Dumbbell } from 'lucide-react';
-import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES } from '../lib/api';
+import { api, ApiError, LANG_META, langMeta, LEVEL_NAMES, levelName } from '../lib/api';
 import { useApi } from '../lib/hooks';
 import { useFeedback } from '../lib/feedback';
 import { PremiumBadge } from '../lib/plan';
 import { Loading, ErrorBox, ProgressBar } from '../components/ui';
 import Avatar, { type AvatarData } from '../components/Avatar';
 import Duo from '../components/Duo';
+import { t } from '../lib/i18n';
 
 interface Profile {
   id: string; me: boolean; tag: string; displayName: string; bio: string | null; avatar: AvatarData; badge: 'premium' | 'former' | null;
@@ -28,7 +29,7 @@ export default function UserProfile() {
   async function addFriend() {
     try {
       await api('/friends/request', { body: { tag: p.tag } });
-      toast('Demande envoyée', 'success');
+      toast(t('Demande envoyée'), 'success');
       reload();
     } catch (e) {
       ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
@@ -57,9 +58,9 @@ export default function UserProfile() {
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <h1 className={`text-3xl font-black ${p.badge === 'premium' ? 'premium-text' : 'text-ink-900 dark:text-white'}`}>{p.displayName}</h1>
               <PremiumBadge kind={p.badge} size="md" />
-              {p.role === 'ADMIN' && <span className="chip bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300">Admin</span>}
+              {p.role === 'ADMIN' && <span className="chip bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300">{t("Admin")}</span>}
             </div>
-            <div className="muted font-mono">{p.tag} · {p.online ? <span className="text-emerald-500">en ligne</span> : `membre depuis ${new Date(p.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`}</div>
+            <div className="muted font-mono">{p.tag} · {p.online ? <span className="text-emerald-500">{t("en ligne")}</span> : `membre depuis ${new Date(p.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`}</div>
             {p.bio && <p className="mt-2 font-semibold">« {p.bio} »</p>}
             <div className="mx-auto mt-3 max-w-sm sm:mx-0">
               <div className="mb-1 flex justify-between text-sm font-black"><span>Niveau {p.level}</span><span className="text-amber-500">⭐ {p.xp} XP</span></div>
@@ -76,13 +77,13 @@ export default function UserProfile() {
           </div>
           <div className="flex flex-col gap-2">
             {p.me ? (
-              <Link to="/avatar" className="btn-outline"><Pencil size={16} /> Modifier mon avatar</Link>
+              <Link to="/avatar" className="btn-outline"><Pencil size={16} /> {t("Modifier mon avatar")}</Link>
             ) : p.friendship?.status === 'ACCEPTED' ? (
-              <span className="chip bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"><Check size={14} /> Ami</span>
+              <span className="chip bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"><Check size={14} /> {t("Ami")}</span>
             ) : p.friendship ? (
-              <span className="chip"><Clock size={14} /> Demande en attente</span>
+              <span className="chip"><Clock size={14} /> {t("Demande en attente")}</span>
             ) : (
-              <button className="btn-primary" onClick={addFriend}><UserPlus size={16} /> Ajouter en ami</button>
+              <button className="btn-primary" onClick={addFriend}><UserPlus size={16} /> {t("Ajouter en ami")}</button>
             )}
           </div>
         </div>
@@ -100,14 +101,14 @@ export default function UserProfile() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="card">
-          <h2 className="section-title mb-3">Niveaux</h2>
+          <h2 className="section-title mb-3">{t("Niveaux")}</h2>
           {(p.skills.length ? p.skills.map((x) => x.language) : ['rust', 'cpp', 'java']).map((l) => {
             const s = p.skills.find((x) => x.language === l);
             return (
               <div key={l} className="mb-3">
                 <div className="mb-1 flex justify-between text-sm font-black">
                   <span>{langMeta(l).icon} {langMeta(l).name}</span>
-                  <span className="muted">{LEVEL_NAMES[s?.level ?? 1]}</span>
+                  <span className="muted">{levelName(s?.level ?? 1)}</span>
                 </div>
                 <ProgressBar value={(s?.level ?? 1) / 5} />
               </div>
@@ -115,7 +116,7 @@ export default function UserProfile() {
           })}
         </div>
         <div className="card">
-          <h2 className="section-title mb-3">Derniers succès</h2>
+          <h2 className="section-title mb-3">{t("Derniers succès")}</h2>
           {p.achievements.length ? (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-4 xl:grid-cols-6">
               {p.achievements.map((a, i) => (
@@ -125,7 +126,7 @@ export default function UserProfile() {
               ))}
             </div>
           ) : (
-            <p className="muted text-sm">Aucun succès pour l’instant.</p>
+            <p className="muted text-sm">{t("Aucun succès pour l’instant.")}</p>
           )}
         </div>
       </div>
@@ -133,7 +134,7 @@ export default function UserProfile() {
       {p.me && (
         <div className="card mt-5">
           <Duo scene="wave" size={100} />
-          <p className="muted text-center text-sm">Voici ton profil tel que les autres le voient.</p>
+          <p className="muted text-center text-sm">{t("Voici ton profil tel que les autres le voient.")}</p>
         </div>
       )}
     </div>

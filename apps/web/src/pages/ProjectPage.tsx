@@ -7,6 +7,7 @@ import { LANG_META, langMeta } from '../lib/api';
 import { Loading, ErrorBox, ProgressBar } from '../components/ui';
 import Markdown from '../components/Markdown';
 import Exercise, { type PublicExercise, type GradeResult } from '../components/Exercise';
+import { t } from '../lib/i18n';
 
 interface ProjectData {
   slug: string;
@@ -48,7 +49,7 @@ export default function ProjectPage() {
   return (
     <div>
       <Link to="/projets" className="btn-ghost btn-sm mb-2">
-        <ChevronLeft size={16} /> Projets
+        <ChevronLeft size={16} /> {t("Projets")}
       </Link>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -67,16 +68,16 @@ export default function ProjectPage() {
 
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <div className="card lg:col-span-2">
-          <h2 className="section-title mb-2">Cahier des charges</h2>
+          <h2 className="section-title mb-2">{t("Cahier des charges")}</h2>
           <Markdown>{data.description}</Markdown>
         </div>
         <div className="space-y-4">
           <div className="card">
-            <h3 className="mb-2 flex items-center gap-2 font-black"><Target size={18} className="text-brand-500" /> Objectifs</h3>
+            <h3 className="mb-2 flex items-center gap-2 font-black"><Target size={18} className="text-brand-500" /> {t("Objectifs")}</h3>
             <ul className="space-y-1 text-sm">{data.objectives.map((o) => <li key={o} className="flex gap-2"><Check size={14} className="mt-1 shrink-0 text-emerald-500" />{o}</li>)}</ul>
           </div>
           <div className="card">
-            <h3 className="mb-2 flex items-center gap-2 font-black"><ShieldAlert size={18} className="text-amber-500" /> Contraintes</h3>
+            <h3 className="mb-2 flex items-center gap-2 font-black"><ShieldAlert size={18} className="text-amber-500" /> {t("Contraintes")}</h3>
             <ul className="list-disc space-y-1 pl-5 text-sm">{data.constraints.map((c) => <li key={c}>{c}</li>)}</ul>
           </div>
         </div>
@@ -100,7 +101,7 @@ export default function ProjectPage() {
       <Exercise key={`${data.steps[step].id}-${data.language}`} exercise={data.steps[step]} language={data.language} onGraded={onGraded(data.steps[step].id)} />
       {data.steps[step].state?.solved && step < data.steps.length - 1 && (
         <div className="mt-4 flex justify-end">
-          <button className="btn-primary" onClick={() => setStep(step + 1)}>Étape suivante</button>
+          <button className="btn-primary" onClick={() => setStep(step + 1)}>{t("Étape suivante")}</button>
         </div>
       )}
     </div>

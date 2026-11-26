@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth';
 
 /** Choix de la langue de l'interface (enregistré sur le compte). */
 export default function LocaleSwitch({ up = true }: { up?: boolean }) {
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale, t } = useI18n();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const cur = LOCALES.find((l) => l.id === locale)!;
@@ -18,7 +18,7 @@ export default function LocaleSwitch({ up = true }: { up?: boolean }) {
   };
   return (
     <div className="relative">
-      <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800" onClick={() => setOpen((o) => !o)} aria-label="Langue">
+      <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800" onClick={() => setOpen((o) => !o)} aria-label={t("Langue")}>
         <Languages size={14} /> {cur.flag}
       </button>
       <AnimatePresence>

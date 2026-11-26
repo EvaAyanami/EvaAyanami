@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { Check, Search } from 'lucide-react';
 import { useApi, useDebounced } from '../lib/hooks';
-import { LANG_META, langMeta, LEVEL_NAMES, TYPE_LABEL } from '../lib/api';
+import { LANG_META, langMeta, LEVEL_NAMES, levelName, TYPE_LABEL } from '../lib/api';
 import { PageTitle, Loading, ErrorBox, LangBadge, Empty } from '../components/ui';
+import { t } from '../lib/i18n';
 
 interface List {
   total: number;
@@ -27,32 +28,32 @@ export default function Exercises() {
   const sel = 'input !w-auto !py-2 text-sm';
   return (
     <div>
-      <PageTitle title="Exercices" subtitle="Toute la banque d’exercices interactifs, filtrable par langage, type et niveau." />
+      <PageTitle title={t("Exercices")} subtitle="Toute la banque d’exercices interactifs, filtrable par langage, type et niveau." />
       <div className="card mb-4 flex flex-wrap gap-2 !p-3">
         <div className="relative min-w-[200px] flex-1">
           <Search size={16} className="absolute left-3 top-3 text-ink-400" />
-          <input className="input !py-2 pl-9 text-sm" placeholder="Rechercher (titre, notion…)" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          <input className="input !py-2 pl-9 text-sm" placeholder={t("Rechercher (titre, notion…)")} value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
         </div>
         <select className={sel} value={language} onChange={(e) => { setLanguage(e.target.value); setPage(1); }}>
-          <option value="">Tous les langages</option>
+          <option value="">{t("Tous les langages")}</option>
           {Object.entries(LANG_META).map(([id, m]) => <option key={id} value={id}>{m.name}</option>)}
         </select>
         <select className={sel} value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
-          <option value="">Tous les types</option>
+          <option value="">{t("Tous les types")}</option>
           {Object.entries(TYPE_LABEL).map(([id, l]) => <option key={id} value={id}>{l}</option>)}
         </select>
         <select className={sel} value={level} onChange={(e) => { setLevel(e.target.value); setPage(1); }}>
-          <option value="">Tous les niveaux</option>
-          {[1, 2, 3, 4, 5].map((l) => <option key={l} value={l}>{LEVEL_NAMES[l]}</option>)}
+          <option value="">{t("Tous les niveaux")}</option>
+          {[1, 2, 3, 4, 5].map((l) => <option key={l} value={l}>{levelName(l)}</option>)}
         </select>
         <select className={sel} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-          <option value="all">Tous</option>
-          <option value="todo">À faire</option>
-          <option value="solved">Réussis</option>
+          <option value="all">{t("Tous")}</option>
+          <option value="todo">{t("À faire")}</option>
+          <option value="solved">{t("Réussis")}</option>
         </select>
       </div>
       {loading && !data ? <Loading /> : error || !data ? <ErrorBox message={error ?? 'Erreur'} onRetry={reload} /> : data.items.length === 0 ? (
-        <Empty title="Aucun exercice trouvé" text="Essaie d’autres filtres." />
+        <Empty title={t("Aucun exercice trouvé")} text="Essaie d’autres filtres." />
       ) : (
         <>
           <div className="muted mb-2 text-sm font-bold">{data.total} exercices</div>
@@ -74,9 +75,9 @@ export default function Exercises() {
           </div>
           {data.pages > 1 && (
             <div className="mt-4 flex items-center justify-center gap-2">
-              <button className="btn-outline btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Précédent</button>
+              <button className="btn-outline btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t("Précédent")}</button>
               <span className="text-sm font-bold">{page} / {data.pages}</span>
-              <button className="btn-outline btn-sm" disabled={page >= data.pages} onClick={() => setPage(page + 1)}>Suivant</button>
+              <button className="btn-outline btn-sm" disabled={page >= data.pages} onClick={() => setPage(page + 1)}>{t("Suivant")}</button>
             </div>
           )}
         </>

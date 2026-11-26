@@ -11,6 +11,7 @@ import { usePlan, remaining, PremiumBadge } from '../lib/plan';
 import { PageTitle, Modal } from '../components/ui';
 import Mascot from '../components/Mascot';
 import Duo from '../components/Duo';
+import { t } from '../lib/i18n';
 
 interface Offer { id: string; months: number; days: number; priceCents: number; label: string; best?: boolean; perMonthCents: number; savingPercent: number }
 interface Shop { payments: boolean; offers: Offer[]; keys: { id: string; code: string; days: number; offer: string | null; amountCents: number | null; createdAt: string; usedBy: string | null }[] }
@@ -46,10 +47,10 @@ export default function Premium() {
   useEffect(() => {
     const sid = params.get('session_id');
     if (params.get('paiement') === 'ok') {
-      toast('Merci ! Ton abonnement est en cours d’activation 💜', 'success');
+      toast(t('Merci ! Ton abonnement est en cours d’activation 💜'), 'success');
       setTimeout(() => { refresh(); refreshUser(); }, 2500);
     }
-    if (params.get('paiement') === 'annule') toast('Paiement annulé', 'info');
+    if (params.get('paiement') === 'annule') toast(t('Paiement annulé'), 'info');
     if (!sid) return;
     let tries = 0;
     const check = async () => {
@@ -124,12 +125,12 @@ export default function Premium() {
     }
   }
 
-  const copy = (t: string) => navigator.clipboard?.writeText(t).then(() => toast('Clé copiée', 'success'));
+  const copy = (txt: string) => navigator.clipboard?.writeText(txt).then(() => toast(t('Clé copiée'), 'success'));
   const active = !!user?.premium;
 
   return (
     <div>
-      <PageTitle title="Premium" subtitle="Soutiens Codemori et apprends sans aucune limite." />
+      <PageTitle title={t("Premium")} subtitle="Soutiens Codemori et apprends sans aucune limite." />
 
       {/* Héros */}
       <motion.div
@@ -143,20 +144,20 @@ export default function Premium() {
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <PremiumBadge kind={active ? 'premium' : user?.formerPremium ? 'former' : null} size="md" />
-              {plan?.trial && <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-black">Essai gratuit</span>}
+              {plan?.trial && <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-black">{t("Essai gratuit")}</span>}
             </div>
             {active ? (
               <>
-                <h2 className="text-3xl font-black sm:text-4xl">Tu es Premium ✨</h2>
+                <h2 className="text-3xl font-black sm:text-4xl">{t("Tu es Premium ✨")}</h2>
                 <p className="mt-2 text-lg opacity-95">
-                  Encore <b>{remaining(user!.premiumUntil)}</b> · jusqu’au {new Date(user!.premiumUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {t("Encore")} <b>{remaining(user!.premiumUntil)}</b> · jusqu’au {new Date(user!.premiumUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
-                {plan?.trial && <p className="mt-1 text-sm opacity-90">Ton essai se termine bientôt : prends une clé pour garder tes avantages sans interruption (le temps s’ajoute).</p>}
+                {plan?.trial && <p className="mt-1 text-sm opacity-90">{t("Ton essai se termine bientôt : prends une clé pour garder tes avantages sans interruption (le temps s’ajoute).")}</p>}
               </>
             ) : (
               <>
-                <h2 className="text-3xl font-black sm:text-4xl">Passe à la vitesse supérieure</h2>
-                <p className="mt-2 text-lg opacity-95">Énergie et exécutions illimitées, zéro pub, l’IA de Kiri et des avatars exclusifs.</p>
+                <h2 className="text-3xl font-black sm:text-4xl">{t("Passe à la vitesse supérieure")}</h2>
+                <p className="mt-2 text-lg opacity-95">{t("Énergie et exécutions illimitées, zéro pub, l’IA de Kiri et des avatars exclusifs.")}</p>
                 <p className="mt-1 text-sm font-bold opacity-90">Dès {plan?.priceLabel ?? '4,99 € / mois'} · sans engagement avec les clés</p>
               </>
             )}
@@ -168,7 +169,7 @@ export default function Premium() {
       </motion.div>
 
       {/* Boutique */}
-      <h2 className="section-title mb-3 flex items-center gap-2"><ShoppingBag size={20} /> Boutique de clés</h2>
+      <h2 className="section-title mb-3 flex items-center gap-2"><ShoppingBag size={20} /> {t("Boutique de clés")}</h2>
       <div className="mb-2 grid gap-4 md:grid-cols-3">
         {shop.data?.offers.map((o, i) => (
           <motion.div
@@ -196,8 +197,8 @@ export default function Premium() {
             </div>
             <ul className="my-4 space-y-1 text-sm">
               <li className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> {o.days} jours de Premium</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Clé à activer ou à offrir</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Sans renouvellement automatique</li>
+              <li className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> {t("Clé à activer ou à offrir")}</li>
+              <li className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> {t("Sans renouvellement automatique")}</li>
             </ul>
             <button className={clsx('mt-auto w-full', o.best ? 'btn-primary' : 'btn-outline')} disabled={!!busy} onClick={() => buy(o.id)}>
               {busy === o.id ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />} Acheter
@@ -214,17 +215,17 @@ export default function Premium() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Activer une clé */}
         <form onSubmit={redeem} className="card space-y-3">
-          <h2 className="section-title flex items-center gap-2"><KeyRound size={20} /> Activer une clé</h2>
-          <p className="muted text-sm">Une clé achetée sur la boutique, sur Discord ou offerte par un ami. Le temps s’ajoute à ton Premium actuel.</p>
+          <h2 className="section-title flex items-center gap-2"><KeyRound size={20} /> {t("Activer une clé")}</h2>
+          <p className="muted text-sm">{t("Une clé achetée sur la boutique, sur Discord ou offerte par un ami. Le temps s’ajoute à ton Premium actuel.")}</p>
           <div className="flex gap-2">
-            <input className="input font-mono uppercase tracking-wider" placeholder="KIRI-XXXX-XXXX-XXXX" value={code} onChange={(e) => setCode(e.target.value)} />
+            <input className="input font-mono uppercase tracking-wider" placeholder={t("KIRI-XXXX-XXXX-XXXX")} value={code} onChange={(e) => setCode(e.target.value)} />
             <button className="btn-primary shrink-0" disabled={!code.trim() || busy === 'redeem'}>
               {busy === 'redeem' ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Activer
             </button>
           </div>
           {plan?.stripe && (
             <div className="rounded-2xl bg-ink-50 p-3 text-sm dark:bg-ink-800/60">
-              <b>Préférer un abonnement mensuel ?</b> {plan.priceLabel}, résiliable à tout moment.
+              <b>{t("Préférer un abonnement mensuel ?")}</b> {plan.priceLabel}, résiliable à tout moment.
               <button type="button" className="btn-outline btn-sm mt-2 w-full" onClick={subscribe} disabled={!!busy}>
                 {plan.canManageBilling ? 'Gérer mon abonnement' : 'S’abonner chaque mois'}
               </button>
@@ -234,8 +235,8 @@ export default function Premium() {
 
         {/* Mes clés */}
         <div className="card">
-          <h2 className="section-title mb-2 flex items-center gap-2"><Gift size={20} /> Mes clés achetées</h2>
-          {!shop.data?.keys.length && <p className="muted text-sm">Aucune clé pour l’instant. Les clés achetées apparaissent ici : active-les ou offre-les à un ami.</p>}
+          <h2 className="section-title mb-2 flex items-center gap-2"><Gift size={20} /> {t("Mes clés achetées")}</h2>
+          {!shop.data?.keys.length && <p className="muted text-sm">{t("Aucune clé pour l’instant. Les clés achetées apparaissent ici : active-les ou offre-les à un ami.")}</p>}
           <div className="space-y-2">
             {shop.data?.keys.map((k) => (
               <div key={k.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-ink-50 p-3 dark:bg-ink-800/60">
@@ -246,8 +247,8 @@ export default function Premium() {
                     <span className="chip">utilisée par {k.usedBy}</span>
                   ) : (
                     <>
-                      <button className="btn-ghost btn-sm" onClick={() => copy(k.code)} title="Copier pour l’offrir"><Copy size={14} /></button>
-                      <button className="btn-primary btn-sm" disabled={busy === k.id} onClick={() => redeemMine(k.id)}>Activer</button>
+                      <button className="btn-ghost btn-sm" onClick={() => copy(k.code)} title={t("Copier pour l’offrir")}><Copy size={14} /></button>
+                      <button className="btn-primary btn-sm" disabled={busy === k.id} onClick={() => redeemMine(k.id)}>{t("Activer")}</button>
                     </>
                   )}
                 </div>
@@ -258,12 +259,12 @@ export default function Premium() {
       </div>
 
       {/* Comparatif */}
-      <h2 className="section-title mb-3 mt-8">Gratuit ou Premium ?</h2>
+      <h2 className="section-title mb-3 mt-8">{t("Gratuit ou Premium ?")}</h2>
       <div className="card overflow-hidden !p-0">
         <div className="grid grid-cols-[1.3fr_1fr_1fr] bg-ink-50 px-4 py-3 text-sm font-black dark:bg-ink-800/60">
           <span />
-          <span className="text-center">Gratuit</span>
-          <span className="premium-text text-center">Premium</span>
+          <span className="text-center">{t("Gratuit")}</span>
+          <span className="premium-text text-center">{t("Premium")}</span>
         </div>
         {perks(plan && !plan.unlimited ? plan : null).map((p, i) => (
           <motion.div
@@ -283,7 +284,7 @@ export default function Premium() {
 
       {/* Historique */}
       <div className="card mt-6">
-        <h2 className="section-title mb-2 flex items-center gap-2"><History size={20} /> Mon historique Premium</h2>
+        <h2 className="section-title mb-2 flex items-center gap-2"><History size={20} /> {t("Mon historique Premium")}</h2>
         {info.data && info.data.history.periods.length ? (
           <>
             <p className="muted mb-3 text-sm">
@@ -298,7 +299,7 @@ export default function Premium() {
                   <span className="ml-auto text-xs">
                     {new Date(p.startsAt).toLocaleDateString('fr-FR')} → {new Date(p.endsAt).toLocaleDateString('fr-FR')}
                   </span>
-                  {p.current && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">en cours</span>}
+                  {p.current && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{t("en cours")}</span>}
                 </div>
               ))}
             </div>
@@ -306,24 +307,24 @@ export default function Premium() {
         ) : (
           <div className="flex items-center gap-3">
             <Mascot mood="explain" size={70} />
-            <p className="muted text-sm">Tu n’as encore jamais été Premium. Ta première période apparaîtra ici.</p>
+            <p className="muted text-sm">{t("Tu n’as encore jamais été Premium. Ta première période apparaîtra ici.")}</p>
           </div>
         )}
       </div>
 
       <p className="muted mt-6 text-center text-xs">
-        Codemori reste gratuit : tous les cours, exercices et projets sont accessibles sans payer. <Link to="/" className="font-bold text-brand-500">Retour à l’accueil</Link>
+        {t("Codemori reste gratuit : tous les cours, exercices et projets sont accessibles sans payer.")} <Link to="/" className="font-bold text-brand-500">{t("Retour à l’accueil")}</Link>
       </p>
 
-      <Modal open={!!bought} onClose={() => setBought(null)} title="Merci pour ton achat ! 🎉">
+      <Modal open={!!bought} onClose={() => setBought(null)} title={t("Merci pour ton achat ! 🎉")}>
         {bought && (
           <div className="flex flex-col items-center text-center">
             <Duo scene="celebrate" size={100} />
             <p className="mt-3 font-semibold">Voici ta clé de {bought.days} jours :</p>
             <code className="my-2 rounded-2xl bg-ink-50 px-4 py-2 font-mono text-lg font-black dark:bg-ink-800">{bought.code}</code>
             <div className="mt-2 grid w-full gap-2">
-              <button className="btn-primary" onClick={() => redeemMine(bought.id)} disabled={busy === bought.id}><Sparkles size={16} /> L’activer sur mon compte</button>
-              <button className="btn-outline" onClick={() => copy(bought.code)}><Copy size={16} /> Copier pour l’offrir</button>
+              <button className="btn-primary" onClick={() => redeemMine(bought.id)} disabled={busy === bought.id}><Sparkles size={16} /> {t("L’activer sur mon compte")}</button>
+              <button className="btn-outline" onClick={() => copy(bought.code)}><Copy size={16} /> {t("Copier pour l’offrir")}</button>
             </div>
           </div>
         )}

@@ -11,6 +11,7 @@ import { PageTitle, Loading } from '../components/ui';
 import Avatar, { DEFAULT_AVATAR, type AvatarData } from '../components/Avatar';
 import Duo, { type Scene } from '../components/Duo';
 import AvatarWizard, { avatarLabel, swatch } from '../components/AvatarWizard';
+import { t } from '../lib/i18n';
 
 type Key = keyof Omit<AvatarData, 'blush'>;
 
@@ -99,14 +100,14 @@ export default function AvatarEditor() {
   if (wizard)
     return (
       <div>
-        <PageTitle title="Créer mon avatar" subtitle="Réponds à quelques questions, ou laisse le hasard choisir pour toi !" />
+        <PageTitle title={t("Créer mon avatar")} subtitle="Réponds à quelques questions, ou laisse le hasard choisir pour toi !" />
         <AvatarWizard initial={a} options={opts.data.options} premium={opts.data.premium} canPremium={canPremium} onDone={(x) => save(x)} onCancel={() => setWizard(false)} />
       </div>
     );
 
   return (
     <div>
-      <PageTitle title="Mon avatar" subtitle="Crée ton personnage, dans le style de Kiri. Il te représente partout dans Codemori." />
+      <PageTitle title={t("Mon avatar")} subtitle="Crée ton personnage, dans le style de Kiri. Il te représente partout dans Codemori." />
       <div className="grid gap-5 lg:grid-cols-[380px_1fr]">
         {/* Aperçu */}
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
@@ -119,9 +120,9 @@ export default function AvatarEditor() {
               <div className="muted font-mono text-sm">{user.tag}</div>
             </div>
             <div className="mt-4 flex w-full gap-2">
-              <button className="btn-outline flex-1" onClick={randomize}><Dices size={16} /> J’ai de la chance</button>
-              <button className="btn-ghost" onClick={() => setWizard(true)} title="Assistant de création">🪄</button>
-              <button className="btn-ghost" onClick={() => setA({ ...DEFAULT_AVATAR })} title="Par défaut"><Undo2 size={16} /></button>
+              <button className="btn-outline flex-1" onClick={randomize}><Dices size={16} /> {t("J’ai de la chance")}</button>
+              <button className="btn-ghost" onClick={() => setWizard(true)} title={t("Assistant de création")}>🪄</button>
+              <button className="btn-ghost" onClick={() => setA({ ...DEFAULT_AVATAR })} title={t("Par défaut")}><Undo2 size={16} /></button>
             </div>
           </div>
           <div className="card">
@@ -193,23 +194,23 @@ export default function AvatarEditor() {
 
           <label className="mt-5 flex items-center gap-2 font-bold">
             <input type="checkbox" className="h-5 w-5 accent-brand-500" checked={a.blush} onChange={(e) => setA({ ...a, blush: e.target.checked })} />
-            Joues roses
+            {t("Joues roses")}
           </label>
 
           <div className="mt-4">
-            <label className="label">Petite bio (facultatif, 160 caractères)</label>
-            <input className="input" maxLength={160} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Ex. : Fan de Rust, je vise le niveau Expertise !" />
+            <label className="label">{t("Petite bio (facultatif, 160 caractères)")}</label>
+            <input className="input" maxLength={160} value={bio} onChange={(e) => setBio(e.target.value)} placeholder={t("Ex. : Fan de Rust, je vise le niveau Expertise !")} />
           </div>
 
           {usesPremium && !canPremium && (
             <div className="mt-4 flex items-center gap-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-              <Crown size={18} /> Certains éléments sont réservés aux membres Premium. <Link to="/premium" className="underline">Découvrir</Link>
+              <Crown size={18} /> {t("Certains éléments sont réservés aux membres Premium.")} <Link to="/premium" className="underline">{t("Découvrir")}</Link>
             </div>
           )}
 
           <div className="mt-5 flex gap-2">
-            <button className="btn-primary" onClick={() => save()} disabled={saving || (usesPremium && !canPremium)}><Save size={16} /> Enregistrer</button>
-            <Link to={`/u/${encodeURIComponent(user.tag)}`} className="btn-ghost">Voir mon profil public</Link>
+            <button className="btn-primary" onClick={() => save()} disabled={saving || (usesPremium && !canPremium)}><Save size={16} /> {t("Enregistrer")}</button>
+            <Link to={`/u/${encodeURIComponent(user.tag)}`} className="btn-ghost">{t("Voir mon profil public")}</Link>
           </div>
         </div>
       </div>

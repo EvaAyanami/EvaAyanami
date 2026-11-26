@@ -10,6 +10,7 @@ import Duo from './Duo';
 import WebPreview, { fillTemplate as fillWeb } from './WebPreview';
 import type { Mood } from './Mascot';
 import type { EditorDiagnostic } from './CodeEditor';
+import { t } from '../lib/i18n';
 
 const CodeEditor = lazy(() => import('./CodeEditor'));
 
@@ -215,7 +216,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           ? await api<RunResult>('/ide/run', { body: { language: lang, code, stdin: useStdin ? stdin : '', compileOnly } })
           : await api<RunResult>(`/exercises/${ex.id}/run`, { body: { language: lang, code: ex.type === 'fill' ? undefined : code, blanks: ex.type === 'fill' ? blanks : undefined, stdin: useStdin ? stdin : undefined } });
       setRun(r);
-      if (compileOnly && r.compile.ok) toast('Compilation réussie ✔', 'success');
+      if (compileOnly && r.compile.ok) toast(t('Compilation réussie ✔'), 'success');
     } catch (e) {
       ((e as ApiError).status !== 402 && toast((e as ApiError).message, 'error'));
     } finally {
@@ -252,12 +253,12 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
   const header = (
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <span className="chip bg-brand-50 text-brand-600 dark:bg-brand-900/40 dark:text-brand-300">{TYPE_LABEL[ex.type]}</span>
-      {ex.kind === 'miniproject' && <span className="chip bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">Mini-projet</span>}
+      {ex.kind === 'miniproject' && <span className="chip bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">{t("Mini-projet")}</span>}
       <span className="chip">{'★'.repeat(ex.difficulty)}{'☆'.repeat(3 - ex.difficulty)}</span>
       {mode !== 'collect' && <span className="chip bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">+{ex.xp} XP</span>}
       {ex.state?.solved && (
         <span className="chip bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
-          <Check size={12} /> Réussi
+          <Check size={12} /> {t("Réussi")}
         </span>
       )}
       {lang && <span className="chip">{langMeta(lang)?.icon} {langMeta(lang)?.name}</span>}
@@ -309,7 +310,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
       )}
       {result.reveal?.output !== undefined && !result.correct && (
         <div className="mt-2 text-sm">
-          <div className="font-bold">Sortie réelle du programme :</div>
+          <div className="font-bold">{t("Sortie réelle du programme :")}</div>
           <pre className="mt-1 rounded-xl bg-ink-900 p-3 font-mono text-ink-100">{result.reveal.output}</pre>
         </div>
       )}
@@ -341,20 +342,20 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
     const consoleOut = (
       <div className="flex h-full min-h-[180px] flex-col bg-ink-950 text-ink-100">
         <div className="flex items-center gap-2 border-b border-ink-800 px-3 py-1.5 text-xs font-bold text-ink-400">
-          <Terminal size={14} /> Console
+          <Terminal size={14} /> {t("Console")}
           <div className="flex-1" />
           <label className="flex cursor-pointer items-center gap-1">
-            <input type="checkbox" checked={useStdin} onChange={(e) => setUseStdin(e.target.checked)} /> Entrée personnalisée
+            <input type="checkbox" checked={useStdin} onChange={(e) => setUseStdin(e.target.checked)} /> {t("Entrée personnalisée")}
           </label>
         </div>
-        {useStdin && <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} placeholder="Entrée standard (stdin)…" className="h-16 resize-none border-b border-ink-800 bg-ink-900 p-2 font-mono text-xs text-ink-100 outline-none" />}
+        {useStdin && <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} placeholder={t("Entrée standard (stdin)…")} className="h-16 resize-none border-b border-ink-800 bg-ink-900 p-2 font-mono text-xs text-ink-100 outline-none" />}
         <div className="scrollbar-thin flex-1 overflow-auto p-3 font-mono text-xs leading-5">
           {busy && (
             <div className="flex items-center gap-2 text-cyan-400">
               <Loader2 size={14} className="animate-spin" /> {busy === 'submit' ? 'Compilation et tests cachés en cours…' : busy === 'compile' ? 'Compilation…' : 'Compilation et exécution…'}
             </div>
           )}
-          {!busy && !run && !result && <div className="text-ink-500">Clique sur « Exécuter » (Ctrl+Entrée) pour lancer ton programme, ou « Valider » pour le soumettre aux tests.</div>}
+          {!busy && !run && !result && <div className="text-ink-500">{t("Clique sur « Exécuter » (Ctrl+Entrée) pour lancer ton programme, ou « Valider » pour le soumettre aux tests.")}</div>}
           {!busy && run && <RunOutput run={run} />}
           {!busy && result && <CompileAndTests result={result} dark />}
         </div>
@@ -369,15 +370,15 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
             {prompt}
             {ex.type === 'bugfix' && (
               <div className="mt-3 rounded-2xl bg-ink-50 p-3 text-sm dark:bg-ink-800/50">
-                <b>Étape 3/3 :</b> corrige le programme pour qu’il passe les tests.
+                <b>{t("Étape 3/3 :")}</b> {t("corrige le programme pour qu’il passe les tests.")}
                 <button className="btn-ghost btn-sm ml-2" onClick={() => setBugStep(0)}>
-                  Revenir aux étapes 1–2
+                  {t("Revenir aux étapes 1–2")}
                 </button>
               </div>
             )}
             {!!ex.rules?.length && (
               <div className="mt-3 text-sm">
-                <div className="font-extrabold">Consignes vérifiées :</div>
+                <div className="font-extrabold">{t("Consignes vérifiées :")}</div>
                 <ul className="mt-1 list-disc pl-5">
                   {ex.rules.map((r) => (
                     <li key={r}>{r}</li>
@@ -387,23 +388,23 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
             )}
             {!!ex.visibleTests?.length && (
               <div className="mt-3">
-                <div className="text-sm font-extrabold">Exemples :</div>
+                <div className="text-sm font-extrabold">{t("Exemples :")}</div>
                 <div className="mt-1 space-y-2">
-                  {ex.visibleTests.map((t, i) => (
+                  {ex.visibleTests.map((tc, i) => (
                     <div key={i} className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <div className="muted font-bold">Entrée</div>
-                        <pre className="mt-0.5 min-h-[2rem] whitespace-pre-wrap rounded-xl bg-ink-100 p-2 font-mono dark:bg-ink-800">{t.input || '(vide)'}</pre>
+                        <div className="muted font-bold">{t("Entrée")}</div>
+                        <pre className="mt-0.5 min-h-[2rem] whitespace-pre-wrap rounded-xl bg-ink-100 p-2 font-mono dark:bg-ink-800">{tc.input || '(vide)'}</pre>
                       </div>
                       <div>
-                        <div className="muted font-bold">Sortie attendue</div>
-                        <pre className="mt-0.5 min-h-[2rem] whitespace-pre-wrap rounded-xl bg-ink-100 p-2 font-mono dark:bg-ink-800">{t.output}</pre>
+                        <div className="muted font-bold">{t("Sortie attendue")}</div>
+                        <pre className="mt-0.5 min-h-[2rem] whitespace-pre-wrap rounded-xl bg-ink-100 p-2 font-mono dark:bg-ink-800">{tc.output}</pre>
                       </div>
                     </div>
                   ))}
                 </div>
                 <p className="muted mt-2 flex items-center gap-1 text-xs">
-                  <EyeOff size={12} /> D’autres tests cachés vérifient ta solution : n’écris pas le résultat en dur !
+                  <EyeOff size={12} /> {t("D’autres tests cachés vérifient ta solution : n’écris pas le résultat en dur !")}
                 </p>
               </div>
             )}
@@ -429,11 +430,11 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
               <div className="flex-1" />
               {!isWeb && (
                 <>
-                  <button className="btn-ghost btn-sm" onClick={() => execute(true)} disabled={!!busy} title="Compiler">
-                    <Hammer size={16} /> <span className="hidden sm:inline">Compiler</span>
+                  <button className="btn-ghost btn-sm" onClick={() => execute(true)} disabled={!!busy} title={t("Compiler")}>
+                    <Hammer size={16} /> <span className="hidden sm:inline">{t("Compiler")}</span>
                   </button>
-                  <button className="btn-ghost btn-sm" onClick={() => execute(false)} disabled={!!busy} title="Exécuter (Ctrl+Entrée)">
-                    <Play size={16} /> <span className="hidden sm:inline">Exécuter</span>
+                  <button className="btn-ghost btn-sm" onClick={() => execute(false)} disabled={!!busy} title={t("Exécuter (Ctrl+Entrée)")}>
+                    <Play size={16} /> <span className="hidden sm:inline">{t("Exécuter")}</span>
                   </button>
                 </>
               )}
@@ -442,11 +443,11 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
                 onClick={() => {
                   if (confirm('Revenir au code de départ ?')) setCode(ex.type === 'bugfix' ? ex.code ?? '' : ex.starter ?? '');
                 }}
-                title="Réinitialiser"
+                title={t("Réinitialiser")}
               >
                 <RotateCcw size={16} />
               </button>
-              <button className="btn-ghost btn-sm" onClick={() => setFullscreen((f) => !f)} title="Agrandir">
+              <button className="btn-ghost btn-sm" onClick={() => setFullscreen((f) => !f)} title={t("Agrandir")}>
                 {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
               {mode !== 'collect' && (
@@ -455,15 +456,15 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
                 </button>
               )}
             </div>
-            <Suspense fallback={<div className="h-[360px] p-4 text-sm text-ink-400">Chargement de l’éditeur…</div>}>
+            <Suspense fallback={<div className="h-[360px] p-4 text-sm text-ink-400">{t("Chargement de l’éditeur…")}</div>}>
               <CodeEditor value={code} onChange={setCode} language={lang} height={fullscreen ? 'calc(100vh - 330px)' : compact ? 300 : 420} diagnostics={diagnostics} onRun={() => (isWeb ? submit() : execute(false))} />
             </Suspense>
             {isWeb ? (
               <div className="grid border-t border-ink-200 dark:border-ink-800 md:grid-cols-2">
-                <div className="h-64"><WebPreview html={code} title="Aperçu en direct" /></div>
+                <div className="h-64"><WebPreview html={code} title={t("Aperçu en direct")} /></div>
                 <div className="scrollbar-thin h-64 overflow-auto bg-ink-950 p-3 font-mono text-xs leading-5 text-ink-100">
-                  {busy === 'submit' && <div className="text-cyan-400">Vérification du document…</div>}
-                  {!busy && !result && <div className="text-ink-500">L’aperçu se met à jour pendant que tu tapes. Clique sur « Valider » pour vérifier les consignes.</div>}
+                  {busy === 'submit' && <div className="text-cyan-400">{t("Vérification du document…")}</div>}
+                  {!busy && !result && <div className="text-ink-500">{t("L’aperçu se met à jour pendant que tu tapes. Clique sur « Valider » pour vérifier les consignes.")}</div>}
                   {!busy && result && <CompileAndTests result={result} dark />}
                 </div>
               </div>
@@ -486,7 +487,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
         <>
           {ex.code && <Markdown>{'```' + lang + '\n' + ex.code + '\n```'}</Markdown>}
           <div className="mt-3 grid gap-2">
-            {ex.multiple && <p className="muted text-sm font-bold">Plusieurs réponses possibles.</p>}
+            {ex.multiple && <p className="muted text-sm font-bold">{t("Plusieurs réponses possibles.")}</p>}
             {ex.choices!.map((c, i) => {
               const selected = choice.includes(i);
               const correctReveal = result?.reveal?.answer !== undefined && [result.reveal.answer].flat().includes(i);
@@ -541,10 +542,10 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
               </span>
             ))}
           </pre>
-          {ex.compiled && <p className="muted mt-2 text-xs">Ce programme sera réellement compilé et exécuté pour vérifier ta réponse.</p>}
+          {ex.compiled && <p className="muted mt-2 text-xs">{t("Ce programme sera réellement compilé et exécuté pour vérifier ta réponse.")}</p>}
           {isWeb && /<[a-z]/i.test(ex.code ?? '') && (
             <div className="mt-3 h-48 overflow-hidden rounded-2xl border-2 border-ink-200 dark:border-ink-700">
-              <WebPreview html={fillWeb(ex.code!, blanks)} title="Aperçu du document complété" />
+              <WebPreview html={fillWeb(ex.code!, blanks)} title={t("Aperçu du document complété")} />
             </div>
           )}
         </div>
@@ -566,12 +567,12 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           <Markdown>{'```' + lang + '\n' + ex.code + '\n```'}</Markdown>
           {ex.input && (
             <div className="text-sm">
-              <b>Entrée fournie au programme :</b>
+              <b>{t("Entrée fournie au programme :")}</b>
               <pre className="mt-1 rounded-xl bg-ink-100 p-2 font-mono dark:bg-ink-800">{ex.input}</pre>
             </div>
           )}
-          <label className="label mt-3">Que va afficher ce programme ?</label>
-          <textarea value={output} onChange={(e) => setOutput(e.target.value)} rows={4} className="input font-mono" placeholder="Écris la sortie exacte, ligne par ligne…" spellCheck={false} />
+          <label className="label mt-3">{t("Que va afficher ce programme ?")}</label>
+          <textarea value={output} onChange={(e) => setOutput(e.target.value)} rows={4} className="input font-mono" placeholder={t("Écris la sortie exacte, ligne par ligne…")} spellCheck={false} />
         </div>
       )}
 
@@ -586,7 +587,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           </div>
           {bugStep === 0 && (
             <>
-              <p className="muted mb-2 text-sm">Clique sur la ligne qui contient l’erreur.</p>
+              <p className="muted mb-2 text-sm">{t("Clique sur la ligne qui contient l’erreur.")}</p>
               <div className="overflow-x-auto rounded-2xl bg-ink-900 py-2 font-mono text-sm text-ink-100">
                 {(ex.code ?? '').split('\n').map((l, i) => (
                   <button key={i} onClick={() => setLine(i + 1)} className={clsx('flex w-full gap-3 px-3 text-left hover:bg-ink-800', line === i + 1 && 'bg-amber-500/30')}>
@@ -596,7 +597,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
                 ))}
               </div>
               <button className="btn-primary mt-3" disabled={line === undefined} onClick={() => setBugStep(1)}>
-                Suivant <ChevronRight size={16} />
+                {t("Suivant")} <ChevronRight size={16} />
               </button>
             </>
           )}
@@ -612,10 +613,10 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
               </div>
               <div className="mt-3 flex gap-2">
                 <button className="btn-outline" onClick={() => setBugStep(0)}>
-                  Retour
+                  {t("Retour")}
                 </button>
                 <button className="btn-primary" disabled={!choice.length} onClick={() => setBugStep(2)}>
-                  Corriger le code <ChevronRight size={16} />
+                  {t("Corriger le code")} <ChevronRight size={16} />
                 </button>
               </div>
             </>
@@ -630,7 +631,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
           </button>
           {ex.type === 'fill' && ex.compiled && !isWeb && (
             <button className="btn-outline" onClick={() => execute(false)} disabled={!ready || !!busy}>
-              <Play size={16} /> Exécuter
+              <Play size={16} /> {t("Exécuter")}
             </button>
           )}
           {result && !result.correct && (
@@ -641,7 +642,7 @@ export default function Exercise({ exercise: ex, language, mode = 'practice', on
                 setChoice([]);
               }}
             >
-              <RotateCcw size={16} /> Réessayer
+              <RotateCcw size={16} /> {t("Réessayer")}
             </button>
           )}
         </div>
@@ -677,7 +678,7 @@ function RunOutput({ run }: { run: RunResult }) {
   if (!run.compile.ok) {
     return (
       <div>
-        <div className="font-bold text-rose-400">✘ Erreur de compilation</div>
+        <div className="font-bold text-rose-400">{t("✘ Erreur de compilation")}</div>
         <pre className="mt-1 whitespace-pre-wrap text-rose-200">{run.compile.stderr}</pre>
         <HelpCards help={run.help} />
       </div>
@@ -712,33 +713,33 @@ function CompileAndTests({ result, dark }: { result: GradeResult; dark?: boolean
     <div className={clsx('mt-2 space-y-2 font-mono text-xs', !dark && 'rounded-2xl bg-ink-950 p-3 text-ink-100')}>
       {result.compile && !result.compile.ok && (
         <div>
-          <div className="font-bold text-rose-400">✘ Erreur de compilation</div>
+          <div className="font-bold text-rose-400">{t("✘ Erreur de compilation")}</div>
           <pre className="mt-1 whitespace-pre-wrap text-rose-200">{result.compile.stderr}</pre>
         </div>
       )}
-      {result.tests?.map((t, i) => (
+      {result.tests?.map((tc, i) => (
         <div key={i} className="rounded-lg bg-white/5 p-2">
-          <div className={clsx('font-bold', t.passed ? 'text-emerald-400' : 'text-rose-400')}>
-            {t.passed ? '✔' : '✘'} {t.name} {t.hidden && <span className="text-ink-500">(test caché)</span>} <span className="font-normal text-ink-500">· {t.timeMs} ms</span>
+          <div className={clsx('font-bold', tc.passed ? 'text-emerald-400' : 'text-rose-400')}>
+            {tc.passed ? '✔' : '✘'} {tc.name} {tc.hidden && <span className="text-ink-500">{t("(test caché)")}</span>} <span className="font-normal text-ink-500">· {tc.timeMs} ms</span>
           </div>
-          {!t.passed && !t.hidden && (
+          {!tc.passed && !tc.hidden && (
             <div className="mt-1 grid gap-1 sm:grid-cols-3">
               <div>
-                <span className="text-ink-500">entrée</span>
-                <pre className="whitespace-pre-wrap">{t.input || '(vide)'}</pre>
+                <span className="text-ink-500">{t("entrée")}</span>
+                <pre className="whitespace-pre-wrap">{tc.input || '(vide)'}</pre>
               </div>
               <div>
                 <span className="text-ink-500">attendu</span>
-                <pre className="whitespace-pre-wrap text-emerald-300">{t.expected}</pre>
+                <pre className="whitespace-pre-wrap text-emerald-300">{tc.expected}</pre>
               </div>
               <div>
                 <span className="text-ink-500">obtenu</span>
-                <pre className="whitespace-pre-wrap text-rose-300">{t.got || '(rien)'}</pre>
+                <pre className="whitespace-pre-wrap text-rose-300">{tc.got || '(rien)'}</pre>
               </div>
             </div>
           )}
-          {!t.passed && t.timedOut && <div className="text-amber-300">⏱ Délai dépassé (boucle infinie ?)</div>}
-          {!t.passed && t.stderr && <pre className="mt-1 whitespace-pre-wrap text-rose-300">{t.stderr.slice(0, 600)}</pre>}
+          {!tc.passed && tc.timedOut && <div className="text-amber-300">{t("⏱ Délai dépassé (boucle infinie ?)")}</div>}
+          {!tc.passed && tc.stderr && <pre className="mt-1 whitespace-pre-wrap text-rose-300">{tc.stderr.slice(0, 600)}</pre>}
         </div>
       ))}
       {result.rules?.map((r) => (

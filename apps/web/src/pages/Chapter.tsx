@@ -9,6 +9,7 @@ import { useFeedback } from '../lib/feedback';
 import { Loading, ErrorBox, MascotSays, ProgressBar, Modal } from '../components/ui';
 import Markdown from '../components/Markdown';
 import Exercise, { type PublicExercise, type GradeResult } from '../components/Exercise';
+import { t } from '../lib/i18n';
 
 interface ChapterData {
   chapter: { slug: string; title: string; summary: string; level: number; levelName: string; language: string; concepts: string[]; sections: { title: string; body: string }[]; minutes: number; examPass: number; examCount: number };
@@ -119,15 +120,15 @@ export default function Chapter() {
   async function resetChapter() {
     if (!confirm('Recommencer ce chapitre ? Ta progression (examen, mini-projet) sera remise à zéro, mais tes exercices réussis et ton XP sont conservés.')) return;
     await api(`/me/chapters/${chapter.slug}/reset`, { body: {} });
-    toast('Chapitre réinitialisé', 'success');
+    toast(t('Chapitre réinitialisé'), 'success');
     reload();
   }
 
   const TABS: { id: Tab; label: string; icon: typeof BookOpen; badge?: string }[] = [
-    { id: 'cours', label: 'Cours', icon: BookOpen, badge: `${nS}` },
-    { id: 'exercices', label: 'Exercices', icon: Dumbbell, badge: `${data.exercises.filter((e) => e.state?.solved).length}/${data.exercises.length}` },
-    { id: 'projet', label: 'Mini-projet', icon: Hammer, badge: data.progress?.projectPassed ? '✔' : undefined },
-    { id: 'examen', label: 'Examen', icon: FileCheck2, badge: data.progress?.examPassed ? '✔' : undefined },
+    { id: 'cours', label: t('Cours'), icon: BookOpen, badge: `${nS}` },
+    { id: 'exercices', label: t('Exercices'), icon: Dumbbell, badge: `${data.exercises.filter((e) => e.state?.solved).length}/${data.exercises.length}` },
+    { id: 'projet', label: t('Mini-projet'), icon: Hammer, badge: data.progress?.projectPassed ? '✔' : undefined },
+    { id: 'examen', label: t('Examen'), icon: FileCheck2, badge: data.progress?.examPassed ? '✔' : undefined },
   ];
 
   return (
@@ -140,8 +141,8 @@ export default function Chapter() {
           </Link>
           <span className="muted">›</span>
           <span className="muted">{chapter.levelName}</span>
-          {data.status === 'done' && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">🎓 Terminé</span>}
-          {data.status === 'skipped' && <span className="chip">Passé</span>}
+          {data.status === 'done' && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{t("🎓 Terminé")}</span>}
+          {data.status === 'skipped' && <span className="chip">{t("Passé")}</span>}
         </div>
         <h1 className="text-3xl text-ink-900 dark:text-white">{chapter.title}</h1>
         <p className="muted mt-1">{chapter.summary}</p>
@@ -155,7 +156,7 @@ export default function Chapter() {
           </span>
           {(data.progress?.examPassed || data.progress?.projectPassed) && (
             <button className="btn-ghost btn-sm" onClick={resetChapter}>
-              <RotateCcw size={14} /> Recommencer
+              <RotateCcw size={14} /> {t("Recommencer")}
             </button>
           )}
         </div>
@@ -165,10 +166,10 @@ export default function Chapter() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-3xl border-2 border-dashed border-ink-300 p-4 dark:border-ink-700">
           <Lock className="text-ink-400" />
           <div className="flex-1 text-sm">
-            <b>Chapitre verrouillé.</b> Termine le chapitre précédent, ou prouve que tu maîtrises déjà cette notion en réussissant directement l’examen.
+            <b>{t("Chapitre verrouillé.")}</b> {t("Termine le chapitre précédent, ou prouve que tu maîtrises déjà cette notion en réussissant directement l’examen.")}
           </div>
           <Link to={`/chapitre/${chapter.slug}/examen`} className="btn-primary btn-sm">
-            Passer l’examen
+            {t("Passer l’examen")}
           </Link>
         </div>
       )}
@@ -218,11 +219,11 @@ export default function Chapter() {
               </div>
               <div className="mt-6 flex justify-between">
                 <button className="btn-outline" disabled={section === 0} onClick={() => goSection(section - 1)}>
-                  <ChevronLeft size={18} /> Précédent
+                  <ChevronLeft size={18} /> {t("Précédent")}
                 </button>
                 {section < nS - 1 ? (
                   <button className="btn-primary" onClick={() => goSection(section + 1)}>
-                    Suivant <ChevronRight size={18} />
+                    {t("Suivant")} <ChevronRight size={18} />
                   </button>
                 ) : (
                   <button
@@ -233,7 +234,7 @@ export default function Chapter() {
                       setExIndex(0);
                     }}
                   >
-                    Passer aux exercices <Dumbbell size={18} />
+                    {t("Passer aux exercices")} <Dumbbell size={18} />
                   </button>
                 )}
               </div>
@@ -261,14 +262,14 @@ export default function Chapter() {
             <Exercise key={data.exercises[exIndex].id} exercise={data.exercises[exIndex]} language={chapter.language} onGraded={onGraded(data.exercises[exIndex].id)} />
             <div className="mt-4 flex flex-wrap justify-between gap-2">
               <button className="btn-outline" disabled={exIndex === 0} onClick={() => goExercise(exIndex - 1)}>
-                <ChevronLeft size={18} /> Précédent
+                <ChevronLeft size={18} /> {t("Précédent")}
               </button>
               <button className="btn-ghost text-violet-600 dark:text-violet-300" onClick={morePractice} disabled={extraBusy}>
                 {extraBusy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Exercices supplémentaires
               </button>
               {exIndex < data.exercises.length - 1 ? (
                 <button className="btn-primary" onClick={() => goExercise(exIndex + 1)}>
-                  Suivant <ChevronRight size={18} />
+                  {t("Suivant")} <ChevronRight size={18} />
                 </button>
               ) : (
                 <button
@@ -278,7 +279,7 @@ export default function Chapter() {
                     savePosition(nS + data.exercises.length);
                   }}
                 >
-                  Mini-projet <Hammer size={18} />
+                  {t("Mini-projet")} <Hammer size={18} />
                 </button>
               )}
             </div>
@@ -288,12 +289,12 @@ export default function Chapter() {
         {tab === 'projet' && data.project && (
           <motion.div key="pj" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <MascotSays mood="coding" className="mb-4">
-              Le mini-projet met en pratique tout le chapitre. Il est vérifié par de vrais tests, dont certains sont cachés. Avec l’examen, il valide le chapitre !
+              {t("Le mini-projet met en pratique tout le chapitre. Il est vérifié par de vrais tests, dont certains sont cachés. Avec l’examen, il valide le chapitre !")}
             </MascotSays>
             <Exercise exercise={data.project} language={chapter.language} onGraded={onGraded(data.project.id)} />
             <div className="mt-4 flex justify-end">
               <Link to={`/chapitre/${chapter.slug}/examen`} className="btn-primary">
-                Passer à l’examen <FileCheck2 size={18} />
+                {t("Passer à l’examen")} <FileCheck2 size={18} />
               </Link>
             </div>
           </motion.div>
@@ -317,7 +318,7 @@ export default function Chapter() {
       </div>
 
       <Modal open={!!extra} onClose={() => setExtra(null)} title={`Exercices supplémentaires${extra?.source === 'ai' ? ' (générés par IA)' : ''}`} wide>
-        {extra && extra.items.length === 0 && <p className="muted">Tu as déjà réussi tous les exercices liés à ces notions. Bravo ! 🎉</p>}
+        {extra && extra.items.length === 0 && <p className="muted">{t("Tu as déjà réussi tous les exercices liés à ces notions. Bravo ! 🎉")}</p>}
         <div className="space-y-4">
           {extra?.items.map((it) => (
             <Exercise

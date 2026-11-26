@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /** Client HTTP de l'API Codemori. */
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) {
@@ -54,6 +55,7 @@ export const CATEGORY_LABEL: Record<string, { title: string; subtitle: string }>
 };
 
 export const LEVEL_NAMES = ['', 'Débutant absolu', 'Fondamentaux', 'Intermédiaire', 'Avancé', 'Expertise et projets'];
+export const levelName = (i: number) => t(LEVEL_NAMES[i] ?? '');
 
 export const TYPE_LABEL: Record<string, string> = {
   mcq: 'Question',

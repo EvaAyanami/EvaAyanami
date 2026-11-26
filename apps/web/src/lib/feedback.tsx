@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Flame, Star, Trophy, Target, X } from 'lucide-react';
 import Duo from '../components/Duo';
 import { useAuth } from './auth';
+import { t } from './i18n';
 
 export interface Rewards {
   xp: number;
@@ -143,7 +144,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button className="btn-ghost btn-sm absolute right-3 top-3" onClick={() => setCelebration(null)} aria-label="Fermer">
+              <button className="btn-ghost btn-sm absolute right-3 top-3" onClick={() => setCelebration(null)} aria-label={t("Fermer")}>
                 <X size={18} />
               </button>
               <div className="mx-auto -mt-2 w-fit">
@@ -185,7 +186,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                 </div>
               )}
               <button className="btn-primary mt-5 w-full" onClick={() => setCelebration(null)}>
-                Continuer
+                {t("Continuer")}
               </button>
             </motion.div>
           </motion.div>

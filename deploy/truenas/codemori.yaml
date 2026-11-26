@@ -120,6 +120,17 @@ services:
       # ADSENSE_CLIENT: ca-pub-XXXXXXXXXXXXXXXX
       # ADSENSE_SLOT_REWARD: "1234567890"
       # ADSENSE_SLOT_BANNER: "0987654321"
+      # --- E-mails : vérification d'adresse à l'inscription, mot de passe oublié ---
+      # SMTP_HOST: smtp-relay.brevo.com
+      # SMTP_PORT: "587"
+      # SMTP_USER: ton-identifiant
+      # SMTP_PASS: ton-mot-de-passe-smtp
+      # SMTP_FROM: "Codemori <no-reply@ton-domaine.fr>"
+      # --- Connexion Google / Facebook (adresse publique HTTPS requise) ---
+      # GOOGLE_CLIENT_ID: xxxx.apps.googleusercontent.com
+      # GOOGLE_CLIENT_SECRET: xxxx
+      # FACEBOOK_CLIENT_ID: "1234567890"
+      # FACEBOOK_CLIENT_SECRET: xxxx
     networks: [interne, web]
     depends_on:
       db: { condition: service_healthy }
